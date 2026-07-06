@@ -97,6 +97,117 @@ export interface PlanComparison {
   totalDifference: number
 }
 
+export interface RevenuePlanLine {
+  id: string
+  itemName: string
+  period: string
+  quantity: number
+  unitPrice: number
+  amount: number
+}
+
+export interface RevenuePlanSummary {
+  id: string
+  projectId: string
+  version: number
+  label: string
+  status: 'Draft' | 'Approved' | 'Superseded'
+  createdAt: string
+  approvedAt: string | null
+  totalAmount: number
+}
+
+export interface RevenuePlanDetail extends RevenuePlanSummary {
+  lines: RevenuePlanLine[]
+}
+
+export interface ActualRevenue {
+  id: string
+  projectId: string
+  itemName: string
+  period: string
+  quantity: number
+  unitPrice: number
+  amount: number
+  note: string | null
+  recordedAt: string
+}
+
+export interface RevenueVarianceLine {
+  itemName: string
+  period: string
+  plannedQuantity: number
+  plannedUnitPrice: number
+  plannedAmount: number
+  actualQuantity: number
+  actualUnitPrice: number
+  actualAmount: number
+  totalVariance: number
+  priceVariance: number | null
+  quantityVariance: number | null
+  isUnplanned: boolean
+  isFavorable: boolean
+}
+
+export interface RevenueVarianceReport {
+  planId: string
+  planVersion: number
+  planLabel: string
+  lines: RevenueVarianceLine[]
+  totalPlannedAmount: number
+  totalActualAmount: number
+  totalVariance: number
+}
+
+export interface RevenuePlanComparisonLine {
+  itemName: string
+  period: string
+  baseAmount: number
+  targetAmount: number
+  difference: number
+}
+
+export interface RevenuePlanComparison {
+  baseVersion: number
+  baseLabel: string
+  targetVersion: number
+  targetLabel: string
+  lines: RevenuePlanComparisonLine[]
+  baseTotalAmount: number
+  targetTotalAmount: number
+  totalDifference: number
+}
+
+export interface ProfitPeriodLine {
+  period: string
+  plannedRevenue: number
+  actualRevenue: number
+  plannedCost: number
+  actualCost: number
+  plannedProfit: number
+  actualProfit: number
+  profitVariance: number
+}
+
+export interface ProfitSummary {
+  revenuePlanVersion: number
+  revenuePlanLabel: string
+  costPlanVersion: number
+  costPlanLabel: string
+  plannedRevenue: number
+  actualRevenue: number
+  revenueVariance: number
+  plannedCost: number
+  actualCost: number
+  costVariance: number
+  plannedProfit: number
+  actualProfit: number
+  profitVariance: number
+  plannedMarginRate: number | null
+  actualMarginRate: number | null
+  periodLines: ProfitPeriodLine[]
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -179,6 +290,75 @@ export const api = {
     request<PlanComparison>(
       `/projects/${projectId}/plan-comparison?baseVersion=${baseVersion}&targetVersion=${targetVersion}`,
     ),
+
+  // ---- 売上 ----
+  listRevenuePlans: (projectId: string) =>
+    request<RevenuePlanSummary[]>(`/projects/${projectId}/revenue-plans`),
+  getRevenuePlan: (planId: string) => request<RevenuePlanDetail>(`/revenue-plans/${planId}`),
+  createRevenuePlan: (projectId: string, body: { label: string; basePlanId?: string | null }) =>
+    request<RevenuePlanDetail>(`/projects/${projectId}/revenue-plans`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  upsertRevenuePlanLine: (
+    planId: string,
+    body: { itemName: string; period: string; quantity: number; unitPrice: number },
+  ) =>
+    request<RevenuePlanDetail>(`/revenue-plans/${planId}/lines`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  removeRevenuePlanLine: (planId: string, itemName: string, period: string) =>
+    request<RevenuePlanDetail>(
+      `/revenue-plans/${planId}/lines?itemName=${encodeURIComponent(itemName)}&period=${encodeURIComponent(period)}`,
+      { method: 'DELETE' },
+    ),
+  approveRevenuePlan: (planId: string) =>
+    request<RevenuePlanDetail>(`/revenue-plans/${planId}/approve`, { method: 'POST' }),
+
+  listActualRevenues: (projectId: string) =>
+    request<ActualRevenue[]>(`/projects/${projectId}/actual-revenues`),
+  recordActualRevenue: (
+    projectId: string,
+    body: {
+      itemName: string
+      period: string
+      quantity: number
+      unitPrice: number
+      note?: string | null
+    },
+  ) =>
+    request<ActualRevenue>(`/projects/${projectId}/actual-revenues`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  deleteActualRevenue: (actualId: string) =>
+    request<void>(`/actual-revenues/${actualId}`, { method: 'DELETE' }),
+
+  getRevenueVariance: (
+    projectId: string,
+    opts?: { planId?: string; from?: string; to?: string },
+  ) => {
+    const params = new URLSearchParams()
+    if (opts?.planId) params.set('planId', opts.planId)
+    if (opts?.from) params.set('from', opts.from)
+    if (opts?.to) params.set('to', opts.to)
+    const qs = params.toString()
+    return request<RevenueVarianceReport>(
+      `/projects/${projectId}/revenue-variance${qs ? `?${qs}` : ''}`,
+    )
+  },
+  compareRevenuePlans: (projectId: string, baseVersion: number, targetVersion: number) =>
+    request<RevenuePlanComparison>(
+      `/projects/${projectId}/revenue-plan-comparison?baseVersion=${baseVersion}&targetVersion=${targetVersion}`,
+    ),
+  getProfit: (projectId: string, opts?: { from?: string; to?: string }) => {
+    const params = new URLSearchParams()
+    if (opts?.from) params.set('from', opts.from)
+    if (opts?.to) params.set('to', opts.to)
+    const qs = params.toString()
+    return request<ProfitSummary>(`/projects/${projectId}/profit${qs ? `?${qs}` : ''}`)
+  },
 }
 
 export const formatYen = (value: number): string =>

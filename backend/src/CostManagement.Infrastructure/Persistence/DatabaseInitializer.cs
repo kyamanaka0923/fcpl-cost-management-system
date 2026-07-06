@@ -64,8 +64,42 @@ public sealed class DatabaseInitializer
                 recorded_at  TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS revenue_plans (
+                id          TEXT PRIMARY KEY,
+                project_id  TEXT NOT NULL REFERENCES projects(id),
+                version     INTEGER NOT NULL,
+                label       TEXT NOT NULL,
+                status      TEXT NOT NULL,
+                created_at  TEXT NOT NULL,
+                approved_at TEXT NULL,
+                UNIQUE (project_id, version)
+            );
+
+            CREATE TABLE IF NOT EXISTS revenue_plan_lines (
+                id         TEXT PRIMARY KEY,
+                plan_id    TEXT NOT NULL REFERENCES revenue_plans(id) ON DELETE CASCADE,
+                item_name  TEXT NOT NULL,
+                period     TEXT NOT NULL,
+                quantity   TEXT NOT NULL,
+                unit_price TEXT NOT NULL,
+                UNIQUE (plan_id, item_name, period)
+            );
+
+            CREATE TABLE IF NOT EXISTS actual_revenues (
+                id          TEXT PRIMARY KEY,
+                project_id  TEXT NOT NULL REFERENCES projects(id),
+                item_name   TEXT NOT NULL,
+                period      TEXT NOT NULL,
+                quantity    TEXT NOT NULL,
+                unit_price  TEXT NOT NULL,
+                note        TEXT NULL,
+                recorded_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS ix_cost_plans_project ON cost_plans(project_id);
             CREATE INDEX IF NOT EXISTS ix_actual_costs_project ON actual_costs(project_id);
+            CREATE INDEX IF NOT EXISTS ix_revenue_plans_project ON revenue_plans(project_id);
+            CREATE INDEX IF NOT EXISTS ix_actual_revenues_project ON actual_revenues(project_id);
             """);
 
         // 総合原価計算の標準的な費目をシードする(既存があれば何もしない)。

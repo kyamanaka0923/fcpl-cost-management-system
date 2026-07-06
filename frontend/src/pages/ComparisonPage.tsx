@@ -1,55 +1,112 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import {
-  api,
-  formatSignedYen,
-  formatYen,
-  type CostElement,
-  type CostPlanSummary,
-  type PlanComparison,
-} from '../api'
+import { api, formatSignedYen, formatYen, type CostElement } from '../api'
+
+type PlanKind = 'cost' | 'revenue'
+
+interface PlanOption {
+  id: string
+  version: number
+  label: string
+}
+
+interface ComparisonView {
+  baseVersion: number
+  baseLabel: string
+  targetVersion: number
+  targetLabel: string
+  lines: {
+    key: string
+    period: string
+    name: string
+    baseAmount: number
+    targetAmount: number
+    difference: number
+  }[]
+  baseTotalAmount: number
+  targetTotalAmount: number
+  totalDifference: number
+}
 
 export default function ComparisonPage() {
   const { projectId } = useParams<{ projectId: string }>()
-  const [plans, setPlans] = useState<CostPlanSummary[]>([])
+  const [kind, setKind] = useState<PlanKind>('cost')
+  const [plans, setPlans] = useState<PlanOption[]>([])
   const [elements, setElements] = useState<CostElement[]>([])
-  const [comparison, setComparison] = useState<PlanComparison | null>(null)
+  const [comparison, setComparison] = useState<ComparisonView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [baseVersion, setBaseVersion] = useState<number | ''>('')
   const [targetVersion, setTargetVersion] = useState<number | ''>('')
 
   useEffect(() => {
+    api.listCostElements().then(setElements).catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
     if (!projectId) return
-    api
-      .listPlans(projectId)
+    setComparison(null)
+    setError(null)
+    const list =
+      kind === 'cost' ? api.listPlans(projectId) : api.listRevenuePlans(projectId)
+    list
       .then((ps) => {
-        setPlans(ps)
-        // 既定では最古 vs 最新を比較対象にする
+        setPlans(ps.map((p) => ({ id: p.id, version: p.version, label: p.label })))
         if (ps.length >= 2) {
           const versions = ps.map((p) => p.version).sort((a, b) => a - b)
           setBaseVersion(versions[0])
           setTargetVersion(versions[versions.length - 1])
+        } else {
+          setBaseVersion('')
+          setTargetVersion('')
         }
       })
       .catch((e: Error) => setError(e.message))
-    api.listCostElements().then(setElements).catch(() => undefined)
-  }, [projectId])
+  }, [projectId, kind])
+
+  const elementName = useCallback(
+    (code: string) => elements.find((e) => e.code === code)?.name ?? code,
+    [elements],
+  )
 
   const load = useCallback(() => {
     if (!projectId || baseVersion === '' || targetVersion === '') return
     setError(null)
-    api
-      .comparePlans(projectId, baseVersion, targetVersion)
-      .then(setComparison)
-      .catch((e: Error) => {
-        setComparison(null)
-        setError(e.message)
-      })
-  }, [projectId, baseVersion, targetVersion])
+    const promise =
+      kind === 'cost'
+        ? api.comparePlans(projectId, baseVersion, targetVersion).then(
+            (c): ComparisonView => ({
+              ...c,
+              lines: c.lines.map((l) => ({
+                key: `${l.period}-${l.elementCode}`,
+                period: l.period,
+                name: elementName(l.elementCode),
+                baseAmount: l.baseAmount,
+                targetAmount: l.targetAmount,
+                difference: l.difference,
+              })),
+            }),
+          )
+        : api.compareRevenuePlans(projectId, baseVersion, targetVersion).then(
+            (c): ComparisonView => ({
+              ...c,
+              lines: c.lines.map((l) => ({
+                key: `${l.period}-${l.itemName}`,
+                period: l.period,
+                name: l.itemName,
+                baseAmount: l.baseAmount,
+                targetAmount: l.targetAmount,
+                difference: l.difference,
+              })),
+            }),
+          )
+    promise.then(setComparison).catch((e: Error) => {
+      setComparison(null)
+      setError(e.message)
+    })
+  }, [projectId, kind, baseVersion, targetVersion, elementName])
   useEffect(load, [load])
 
   if (!projectId) return null
-  const elementName = (code: string) => elements.find((e) => e.code === code)?.name ?? code
 
   return (
     <>
@@ -58,6 +115,15 @@ export default function ComparisonPage() {
         <Link to={`/projects/${projectId}`}>プロジェクト</Link> / 予算バージョン比較
       </div>
       {error && <div className="error-banner">{error}</div>}
+
+      <div className="tab-row">
+        <button className={kind === 'cost' ? 'active' : ''} onClick={() => setKind('cost')}>
+          原価予算
+        </button>
+        <button className={kind === 'revenue' ? 'active' : ''} onClick={() => setKind('revenue')}>
+          売上予算
+        </button>
+      </div>
 
       <div className="card">
         <h2>比較対象</h2>
@@ -112,17 +178,7 @@ export default function ComparisonPage() {
             </div>
             <div className="stat-tile">
               <div className="label">増減</div>
-              <div
-                className={`value ${
-                  comparison.totalDifference > 0
-                    ? 'adverse'
-                    : comparison.totalDifference < 0
-                      ? 'favorable'
-                      : ''
-                }`}
-              >
-                ¥{formatSignedYen(comparison.totalDifference)}
-              </div>
+              <div className="value">¥{formatSignedYen(comparison.totalDifference)}</div>
             </div>
           </div>
 
@@ -132,7 +188,7 @@ export default function ComparisonPage() {
               <thead>
                 <tr>
                   <th>年月</th>
-                  <th>費目</th>
+                  <th>{kind === 'cost' ? '費目' : '品目'}</th>
                   <th className="num">
                     v{comparison.baseVersion} {comparison.baseLabel}
                   </th>
@@ -144,13 +200,13 @@ export default function ComparisonPage() {
               </thead>
               <tbody>
                 {comparison.lines.map((l) => (
-                  <tr key={`${l.period}-${l.elementCode}`}>
+                  <tr key={l.key}>
                     <td>{l.period}</td>
-                    <td>{elementName(l.elementCode)}</td>
+                    <td>{l.name}</td>
                     <td className="num">¥{formatYen(l.baseAmount)}</td>
                     <td className="num">¥{formatYen(l.targetAmount)}</td>
-                    <td className={`num ${l.difference > 0 ? 'adverse' : l.difference < 0 ? 'favorable' : ''}`}>
-                      ¥{formatSignedYen(l.difference)}
+                    <td className={`num ${l.difference !== 0 ? 'muted' : ''}`}>
+                      <strong>¥{formatSignedYen(l.difference)}</strong>
                     </td>
                   </tr>
                 ))}

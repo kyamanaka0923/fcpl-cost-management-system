@@ -1,9 +1,11 @@
 # 総合原価管理システム(予実管理)
 
-総合原価計算における原価の**予算策定・実績計上・差異分析**を行うシステムです。
+総合原価計算における**原価・売上高の予算策定・実績計上・差異分析**を行うシステムです。
 
 - 予算(予定)はプロジェクトごとに**バージョン管理**され、四半期などの節目で何度でも改定できます
-- 予実の**差異分析**では、総差異を**価格差異**と**数量差異**に分解します
+- **売上予算**は原価予算とは独立にバージョン管理・改定できます(品目 × 年月 × 販売数量 × 販売単価)
+- 予実の**差異分析**では、総差異を**価格差異**と**数量差異**に分解します(原価・売上とも)
+- **損益(粗利)分析**: 売上 − 原価 = 粗利の予実比較と粗利率、月別内訳
 - 予算バージョン間の**変動比較**(例: 当初予算 vs 第2四半期改定)ができます
 
 ## 技術スタック
@@ -29,8 +31,8 @@ backend/
 │   │   ├── CostElements/               #   CostElement(費目マスタ)集約
 │   │   ├── Planning/                   #   CostPlan 集約(バージョン管理・承認ワークフロー)
 │   │   ├── Actuals/                    #   ActualCost 集約
-│   │   └── Analysis/                   #   VarianceAnalysisService / PlanComparisonService
-│   │                                   #   (ドメインサービス)
+│   │   ├── Revenue/                    #   RevenuePlan / ActualRevenue 集約(売上)
+│   │   └── Analysis/                   #   差異分析・バージョン比較のドメインサービス群
 │   ├── CostManagement.Application/     # ユースケース(入力ポート)・DTO
 │   ├── CostManagement.Infrastructure/  # 出力アダプタ: Dapper + SQLite リポジトリ実装
 │   └── CostManagement.WebApi/          # 入力アダプタ: HTTP API(Minimal API)
@@ -44,11 +46,11 @@ frontend/                               # React SPA(/api を dev proxy 経由で
 
 | 要素 | 実装 |
 |---|---|
-| 集約ルート | `Project`, `CostPlan`, `ActualCost`, `CostElement` |
-| エンティティ | `PlanLine`(CostPlan 集約内) |
+| 集約ルート | `Project`, `CostPlan`, `ActualCost`, `CostElement`, `RevenuePlan`, `ActualRevenue` |
+| エンティティ | `PlanLine`(CostPlan 集約内), `RevenuePlanLine`(RevenuePlan 集約内) |
 | 値オブジェクト | `Money`, `AccountingPeriod`(yyyy-MM), `ProjectId` 等の型付き ID, `CostElementCode` |
-| ドメインサービス | `VarianceAnalysisService`(予実差異分析), `PlanComparisonService`(バージョン間比較) |
-| リポジトリ(ポート) | `IProjectRepository`, `ICostPlanRepository`, `IActualCostRepository`, `ICostElementRepository` |
+| ドメインサービス | `VarianceAnalysisService` / `RevenueVarianceAnalysisService`(予実差異分析), `PlanComparisonService` / `RevenuePlanComparisonService`(バージョン間比較) |
+| リポジトリ(ポート) | `IProjectRepository`, `ICostPlanRepository`, `IActualCostRepository`, `ICostElementRepository`, `IRevenuePlanRepository`, `IActualRevenueRepository` |
 | ドメイン例外 | `DomainException`(不変条件違反 → HTTP 400 に変換) |
 
 ### 予算のライフサイクル
@@ -81,6 +83,11 @@ frontend/                               # React SPA(/api を dev proxy 経由で
 
 同一(費目, 年月)に複数の実績がある場合は合算し、実際単価は加重平均で求めます。
 予算にない実績は「予定外」として報告されます。
+
+売上も同じ式で**販売価格差異**と**販売数量差異**に分解します(品目 × 年月単位)。
+符号の解釈は原価と逆で、売上は「実績 > 予算」が有利差異です。
+損益タブでは最新の承認済み売上予算・原価予算を突き合わせ、粗利(売上 − 原価)の
+予実差異・粗利率・月別内訳を表示します。
 
 ## 実行方法
 
@@ -121,13 +128,22 @@ dotnet test
 | `POST /api/plans/{planId}/approve` | 予算承認(旧承認版は自動失効) |
 | `GET/POST /api/projects/{id}/actuals` | 実績一覧・計上 |
 | `DELETE /api/actuals/{actualId}` | 実績取消 |
-| `GET /api/projects/{id}/variance?planId=&from=&to=` | 予実差異分析(バージョン・期間指定可) |
-| `GET /api/projects/{id}/plan-comparison?baseVersion=&targetVersion=` | 予算バージョン間比較 |
+| `GET/POST /api/projects/{id}/revenue-plans` | 売上予算バージョン一覧・ドラフト起票 |
+| `GET /api/revenue-plans/{planId}` | 売上予算詳細(明細含む) |
+| `PUT/DELETE /api/revenue-plans/{planId}/lines` | 売上予算明細の登録(upsert)・削除 |
+| `POST /api/revenue-plans/{planId}/approve` | 売上予算承認(旧承認版は自動失効) |
+| `GET/POST /api/projects/{id}/actual-revenues` | 売上実績一覧・計上 |
+| `DELETE /api/actual-revenues/{actualId}` | 売上実績取消 |
+| `GET /api/projects/{id}/variance?planId=&from=&to=` | 原価の予実差異分析(バージョン・期間指定可) |
+| `GET /api/projects/{id}/revenue-variance?planId=&from=&to=` | 売上の予実差異分析 |
+| `GET /api/projects/{id}/plan-comparison?baseVersion=&targetVersion=` | 原価予算バージョン間比較 |
+| `GET /api/projects/{id}/revenue-plan-comparison?baseVersion=&targetVersion=` | 売上予算バージョン間比較 |
+| `GET /api/projects/{id}/profit?from=&to=` | 損益(粗利)予実サマリ |
 
 ## 画面
 
-- **プロジェクト一覧 / 詳細** — プロジェクト登録、予算バージョンの一覧・改定・承認
-- **予算編集** — ドラフト予算の明細(費目 × 年月 × 数量 × 単価)編集
-- **実績入力** — 実績の計上(同一費目・年月への複数計上に対応)
-- **予実差異分析** — 月別 予算 vs 実績チャート、費目別差異チャート、価格・数量差異の分解テーブル(バージョン・期間で絞り込み)
-- **予算バージョン比較** — 任意の 2 バージョン間の増減を明細単位で比較
+- **プロジェクト一覧 / 詳細** — プロジェクト登録、原価・売上それぞれの予算バージョンの一覧・改定・承認
+- **予算編集** — 原価予算(費目 × 年月 × 数量 × 単価)/ 売上予算(品目 × 年月 × 販売数量 × 販売単価)のドラフト明細編集
+- **実績入力** — 原価実績・売上実績の計上(同一キーへの複数計上に対応)
+- **予実差異分析・損益** — タブ構成: 原価差異 / 売上差異 / 損益(粗利)。月別チャート、費目・品目別差異チャート、価格・数量差異の分解テーブル、粗利の予実と月別内訳
+- **予算バージョン比較** — 原価予算・売上予算それぞれで任意の 2 バージョン間の増減を明細単位で比較

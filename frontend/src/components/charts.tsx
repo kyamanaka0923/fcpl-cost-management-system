@@ -49,8 +49,14 @@ export interface GroupedBarDatum {
   actual: number
 }
 
-/** 予算 vs 実績のグループ棒グラフ。 */
-export function PlannedVsActualChart({ data }: { data: GroupedBarDatum[] }) {
+/** 予算 vs 実績のグループ棒グラフ。負値(損失など)は基線の下に描画する。 */
+export function PlannedVsActualChart({
+  data,
+  seriesLabels = ['予算', '実績'],
+}: {
+  data: GroupedBarDatum[]
+  seriesLabels?: [string, string]
+}) {
   const tooltip = useTooltip()
   if (data.length === 0) return <p className="muted small">表示するデータがありません。</p>
 
@@ -60,22 +66,26 @@ export function PlannedVsActualChart({ data }: { data: GroupedBarDatum[] }) {
   const plotW = width - margin.left - margin.right
   const plotH = height - margin.top - margin.bottom
 
-  const max = niceMax(Math.max(...data.map((d) => Math.max(d.planned, d.actual))))
-  const yScale = (v: number) => plotH - (v / max) * plotH
+  const rawMax = Math.max(...data.map((d) => Math.max(d.planned, d.actual, 0)))
+  const rawMin = Math.min(...data.map((d) => Math.min(d.planned, d.actual, 0)))
+  const max = rawMax > 0 ? niceMax(rawMax) : 0
+  const min = rawMin < 0 ? -niceMax(-rawMin) : 0
+  const span = max - min || 1
+  const yScale = (v: number) => plotH - ((v - min) / span) * plotH
   const groupW = plotW / data.length
   const barW = Math.min(28, (groupW - 12) / 2 - 1)
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => t * max)
+  const ticks = [...new Set([0, 0.25, 0.5, 0.75, 1].map((t) => min + t * span).concat([0]))]
 
   return (
     <div>
       <div className="chart-legend">
         <span className="item">
           <span className="swatch" style={{ background: 'var(--series-1)' }} />
-          予算
+          {seriesLabels[0]}
         </span>
         <span className="item">
           <span className="swatch" style={{ background: 'var(--series-2)' }} />
-          実績
+          {seriesLabels[1]}
         </span>
       </div>
       <svg
@@ -117,11 +127,11 @@ export function PlannedVsActualChart({ data }: { data: GroupedBarDatum[] }) {
                 <>
                   <div className="tt-title">{d.label}</div>
                   <div className="tt-line">
-                    <span>予算</span>
+                    <span>{seriesLabels[0]}</span>
                     <span className="v">¥{formatYen(d.planned)}</span>
                   </div>
                   <div className="tt-line">
-                    <span>実績</span>
+                    <span>{seriesLabels[1]}</span>
                     <span className="v">¥{formatYen(d.actual)}</span>
                   </div>
                   <div className="tt-line">
@@ -130,18 +140,21 @@ export function PlannedVsActualChart({ data }: { data: GroupedBarDatum[] }) {
                   </div>
                 </>
               ))
+            const zeroY = yScale(0)
+            const bar = (x: number, v: number, color: string) => {
+              const vy = yScale(v)
+              return v >= 0 ? (
+                <path d={barPath(x, vy, barW, zeroY - vy, true)} fill={color} />
+              ) : (
+                <path d={barPath(x, zeroY, barW, vy - zeroY, false)} fill={color} />
+              )
+            }
             return (
               <g key={d.label} onMouseMove={show} onMouseLeave={tooltip.hide}>
                 {/* ヒットターゲットはマークより大きく */}
                 <rect x={i * groupW} y={0} width={groupW} height={plotH} fill="transparent" />
-                <path
-                  d={barPath(xPlanned, yScale(d.planned), barW, plotH - yScale(d.planned), true)}
-                  fill="var(--series-1)"
-                />
-                <path
-                  d={barPath(xActual, yScale(d.actual), barW, plotH - yScale(d.actual), true)}
-                  fill="var(--series-2)"
-                />
+                {bar(xPlanned, d.planned, 'var(--series-1)')}
+                {bar(xActual, d.actual, 'var(--series-2)')}
                 <text
                   x={cx}
                   y={plotH + 18}
@@ -167,10 +180,25 @@ export interface DivergingBarDatum {
   detail?: ReactNode
 }
 
-/** 差異の分岐棒グラフ(正 = 不利差異 = 赤、負 = 有利差異 = 青)。 */
-export function VarianceBarChart({ data }: { data: DivergingBarDatum[] }) {
+/**
+ * 差異の分岐棒グラフ。
+ * 原価(既定): 正 = 不利差異 = 赤、負 = 有利差異 = 青。
+ * 売上(adverseWhenPositive=false): 正 = 有利差異 = 青、負 = 不利差異 = 赤。
+ */
+export function VarianceBarChart({
+  data,
+  adverseWhenPositive = true,
+  legendLabels = ['不利差異(予算超過)', '有利差異(予算内)'],
+}: {
+  data: DivergingBarDatum[]
+  adverseWhenPositive?: boolean
+  legendLabels?: [string, string]
+}) {
   const tooltip = useTooltip()
   if (data.length === 0) return <p className="muted small">表示するデータがありません。</p>
+
+  const positiveColor = adverseWhenPositive ? 'var(--diverge-adverse)' : 'var(--diverge-favorable)'
+  const negativeColor = adverseWhenPositive ? 'var(--diverge-favorable)' : 'var(--diverge-adverse)'
 
   const width = 720
   const rowH = 30
@@ -186,12 +214,12 @@ export function VarianceBarChart({ data }: { data: DivergingBarDatum[] }) {
     <div>
       <div className="chart-legend">
         <span className="item">
-          <span className="swatch" style={{ background: 'var(--diverge-adverse)' }} />
-          不利差異(予算超過)
+          <span className="swatch" style={{ background: positiveColor }} />
+          {legendLabels[0]}
         </span>
         <span className="item">
-          <span className="swatch" style={{ background: 'var(--diverge-favorable)' }} />
-          有利差異(予算内)
+          <span className="swatch" style={{ background: negativeColor }} />
+          {legendLabels[1]}
         </span>
       </div>
       <svg
@@ -214,7 +242,6 @@ export function VarianceBarChart({ data }: { data: DivergingBarDatum[] }) {
             const barH = 14
             const x0 = Math.min(xScale(0), xScale(d.value))
             const w = Math.abs(xScale(d.value) - xScale(0))
-            const adverse = d.value > 0
             const show = (e: React.MouseEvent) =>
               tooltip.show(e, (
                 <>
@@ -246,7 +273,7 @@ export function VarianceBarChart({ data }: { data: DivergingBarDatum[] }) {
                     width={w}
                     height={barH}
                     rx={4}
-                    fill={adverse ? 'var(--diverge-adverse)' : 'var(--diverge-favorable)'}
+                    fill={d.value > 0 ? positiveColor : negativeColor}
                   />
                 )}
                 <text

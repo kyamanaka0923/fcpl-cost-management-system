@@ -5,6 +5,7 @@ using CostManagement.Domain.Analysis;
 using CostManagement.Domain.CostElements;
 using CostManagement.Domain.Planning;
 using CostManagement.Domain.Projects;
+using CostManagement.Domain.Revenue;
 using CostManagement.Infrastructure.Persistence;
 using CostManagement.Infrastructure.Repositories;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,17 +30,23 @@ public static class DependencyInjection
         services.AddSingleton<ICostElementRepository, CostElementRepository>();
         services.AddSingleton<ICostPlanRepository, CostPlanRepository>();
         services.AddSingleton<IActualCostRepository, ActualCostRepository>();
+        services.AddSingleton<IRevenuePlanRepository, RevenuePlanRepository>();
+        services.AddSingleton<IActualRevenueRepository, ActualRevenueRepository>();
         services.AddSingleton<ISystemClock, SystemClock>();
 
         // ドメインサービス
         services.AddSingleton<VarianceAnalysisService>();
         services.AddSingleton<PlanComparisonService>();
+        services.AddSingleton<RevenueVarianceAnalysisService>();
+        services.AddSingleton<RevenuePlanComparisonService>();
 
         // ユースケース(アプリケーションサービス)
         services.AddSingleton<ProjectService>();
         services.AddSingleton<CostElementService>();
         services.AddSingleton<CostPlanService>();
         services.AddSingleton<ActualCostService>();
+        services.AddSingleton<RevenuePlanService>();
+        services.AddSingleton<ActualRevenueService>();
         services.AddSingleton<AnalysisService>();
 
         return services;
