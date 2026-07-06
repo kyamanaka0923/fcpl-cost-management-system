@@ -13,15 +13,13 @@ export interface CostElement {
   code: string
   name: string
   type: 'Material' | 'Labor' | 'Overhead' | 'Expense'
-  isQuantityManaged: boolean
 }
 
 export interface PlanLine {
   id: string
   elementCode: string
+  revenueItem: string | null
   period: string
-  quantity: number
-  unitPrice: number
   amount: number
 }
 
@@ -44,9 +42,8 @@ export interface ActualCost {
   id: string
   projectId: string
   elementCode: string
+  revenueItem: string | null
   period: string
-  quantity: number
-  unitPrice: number
   amount: number
   note: string | null
   recordedAt: string
@@ -54,16 +51,11 @@ export interface ActualCost {
 
 export interface VarianceLine {
   elementCode: string
+  revenueItem: string | null
   period: string
-  plannedQuantity: number
-  plannedUnitPrice: number
   plannedAmount: number
-  actualQuantity: number
-  actualUnitPrice: number
   actualAmount: number
   totalVariance: number
-  priceVariance: number | null
-  quantityVariance: number | null
   isUnplanned: boolean
   isAdverse: boolean
 }
@@ -80,6 +72,7 @@ export interface VarianceReport {
 
 export interface PlanComparisonLine {
   elementCode: string
+  revenueItem: string | null
   period: string
   baseAmount: number
   targetAmount: number
@@ -101,8 +94,6 @@ export interface RevenuePlanLine {
   id: string
   itemName: string
   period: string
-  quantity: number
-  unitPrice: number
   amount: number
 }
 
@@ -126,8 +117,6 @@ export interface ActualRevenue {
   projectId: string
   itemName: string
   period: string
-  quantity: number
-  unitPrice: number
   amount: number
   note: string | null
   recordedAt: string
@@ -136,15 +125,9 @@ export interface ActualRevenue {
 export interface RevenueVarianceLine {
   itemName: string
   period: string
-  plannedQuantity: number
-  plannedUnitPrice: number
   plannedAmount: number
-  actualQuantity: number
-  actualUnitPrice: number
   actualAmount: number
   totalVariance: number
-  priceVariance: number | null
-  quantityVariance: number | null
   isUnplanned: boolean
   isFavorable: boolean
 }
@@ -178,6 +161,17 @@ export interface RevenuePlanComparison {
   totalDifference: number
 }
 
+export interface ProfitItemLine {
+  itemName: string | null
+  plannedRevenue: number
+  actualRevenue: number
+  plannedCost: number
+  actualCost: number
+  plannedProfit: number
+  actualProfit: number
+  profitVariance: number
+}
+
 export interface ProfitPeriodLine {
   period: string
   plannedRevenue: number
@@ -205,6 +199,7 @@ export interface ProfitSummary {
   profitVariance: number
   plannedMarginRate: number | null
   actualMarginRate: number | null
+  itemLines: ProfitItemLine[]
   periodLines: ProfitPeriodLine[]
 }
 
@@ -234,7 +229,10 @@ export const api = {
     request<Project>('/projects', { method: 'POST', body: JSON.stringify(body) }),
 
   listCostElements: () => request<CostElement[]>('/cost-elements'),
+  listRevenueItems: (projectId: string) =>
+    request<string[]>(`/projects/${projectId}/revenue-items`),
 
+  // ---- 原価予算 ----
   listPlans: (projectId: string) =>
     request<CostPlanSummary[]>(`/projects/${projectId}/plans`),
   getPlan: (planId: string) => request<CostPlanDetail>(`/plans/${planId}`),
@@ -245,29 +243,30 @@ export const api = {
     }),
   upsertPlanLine: (
     planId: string,
-    body: { elementCode: string; period: string; quantity: number; unitPrice: number },
+    body: { elementCode: string; revenueItem?: string | null; period: string; amount: number },
   ) =>
     request<CostPlanDetail>(`/plans/${planId}/lines`, {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
-  removePlanLine: (planId: string, elementCode: string, period: string) =>
-    request<CostPlanDetail>(
-      `/plans/${planId}/lines?elementCode=${encodeURIComponent(elementCode)}&period=${encodeURIComponent(period)}`,
-      { method: 'DELETE' },
-    ),
+  removePlanLine: (planId: string, elementCode: string, revenueItem: string | null, period: string) => {
+    const params = new URLSearchParams({ elementCode, period })
+    if (revenueItem) params.set('revenueItem', revenueItem)
+    return request<CostPlanDetail>(`/plans/${planId}/lines?${params}`, { method: 'DELETE' })
+  },
   approvePlan: (planId: string) =>
     request<CostPlanDetail>(`/plans/${planId}/approve`, { method: 'POST' }),
 
+  // ---- 原価実績 ----
   listActuals: (projectId: string) =>
     request<ActualCost[]>(`/projects/${projectId}/actuals`),
   recordActual: (
     projectId: string,
     body: {
       elementCode: string
+      revenueItem?: string | null
       period: string
-      quantity: number
-      unitPrice: number
+      amount: number
       note?: string | null
     },
   ) =>
@@ -278,20 +277,7 @@ export const api = {
   deleteActual: (actualId: string) =>
     request<void>(`/actuals/${actualId}`, { method: 'DELETE' }),
 
-  getVariance: (projectId: string, opts?: { planId?: string; from?: string; to?: string }) => {
-    const params = new URLSearchParams()
-    if (opts?.planId) params.set('planId', opts.planId)
-    if (opts?.from) params.set('from', opts.from)
-    if (opts?.to) params.set('to', opts.to)
-    const qs = params.toString()
-    return request<VarianceReport>(`/projects/${projectId}/variance${qs ? `?${qs}` : ''}`)
-  },
-  comparePlans: (projectId: string, baseVersion: number, targetVersion: number) =>
-    request<PlanComparison>(
-      `/projects/${projectId}/plan-comparison?baseVersion=${baseVersion}&targetVersion=${targetVersion}`,
-    ),
-
-  // ---- 売上 ----
+  // ---- 売上予算 ----
   listRevenuePlans: (projectId: string) =>
     request<RevenuePlanSummary[]>(`/projects/${projectId}/revenue-plans`),
   getRevenuePlan: (planId: string) => request<RevenuePlanDetail>(`/revenue-plans/${planId}`),
@@ -302,7 +288,7 @@ export const api = {
     }),
   upsertRevenuePlanLine: (
     planId: string,
-    body: { itemName: string; period: string; quantity: number; unitPrice: number },
+    body: { itemName: string; period: string; amount: number },
   ) =>
     request<RevenuePlanDetail>(`/revenue-plans/${planId}/lines`, {
       method: 'PUT',
@@ -316,17 +302,12 @@ export const api = {
   approveRevenuePlan: (planId: string) =>
     request<RevenuePlanDetail>(`/revenue-plans/${planId}/approve`, { method: 'POST' }),
 
+  // ---- 売上実績 ----
   listActualRevenues: (projectId: string) =>
     request<ActualRevenue[]>(`/projects/${projectId}/actual-revenues`),
   recordActualRevenue: (
     projectId: string,
-    body: {
-      itemName: string
-      period: string
-      quantity: number
-      unitPrice: number
-      note?: string | null
-    },
+    body: { itemName: string; period: string; amount: number; note?: string | null },
   ) =>
     request<ActualRevenue>(`/projects/${projectId}/actual-revenues`, {
       method: 'POST',
@@ -335,6 +316,15 @@ export const api = {
   deleteActualRevenue: (actualId: string) =>
     request<void>(`/actual-revenues/${actualId}`, { method: 'DELETE' }),
 
+  // ---- 分析 ----
+  getVariance: (projectId: string, opts?: { planId?: string; from?: string; to?: string }) => {
+    const params = new URLSearchParams()
+    if (opts?.planId) params.set('planId', opts.planId)
+    if (opts?.from) params.set('from', opts.from)
+    if (opts?.to) params.set('to', opts.to)
+    const qs = params.toString()
+    return request<VarianceReport>(`/projects/${projectId}/variance${qs ? `?${qs}` : ''}`)
+  },
   getRevenueVariance: (
     projectId: string,
     opts?: { planId?: string; from?: string; to?: string },
@@ -348,6 +338,10 @@ export const api = {
       `/projects/${projectId}/revenue-variance${qs ? `?${qs}` : ''}`,
     )
   },
+  comparePlans: (projectId: string, baseVersion: number, targetVersion: number) =>
+    request<PlanComparison>(
+      `/projects/${projectId}/plan-comparison?baseVersion=${baseVersion}&targetVersion=${targetVersion}`,
+    ),
   compareRevenuePlans: (projectId: string, baseVersion: number, targetVersion: number) =>
     request<RevenuePlanComparison>(
       `/projects/${projectId}/revenue-plan-comparison?baseVersion=${baseVersion}&targetVersion=${targetVersion}`,
@@ -366,3 +360,6 @@ export const formatYen = (value: number): string =>
 
 export const formatSignedYen = (value: number): string =>
   (value > 0 ? '+' : '') + formatYen(value)
+
+/** 売上対応品目の表示名(null = 共通費)。 */
+export const revenueItemLabel = (item: string | null): string => item ?? '(共通)'

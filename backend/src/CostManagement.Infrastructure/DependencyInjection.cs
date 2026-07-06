@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddSingleton<PlanComparisonService>();
         services.AddSingleton<RevenueVarianceAnalysisService>();
         services.AddSingleton<RevenuePlanComparisonService>();
+        services.AddSingleton<ProfitAnalysisService>();
 
         // ユースケース(アプリケーションサービス)
         services.AddSingleton<ProjectService>();

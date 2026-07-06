@@ -9,8 +9,7 @@ export default function RevenuePlanEditPage() {
 
   const [itemName, setItemName] = useState('')
   const [period, setPeriod] = useState('')
-  const [quantity, setQuantity] = useState('1')
-  const [unitPrice, setUnitPrice] = useState('')
+  const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(() => {
@@ -30,8 +29,7 @@ export default function RevenuePlanEditPage() {
       const updated = await api.upsertRevenuePlanLine(planId, {
         itemName,
         period,
-        quantity: Number(quantity),
-        unitPrice: Number(unitPrice),
+        amount: Number(amount),
       })
       setPlan(updated)
     } catch (err) {
@@ -92,15 +90,17 @@ export default function RevenuePlanEditPage() {
       {editable && (
         <div className="card">
           <h2>明細の追加・更新</h2>
-          <p className="muted small">同じ品目・年月の明細は上書きされます。</p>
+          <p className="muted small">
+            同じ品目・年月の明細は上書きされます。品目名は原価側の「売上対応品目」と対応します。
+          </p>
           <form onSubmit={upsert} className="form-row">
             <label>
-              品目
+              品目(案件名など)
               <input
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
                 required
-                placeholder="製品A"
+                placeholder="案件A"
               />
             </label>
             <label>
@@ -108,22 +108,11 @@ export default function RevenuePlanEditPage() {
               <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} required />
             </label>
             <label>
-              販売数量
+              金額(円)
               <input
                 type="number"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                min={0}
-                step="any"
-                required
-              />
-            </label>
-            <label>
-              販売単価(円)
-              <input
-                type="number"
-                value={unitPrice}
-                onChange={(e) => setUnitPrice(e.target.value)}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
                 min={0}
                 step="any"
                 required
@@ -146,8 +135,6 @@ export default function RevenuePlanEditPage() {
               <tr>
                 <th>年月</th>
                 <th>品目</th>
-                <th className="num">販売数量</th>
-                <th className="num">販売単価</th>
                 <th className="num">金額</th>
                 {editable && <th></th>}
               </tr>
@@ -157,8 +144,6 @@ export default function RevenuePlanEditPage() {
                 <tr key={l.id}>
                   <td>{l.period}</td>
                   <td>{l.itemName}</td>
-                  <td className="num">{formatYen(l.quantity)}</td>
-                  <td className="num">¥{formatYen(l.unitPrice)}</td>
                   <td className="num">¥{formatYen(l.amount)}</td>
                   {editable && (
                     <td>
@@ -168,7 +153,7 @@ export default function RevenuePlanEditPage() {
                 </tr>
               ))}
               <tr className="total-row">
-                <td colSpan={4}>合計</td>
+                <td colSpan={2}>合計</td>
                 <td className="num">¥{formatYen(plan.totalAmount)}</td>
                 {editable && <td></td>}
               </tr>

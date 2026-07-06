@@ -18,8 +18,8 @@ public sealed class CostPlanRepository : ICostPlanRepository
     private sealed record PlanRow(Guid Id, Guid ProjectId, long Version, string Label,
         string Status, DateTime CreatedAt, DateTime? ApprovedAt);
 
-    private sealed record LineRow(Guid Id, Guid PlanId, string ElementCode, string Period,
-        decimal Quantity, decimal UnitPrice);
+    private sealed record LineRow(Guid Id, Guid PlanId, string ElementCode, string RevenueItem,
+        string Period, decimal Amount);
 
     private const string SelectPlanSql = """
         SELECT id AS Id, project_id AS ProjectId, version AS Version, label AS Label,
@@ -28,8 +28,8 @@ public sealed class CostPlanRepository : ICostPlanRepository
         """;
 
     private const string SelectLineSql = """
-        SELECT id AS Id, plan_id AS PlanId, element_code AS ElementCode, period AS Period,
-               quantity AS Quantity, unit_price AS UnitPrice
+        SELECT id AS Id, plan_id AS PlanId, element_code AS ElementCode,
+               revenue_item AS RevenueItem, period AS Period, amount AS Amount
         FROM cost_plan_lines
         """;
 
@@ -54,7 +54,7 @@ public sealed class CostPlanRepository : ICostPlanRepository
             new { Pid = projectId.Value })).ToList();
         var lines = (await conn.QueryAsync<LineRow>("""
             SELECT l.id AS Id, l.plan_id AS PlanId, l.element_code AS ElementCode,
-                   l.period AS Period, l.quantity AS Quantity, l.unit_price AS UnitPrice
+                   l.revenue_item AS RevenueItem, l.period AS Period, l.amount AS Amount
             FROM cost_plan_lines l
             JOIN cost_plans p ON p.id = l.plan_id
             WHERE p.project_id = @Pid
@@ -136,16 +136,16 @@ public sealed class CostPlanRepository : ICostPlanRepository
         foreach (var line in plan.Lines)
         {
             await conn.ExecuteAsync("""
-                INSERT INTO cost_plan_lines (id, plan_id, element_code, period, quantity, unit_price)
-                VALUES (@Id, @PlanId, @ElementCode, @Period, @Quantity, @UnitPrice)
+                INSERT INTO cost_plan_lines (id, plan_id, element_code, revenue_item, period, amount)
+                VALUES (@Id, @PlanId, @ElementCode, @RevenueItem, @Period, @Amount)
                 """, new
             {
                 line.Id,
                 PlanId = plan.Id.Value,
                 ElementCode = line.ElementCode.Value,
+                RevenueItem = line.RevenueItem ?? "",
                 Period = line.Period.ToString(),
-                line.Quantity,
-                UnitPrice = line.UnitPrice.Value,
+                Amount = line.Amount.Value,
             }, tx);
         }
     }
@@ -153,5 +153,6 @@ public sealed class CostPlanRepository : ICostPlanRepository
     private static CostPlan ToEntity(PlanRow plan, IEnumerable<LineRow> lines) =>
         CostPlan.Restore(plan.Id, plan.ProjectId, (int)plan.Version, plan.Label,
             Enum.Parse<PlanStatus>(plan.Status), plan.CreatedAt, plan.ApprovedAt,
-            lines.Select(l => (l.Id, l.ElementCode, l.Period, l.Quantity, l.UnitPrice)));
+            lines.Select(l => (l.Id, l.ElementCode,
+                l.RevenueItem == "" ? null : l.RevenueItem, l.Period, l.Amount)));
 }

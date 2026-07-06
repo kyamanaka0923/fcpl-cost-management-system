@@ -8,7 +8,7 @@ namespace CostManagement.Domain.Tests;
 public class CostPlanTests
 {
     private static readonly DateTime Now = new(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc);
-    private static readonly CostElementCode Material = new("MAT-RAW");
+    private static readonly CostElementCode Labor = new("LAB-SE");
     private static readonly AccountingPeriod Apr = new(2026, 4);
 
     private static CostPlan NewDraft() =>
@@ -25,16 +25,39 @@ public class CostPlanTests
     }
 
     [Fact]
-    public void 同一費目同一期間の明細は上書きされる()
+    public void 同一費目同一品目同一期間の明細は上書きされる()
     {
         var plan = NewDraft();
-        plan.UpsertLine(Material, Apr, 100m, new Money(500m));
-        plan.UpsertLine(Material, Apr, 120m, new Money(480m));
+        plan.UpsertLine(Labor, "案件A", Apr, new Money(500_000m));
+        plan.UpsertLine(Labor, "案件A", Apr, new Money(550_000m));
 
         var line = Assert.Single(plan.Lines);
-        Assert.Equal(120m, line.Quantity);
-        Assert.Equal(480m, line.UnitPrice.Value);
-        Assert.Equal(57_600m, plan.TotalAmount.Value);
+        Assert.Equal(550_000m, line.Amount.Value);
+        Assert.Equal(550_000m, plan.TotalAmount.Value);
+    }
+
+    [Fact]
+    public void 売上対応品目が異なれば別明細として管理される()
+    {
+        var plan = NewDraft();
+        plan.UpsertLine(Labor, "案件A", Apr, new Money(500_000m));
+        plan.UpsertLine(Labor, "案件B", Apr, new Money(300_000m));
+        plan.UpsertLine(Labor, null, Apr, new Money(100_000m)); // 共通費
+
+        Assert.Equal(3, plan.Lines.Count);
+        Assert.Equal(900_000m, plan.TotalAmount.Value);
+    }
+
+    [Fact]
+    public void 売上対応品目は空白なら共通費として正規化される()
+    {
+        var plan = NewDraft();
+        plan.UpsertLine(Labor, "  ", Apr, new Money(100_000m));
+        plan.UpsertLine(Labor, null, Apr, new Money(200_000m)); // 同一キー(共通費)として上書き
+
+        var line = Assert.Single(plan.Lines);
+        Assert.Null(line.RevenueItem);
+        Assert.Equal(200_000m, line.Amount.Value);
     }
 
     [Fact]
@@ -49,20 +72,20 @@ public class CostPlanTests
     public void 承認済みの予算は編集できない()
     {
         var plan = NewDraft();
-        plan.UpsertLine(Material, Apr, 100m, new Money(500m));
+        plan.UpsertLine(Labor, "案件A", Apr, new Money(500_000m));
         plan.Approve(Now);
 
         Assert.Equal(PlanStatus.Approved, plan.Status);
         Assert.Throws<DomainException>(() =>
-            plan.UpsertLine(Material, Apr, 200m, new Money(500m)));
-        Assert.Throws<DomainException>(() => plan.RemoveLine(Material, Apr));
+            plan.UpsertLine(Labor, "案件A", Apr, new Money(600_000m)));
+        Assert.Throws<DomainException>(() => plan.RemoveLine(Labor, "案件A", Apr));
     }
 
     [Fact]
     public void 改定版は明細を引き継いだ新バージョンのドラフトになる()
     {
         var basePlan = NewDraft();
-        basePlan.UpsertLine(Material, Apr, 100m, new Money(500m));
+        basePlan.UpsertLine(Labor, "案件A", Apr, new Money(500_000m));
         basePlan.Approve(Now);
 
         var revised = CostPlan.ReviseFrom(basePlan, 2, "第2四半期改定", Now);
@@ -71,8 +94,8 @@ public class CostPlanTests
         Assert.Equal(PlanStatus.Draft, revised.Status);
         Assert.Equal(basePlan.ProjectId, revised.ProjectId);
         var line = Assert.Single(revised.Lines);
-        Assert.Equal(100m, line.Quantity);
-        Assert.Equal(500m, line.UnitPrice.Value);
+        Assert.Equal(500_000m, line.Amount.Value);
+        Assert.Equal("案件A", line.RevenueItem);
         // 明細は複製であり、基の予算とは独立している。
         Assert.NotEqual(basePlan.Lines[0].Id, line.Id);
     }
@@ -81,7 +104,7 @@ public class CostPlanTests
     public void 改定版のバージョンは基より大きくなければならない()
     {
         var basePlan = NewDraft();
-        basePlan.UpsertLine(Material, Apr, 100m, new Money(500m));
+        basePlan.UpsertLine(Labor, null, Apr, new Money(500_000m));
 
         Assert.Throws<DomainException>(() =>
             CostPlan.ReviseFrom(basePlan, 1, "改定", Now));
@@ -91,7 +114,7 @@ public class CostPlanTests
     public void 承認済みの予算のみ失効にできる()
     {
         var plan = NewDraft();
-        plan.UpsertLine(Material, Apr, 100m, new Money(500m));
+        plan.UpsertLine(Labor, null, Apr, new Money(500_000m));
 
         Assert.Throws<DomainException>(plan.Supersede);
 
@@ -101,13 +124,11 @@ public class CostPlanTests
     }
 
     [Fact]
-    public void 負の数量や単価は登録できない()
+    public void 負の金額は登録できない()
     {
         var plan = NewDraft();
 
         Assert.Throws<DomainException>(() =>
-            plan.UpsertLine(Material, Apr, -1m, new Money(500m)));
-        Assert.Throws<DomainException>(() =>
-            plan.UpsertLine(Material, Apr, 1m, new Money(-500m)));
+            plan.UpsertLine(Labor, null, Apr, new Money(-1m)));
     }
 }

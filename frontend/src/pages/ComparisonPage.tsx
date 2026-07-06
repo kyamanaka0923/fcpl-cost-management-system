@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { api, formatSignedYen, formatYen, type CostElement } from '../api'
+import { api, formatSignedYen, formatYen, revenueItemLabel, type CostElement } from '../api'
 
 type PlanKind = 'cost' | 'revenue'
 
@@ -19,6 +19,7 @@ interface ComparisonView {
     key: string
     period: string
     name: string
+    revenueItem?: string | null
     baseAmount: number
     targetAmount: number
     difference: number
@@ -77,9 +78,10 @@ export default function ComparisonPage() {
             (c): ComparisonView => ({
               ...c,
               lines: c.lines.map((l) => ({
-                key: `${l.period}-${l.elementCode}`,
+                key: `${l.period}-${l.elementCode}-${l.revenueItem ?? ''}`,
                 period: l.period,
                 name: elementName(l.elementCode),
+                revenueItem: l.revenueItem,
                 baseAmount: l.baseAmount,
                 targetAmount: l.targetAmount,
                 difference: l.difference,
@@ -189,6 +191,7 @@ export default function ComparisonPage() {
                 <tr>
                   <th>年月</th>
                   <th>{kind === 'cost' ? '費目' : '品目'}</th>
+                  {kind === 'cost' && <th>売上対応品目</th>}
                   <th className="num">
                     v{comparison.baseVersion} {comparison.baseLabel}
                   </th>
@@ -203,15 +206,20 @@ export default function ComparisonPage() {
                   <tr key={l.key}>
                     <td>{l.period}</td>
                     <td>{l.name}</td>
+                    {kind === 'cost' && (
+                      <td className={l.revenueItem ? '' : 'muted'}>
+                        {revenueItemLabel(l.revenueItem ?? null)}
+                      </td>
+                    )}
                     <td className="num">¥{formatYen(l.baseAmount)}</td>
                     <td className="num">¥{formatYen(l.targetAmount)}</td>
-                    <td className={`num ${l.difference !== 0 ? 'muted' : ''}`}>
+                    <td className="num">
                       <strong>¥{formatSignedYen(l.difference)}</strong>
                     </td>
                   </tr>
                 ))}
                 <tr className="total-row">
-                  <td colSpan={2}>合計</td>
+                  <td colSpan={kind === 'cost' ? 3 : 2}>合計</td>
                   <td className="num">¥{formatYen(comparison.baseTotalAmount)}</td>
                   <td className="num">¥{formatYen(comparison.targetTotalAmount)}</td>
                   <td className="num">¥{formatSignedYen(comparison.totalDifference)}</td>

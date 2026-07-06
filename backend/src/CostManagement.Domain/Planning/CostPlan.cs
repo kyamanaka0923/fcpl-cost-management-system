@@ -22,34 +22,34 @@ public enum PlanStatus
     Superseded,
 }
 
-/// <summary>原価予算の明細。集約内エンティティ。(費目, 会計期間) ごとに一意。</summary>
+/// <summary>
+/// 原価予算の明細。集約内エンティティ。
+/// (費目, 売上対応品目, 会計期間) ごとに一意で、金額を直接持つ(数量×単価では管理しない)。
+/// </summary>
 public sealed class PlanLine
 {
     public Guid Id { get; }
     public CostElementCode ElementCode { get; }
+
+    /// <summary>売上対応品目。どの売上(品目)に対応する原価かを表す。null = 共通費。</summary>
+    public string? RevenueItem { get; }
+
     public AccountingPeriod Period { get; }
-    public decimal Quantity { get; private set; }
-    public Money UnitPrice { get; private set; }
+    public Money Amount { get; private set; }
 
-    public Money Amount => UnitPrice * Quantity;
-
-    internal PlanLine(Guid id, CostElementCode elementCode, AccountingPeriod period,
-        decimal quantity, Money unitPrice)
+    internal PlanLine(Guid id, CostElementCode elementCode, string? revenueItem,
+        AccountingPeriod period, Money amount)
     {
         Id = id;
         ElementCode = elementCode;
+        RevenueItem = revenueItem;
         Period = period;
-        Quantity = quantity;
-        UnitPrice = unitPrice;
+        Amount = amount;
     }
 
-    internal void Update(decimal quantity, Money unitPrice)
-    {
-        Quantity = quantity;
-        UnitPrice = unitPrice;
-    }
+    internal void Update(Money amount) => Amount = amount;
 
-    internal PlanLine Copy() => new(Guid.NewGuid(), ElementCode, Period, Quantity, UnitPrice);
+    internal PlanLine Copy() => new(Guid.NewGuid(), ElementCode, RevenueItem, Period, Amount);
 }
 
 /// <summary>
@@ -113,28 +113,31 @@ public sealed class CostPlan
             PlanStatus.Draft, now, null, copiedLines);
     }
 
-    /// <summary>明細を追加または更新する。(費目, 会計期間) が同じ明細は1件に統合される。</summary>
-    public void UpsertLine(CostElementCode elementCode, AccountingPeriod period,
-        decimal quantity, Money unitPrice)
+    /// <summary>
+    /// 明細を追加または更新する。(費目, 売上対応品目, 会計期間) が同じ明細は1件に統合される。
+    /// </summary>
+    public void UpsertLine(CostElementCode elementCode, string? revenueItem,
+        AccountingPeriod period, Money amount)
     {
         EnsureDraft();
-        if (quantity < 0m)
-            throw new DomainException("数量は0以上で入力してください。");
-        if (unitPrice.IsNegative)
-            throw new DomainException("単価は0以上で入力してください。");
+        if (amount.IsNegative)
+            throw new DomainException("金額は0以上で入力してください。");
 
+        var normalized = NormalizeRevenueItem(revenueItem);
         var existing = _lines.FirstOrDefault(l =>
-            l.ElementCode == elementCode && l.Period == period);
+            l.ElementCode == elementCode && l.RevenueItem == normalized && l.Period == period);
         if (existing is null)
-            _lines.Add(new PlanLine(Guid.NewGuid(), elementCode, period, quantity, unitPrice));
+            _lines.Add(new PlanLine(Guid.NewGuid(), elementCode, normalized, period, amount));
         else
-            existing.Update(quantity, unitPrice);
+            existing.Update(amount);
     }
 
-    public void RemoveLine(CostElementCode elementCode, AccountingPeriod period)
+    public void RemoveLine(CostElementCode elementCode, string? revenueItem, AccountingPeriod period)
     {
         EnsureDraft();
-        var removed = _lines.RemoveAll(l => l.ElementCode == elementCode && l.Period == period);
+        var normalized = NormalizeRevenueItem(revenueItem);
+        var removed = _lines.RemoveAll(l =>
+            l.ElementCode == elementCode && l.RevenueItem == normalized && l.Period == period);
         if (removed == 0)
             throw new DomainException("指定された明細が存在しません。");
     }
@@ -158,8 +161,8 @@ public sealed class CostPlan
         Status = PlanStatus.Superseded;
     }
 
-    public PlanLine? FindLine(CostElementCode elementCode, AccountingPeriod period) =>
-        _lines.FirstOrDefault(l => l.ElementCode == elementCode && l.Period == period);
+    internal static string? NormalizeRevenueItem(string? revenueItem) =>
+        string.IsNullOrWhiteSpace(revenueItem) ? null : revenueItem.Trim();
 
     private void EnsureDraft()
     {
@@ -176,11 +179,12 @@ public sealed class CostPlan
     /// <summary>永続化層からの復元用ファクトリ。</summary>
     public static CostPlan Restore(Guid id, Guid projectId, int version, string label,
         PlanStatus status, DateTime createdAt, DateTime? approvedAt,
-        IEnumerable<(Guid Id, string ElementCode, string Period, decimal Quantity, decimal UnitPrice)> lines)
+        IEnumerable<(Guid Id, string ElementCode, string? RevenueItem, string Period, decimal Amount)> lines)
     {
         var restored = lines
             .Select(l => new PlanLine(l.Id, new CostElementCode(l.ElementCode),
-                AccountingPeriod.Parse(l.Period), l.Quantity, new Money(l.UnitPrice)))
+                NormalizeRevenueItem(l.RevenueItem), AccountingPeriod.Parse(l.Period),
+                new Money(l.Amount)))
             .ToList();
         return new CostPlan(new CostPlanId(id), new ProjectId(projectId), version, label,
             status, createdAt, approvedAt, restored);

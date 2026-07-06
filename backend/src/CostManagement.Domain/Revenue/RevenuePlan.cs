@@ -10,37 +10,31 @@ public readonly record struct RevenuePlanId(Guid Value)
     public override string ToString() => Value.ToString();
 }
 
-/// <summary>売上予算の明細。集約内エンティティ。(品目, 会計期間) ごとに一意。</summary>
+/// <summary>
+/// 売上予算の明細。集約内エンティティ。
+/// (品目, 会計期間) ごとに一意で、金額を直接持つ(数量×単価では管理しない)。
+/// </summary>
 public sealed class RevenuePlanLine
 {
     public Guid Id { get; }
 
-    /// <summary>製品・サービスなどの品目名。</summary>
+    /// <summary>案件・サービスなどの品目名。原価側の「売上対応品目」と対応する。</summary>
     public string ItemName { get; }
 
     public AccountingPeriod Period { get; }
-    public decimal Quantity { get; private set; }
-    public Money UnitPrice { get; private set; }
+    public Money Amount { get; private set; }
 
-    public Money Amount => UnitPrice * Quantity;
-
-    internal RevenuePlanLine(Guid id, string itemName, AccountingPeriod period,
-        decimal quantity, Money unitPrice)
+    internal RevenuePlanLine(Guid id, string itemName, AccountingPeriod period, Money amount)
     {
         Id = id;
         ItemName = itemName;
         Period = period;
-        Quantity = quantity;
-        UnitPrice = unitPrice;
+        Amount = amount;
     }
 
-    internal void Update(decimal quantity, Money unitPrice)
-    {
-        Quantity = quantity;
-        UnitPrice = unitPrice;
-    }
+    internal void Update(Money amount) => Amount = amount;
 
-    internal RevenuePlanLine Copy() => new(Guid.NewGuid(), ItemName, Period, Quantity, UnitPrice);
+    internal RevenuePlanLine Copy() => new(Guid.NewGuid(), ItemName, Period, Amount);
 }
 
 /// <summary>
@@ -100,23 +94,20 @@ public sealed class RevenuePlan
     }
 
     /// <summary>明細を追加または更新する。(品目, 会計期間) が同じ明細は1件に統合される。</summary>
-    public void UpsertLine(string itemName, AccountingPeriod period, decimal quantity,
-        Money unitPrice)
+    public void UpsertLine(string itemName, AccountingPeriod period, Money amount)
     {
         EnsureDraft();
         if (string.IsNullOrWhiteSpace(itemName))
             throw new DomainException("品目名は必須です。");
-        if (quantity < 0m)
-            throw new DomainException("数量は0以上で入力してください。");
-        if (unitPrice.IsNegative)
-            throw new DomainException("単価は0以上で入力してください。");
+        if (amount.IsNegative)
+            throw new DomainException("金額は0以上で入力してください。");
 
         var normalized = itemName.Trim();
         var existing = _lines.FirstOrDefault(l => l.ItemName == normalized && l.Period == period);
         if (existing is null)
-            _lines.Add(new RevenuePlanLine(Guid.NewGuid(), normalized, period, quantity, unitPrice));
+            _lines.Add(new RevenuePlanLine(Guid.NewGuid(), normalized, period, amount));
         else
-            existing.Update(quantity, unitPrice);
+            existing.Update(amount);
     }
 
     public void RemoveLine(string itemName, AccountingPeriod period)
@@ -160,11 +151,11 @@ public sealed class RevenuePlan
     /// <summary>永続化層からの復元用ファクトリ。</summary>
     public static RevenuePlan Restore(Guid id, Guid projectId, int version, string label,
         PlanStatus status, DateTime createdAt, DateTime? approvedAt,
-        IEnumerable<(Guid Id, string ItemName, string Period, decimal Quantity, decimal UnitPrice)> lines)
+        IEnumerable<(Guid Id, string ItemName, string Period, decimal Amount)> lines)
     {
         var restored = lines
             .Select(l => new RevenuePlanLine(l.Id, l.ItemName, AccountingPeriod.Parse(l.Period),
-                l.Quantity, new Money(l.UnitPrice)))
+                new Money(l.Amount)))
             .ToList();
         return new RevenuePlan(new RevenuePlanId(id), new ProjectId(projectId), version, label,
             status, createdAt, approvedAt, restored);

@@ -5,18 +5,19 @@ import { api, formatYen, type ActualRevenue } from '../api'
 export default function RevenueActualsPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const [actuals, setActuals] = useState<ActualRevenue[]>([])
+  const [revenueItems, setRevenueItems] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const [itemName, setItemName] = useState('')
   const [period, setPeriod] = useState('')
-  const [quantity, setQuantity] = useState('1')
-  const [unitPrice, setUnitPrice] = useState('')
+  const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(() => {
     if (!projectId) return
     api.listActualRevenues(projectId).then(setActuals).catch((e: Error) => setError(e.message))
+    api.listRevenueItems(projectId).then(setRevenueItems).catch(() => undefined)
   }, [projectId])
   useEffect(load, [load])
 
@@ -31,8 +32,7 @@ export default function RevenueActualsPage() {
       await api.recordActualRevenue(projectId, {
         itemName,
         period,
-        quantity: Number(quantity),
-        unitPrice: Number(unitPrice),
+        amount: Number(amount),
         note: note || null,
       })
       setNote('')
@@ -65,39 +65,34 @@ export default function RevenueActualsPage() {
       <div className="card">
         <h2>売上実績の計上</h2>
         <p className="muted small">
-          同じ品目・年月に複数回計上できます。分析時には合算され、単価は加重平均で扱われます。
+          同じ品目・年月に複数回計上でき、分析時には合算されます(検収単位の計上などを想定)。
         </p>
         <form onSubmit={record} className="form-row">
           <label>
-            品目
+            品目(案件名など)
             <input
               value={itemName}
               onChange={(e) => setItemName(e.target.value)}
               required
-              placeholder="製品A"
+              placeholder="案件A"
+              list="revenue-items-rev-actual"
             />
+            <datalist id="revenue-items-rev-actual">
+              {revenueItems.map((item) => (
+                <option key={item} value={item} />
+              ))}
+            </datalist>
           </label>
           <label>
             年月
             <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} required />
           </label>
           <label>
-            販売数量
+            金額(円)
             <input
               type="number"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              min={0}
-              step="any"
-              required
-            />
-          </label>
-          <label>
-            販売単価(円)
-            <input
-              type="number"
-              value={unitPrice}
-              onChange={(e) => setUnitPrice(e.target.value)}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
               min={0}
               step="any"
               required
@@ -123,8 +118,6 @@ export default function RevenueActualsPage() {
               <tr>
                 <th>年月</th>
                 <th>品目</th>
-                <th className="num">販売数量</th>
-                <th className="num">販売単価</th>
                 <th className="num">金額</th>
                 <th>摘要</th>
                 <th></th>
@@ -135,8 +128,6 @@ export default function RevenueActualsPage() {
                 <tr key={a.id}>
                   <td>{a.period}</td>
                   <td>{a.itemName}</td>
-                  <td className="num">{formatYen(a.quantity)}</td>
-                  <td className="num">¥{formatYen(a.unitPrice)}</td>
                   <td className="num">¥{formatYen(a.amount)}</td>
                   <td className="small muted">{a.note ?? ''}</td>
                   <td>
@@ -145,7 +136,7 @@ export default function RevenueActualsPage() {
                 </tr>
               ))}
               <tr className="total-row">
-                <td colSpan={4}>合計</td>
+                <td colSpan={2}>合計</td>
                 <td className="num">¥{formatYen(total)}</td>
                 <td colSpan={2}></td>
               </tr>

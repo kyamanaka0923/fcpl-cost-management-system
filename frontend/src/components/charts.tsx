@@ -208,7 +208,9 @@ export function VarianceBarChart({
 
   const maxAbs = niceMax(Math.max(...data.map((d) => Math.abs(d.value)), 1))
   const zeroX = plotW / 2
-  const xScale = (v: number) => zeroX + (v / maxAbs) * (plotW / 2)
+  // 値ラベル分の余白をバーの外側に確保する
+  const armW = plotW / 2 - 64
+  const xScale = (v: number) => zeroX + (v / maxAbs) * armW
 
   return (
     <div>

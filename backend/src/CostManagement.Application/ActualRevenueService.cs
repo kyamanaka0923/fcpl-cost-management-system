@@ -28,8 +28,8 @@ public sealed class ActualRevenueService
             ?? throw new NotFoundException($"プロジェクトが見つかりません: {projectId}");
 
         var actual = ActualRevenue.Record(pid, request.ItemName,
-            AccountingPeriod.Parse(request.Period), request.Quantity,
-            new Money(request.UnitPrice), request.Note, _clock.UtcNow);
+            AccountingPeriod.Parse(request.Period), new Money(request.Amount),
+            request.Note, _clock.UtcNow);
         await _actuals.AddAsync(actual, ct);
         return ToDto(actual);
     }
@@ -55,5 +55,5 @@ public sealed class ActualRevenueService
 
     internal static ActualRevenueDto ToDto(ActualRevenue a) =>
         new(a.Id.Value, a.ProjectId.Value, a.ItemName, a.Period.ToString(),
-            a.Quantity, a.UnitPrice.Value, a.Amount.Value, a.Note, a.RecordedAt);
+            a.Amount.Value, a.Note, a.RecordedAt);
 }

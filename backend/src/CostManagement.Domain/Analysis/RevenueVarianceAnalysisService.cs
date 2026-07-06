@@ -10,15 +10,9 @@ namespace CostManagement.Domain.Analysis;
 public sealed record RevenueVarianceLine(
     string ItemName,
     AccountingPeriod Period,
-    decimal PlannedQuantity,
-    decimal PlannedUnitPrice,
     decimal PlannedAmount,
-    decimal ActualQuantity,
-    decimal ActualUnitPrice,
     decimal ActualAmount,
     decimal TotalVariance,
-    decimal? PriceVariance,
-    decimal? QuantityVariance,
     bool IsUnplanned)
 {
     /// <summary>有利差異(売上が予算を上回った)かどうか。</summary>
@@ -34,10 +28,7 @@ public sealed record RevenueVarianceReport(
 
 /// <summary>
 /// 売上の予実差異分析を行うドメインサービス。
-/// 総差異を販売価格差異と販売数量差異に分解する:
-///   販売価格差異 = (実際単価 − 予定単価) × 実際数量
-///   販売数量差異 = (実際数量 − 予定数量) × 予定単価
-///   総差異       = 販売価格差異 + 販売数量差異 = 実績売上 − 予算売上
+/// 明細は金額で管理されるため、差異 = 実績金額 − 予算金額 として (品目, 会計期間) の粒度で算出する。
 /// </summary>
 public sealed class RevenueVarianceAnalysisService
 {
@@ -50,47 +41,26 @@ public sealed class RevenueVarianceAnalysisService
 
         var plannedByKey = plan.Lines
             .Where(l => InRange(l.Period))
-            .ToDictionary(l => (l.ItemName, l.Period));
+            .ToDictionary(l => (l.ItemName, l.Period), l => l.Amount.Value);
 
-        // 同一 (品目, 期間) の実績を合算し、実際単価は加重平均で求める。
+        // 同一 (品目, 期間) の実績を合算する。
         var actualByKey = actuals
             .Where(a => InRange(a.Period))
             .GroupBy(a => (a.ItemName, a.Period))
-            .ToDictionary(
-                g => g.Key,
-                g => (Quantity: g.Sum(a => a.Quantity), Amount: g.Sum(a => a.Amount.Value)));
+            .ToDictionary(g => g.Key, g => g.Sum(a => a.Amount.Value));
 
-        var keys = plannedByKey.Keys.Union(actualByKey.Keys)
-            .OrderBy(k => k.Period).ThenBy(k => k.ItemName);
-
-        var lines = new List<RevenueVarianceLine>();
-        foreach (var key in keys)
-        {
-            var planned = plannedByKey.GetValueOrDefault(key);
-            var (actualQty, actualAmount) = actualByKey.GetValueOrDefault(key);
-
-            var plannedQty = planned?.Quantity ?? 0m;
-            var plannedPrice = planned?.UnitPrice.Value ?? 0m;
-            var plannedAmount = planned?.Amount.Value ?? 0m;
-            var actualPrice = actualQty != 0m ? actualAmount / actualQty : 0m;
-
-            var totalVariance = actualAmount - plannedAmount;
-
-            decimal? priceVariance = null;
-            decimal? quantityVariance = null;
-            var isUnplanned = planned is null;
-            if (!isUnplanned)
+        var lines = plannedByKey.Keys.Union(actualByKey.Keys)
+            .OrderBy(k => k.Period).ThenBy(k => k.ItemName)
+            .Select(key =>
             {
-                priceVariance = (actualPrice - plannedPrice) * actualQty;
-                quantityVariance = (actualQty - plannedQty) * plannedPrice;
-            }
-
-            lines.Add(new RevenueVarianceLine(
-                key.ItemName, key.Period,
-                plannedQty, plannedPrice, plannedAmount,
-                actualQty, actualPrice, actualAmount,
-                totalVariance, priceVariance, quantityVariance, isUnplanned));
-        }
+                var hasPlan = plannedByKey.TryGetValue(key, out var plannedAmount);
+                var actualAmount = actualByKey.GetValueOrDefault(key);
+                return new RevenueVarianceLine(
+                    key.ItemName, key.Period,
+                    plannedAmount, actualAmount, actualAmount - plannedAmount,
+                    IsUnplanned: !hasPlan);
+            })
+            .ToList();
 
         var totalPlanned = lines.Sum(l => l.PlannedAmount);
         var totalActual = lines.Sum(l => l.ActualAmount);
@@ -126,15 +96,15 @@ public sealed class RevenuePlanComparisonService
         if (basePlan.ProjectId != targetPlan.ProjectId)
             throw new DomainException("同一プロジェクトの予算同士のみ比較できます。");
 
-        var baseByKey = basePlan.Lines.ToDictionary(l => (l.ItemName, l.Period));
-        var targetByKey = targetPlan.Lines.ToDictionary(l => (l.ItemName, l.Period));
+        var baseByKey = basePlan.Lines.ToDictionary(l => (l.ItemName, l.Period), l => l.Amount.Value);
+        var targetByKey = targetPlan.Lines.ToDictionary(l => (l.ItemName, l.Period), l => l.Amount.Value);
 
         var lines = baseByKey.Keys.Union(targetByKey.Keys)
             .OrderBy(k => k.Period).ThenBy(k => k.ItemName)
             .Select(key =>
             {
-                var baseAmount = baseByKey.GetValueOrDefault(key)?.Amount.Value ?? 0m;
-                var targetAmount = targetByKey.GetValueOrDefault(key)?.Amount.Value ?? 0m;
+                var baseAmount = baseByKey.GetValueOrDefault(key);
+                var targetAmount = targetByKey.GetValueOrDefault(key);
                 return new RevenuePlanComparisonLine(key.ItemName, key.Period, baseAmount,
                     targetAmount, targetAmount - baseAmount);
             })

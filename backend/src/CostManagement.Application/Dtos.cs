@@ -3,11 +3,10 @@ namespace CostManagement.Application;
 public sealed record ProjectDto(
     Guid Id, string Code, string Name, int FiscalYear, string Status, DateTime CreatedAt);
 
-public sealed record CostElementDto(
-    string Code, string Name, string Type, bool IsQuantityManaged);
+public sealed record CostElementDto(string Code, string Name, string Type);
 
 public sealed record PlanLineDto(
-    Guid Id, string ElementCode, string Period, decimal Quantity, decimal UnitPrice, decimal Amount);
+    Guid Id, string ElementCode, string? RevenueItem, string Period, decimal Amount);
 
 public sealed record CostPlanSummaryDto(
     Guid Id, Guid ProjectId, int Version, string Label, string Status,
@@ -19,14 +18,12 @@ public sealed record CostPlanDetailDto(
     IReadOnlyList<PlanLineDto> Lines);
 
 public sealed record ActualCostDto(
-    Guid Id, Guid ProjectId, string ElementCode, string Period,
-    decimal Quantity, decimal UnitPrice, decimal Amount, string? Note, DateTime RecordedAt);
+    Guid Id, Guid ProjectId, string ElementCode, string? RevenueItem, string Period,
+    decimal Amount, string? Note, DateTime RecordedAt);
 
 public sealed record VarianceLineDto(
-    string ElementCode, string Period,
-    decimal PlannedQuantity, decimal PlannedUnitPrice, decimal PlannedAmount,
-    decimal ActualQuantity, decimal ActualUnitPrice, decimal ActualAmount,
-    decimal TotalVariance, decimal? PriceVariance, decimal? QuantityVariance,
+    string ElementCode, string? RevenueItem, string Period,
+    decimal PlannedAmount, decimal ActualAmount, decimal TotalVariance,
     bool IsUnplanned, bool IsAdverse);
 
 public sealed record VarianceReportDto(
@@ -35,7 +32,8 @@ public sealed record VarianceReportDto(
     decimal TotalPlannedAmount, decimal TotalActualAmount, decimal TotalVariance);
 
 public sealed record PlanComparisonLineDto(
-    string ElementCode, string Period, decimal BaseAmount, decimal TargetAmount, decimal Difference);
+    string ElementCode, string? RevenueItem, string Period,
+    decimal BaseAmount, decimal TargetAmount, decimal Difference);
 
 public sealed record PlanComparisonDto(
     int BaseVersion, string BaseLabel, int TargetVersion, string TargetLabel,
@@ -45,7 +43,7 @@ public sealed record PlanComparisonDto(
 // ---- 売上 ----
 
 public sealed record RevenuePlanLineDto(
-    Guid Id, string ItemName, string Period, decimal Quantity, decimal UnitPrice, decimal Amount);
+    Guid Id, string ItemName, string Period, decimal Amount);
 
 public sealed record RevenuePlanSummaryDto(
     Guid Id, Guid ProjectId, int Version, string Label, string Status,
@@ -58,13 +56,11 @@ public sealed record RevenuePlanDetailDto(
 
 public sealed record ActualRevenueDto(
     Guid Id, Guid ProjectId, string ItemName, string Period,
-    decimal Quantity, decimal UnitPrice, decimal Amount, string? Note, DateTime RecordedAt);
+    decimal Amount, string? Note, DateTime RecordedAt);
 
 public sealed record RevenueVarianceLineDto(
     string ItemName, string Period,
-    decimal PlannedQuantity, decimal PlannedUnitPrice, decimal PlannedAmount,
-    decimal ActualQuantity, decimal ActualUnitPrice, decimal ActualAmount,
-    decimal TotalVariance, decimal? PriceVariance, decimal? QuantityVariance,
+    decimal PlannedAmount, decimal ActualAmount, decimal TotalVariance,
     bool IsUnplanned, bool IsFavorable);
 
 public sealed record RevenueVarianceReportDto(
@@ -80,7 +76,13 @@ public sealed record RevenuePlanComparisonDto(
     IReadOnlyList<RevenuePlanComparisonLineDto> Lines,
     decimal BaseTotalAmount, decimal TargetTotalAmount, decimal TotalDifference);
 
-// ---- 損益(粗利)サマリ ----
+// ---- 損益(粗利) ----
+
+public sealed record ProfitItemLineDto(
+    string? ItemName,
+    decimal PlannedRevenue, decimal ActualRevenue,
+    decimal PlannedCost, decimal ActualCost,
+    decimal PlannedProfit, decimal ActualProfit, decimal ProfitVariance);
 
 public sealed record ProfitPeriodLineDto(
     string Period,
@@ -95,25 +97,24 @@ public sealed record ProfitSummaryDto(
     decimal PlannedCost, decimal ActualCost, decimal CostVariance,
     decimal PlannedProfit, decimal ActualProfit, decimal ProfitVariance,
     decimal? PlannedMarginRate, decimal? ActualMarginRate,
+    IReadOnlyList<ProfitItemLineDto> ItemLines,
     IReadOnlyList<ProfitPeriodLineDto> PeriodLines);
 
 // ---- リクエスト ----
 
 public sealed record CreateProjectRequest(string Code, string Name, int FiscalYear);
 
-public sealed record CreateCostElementRequest(
-    string Code, string Name, string Type, bool IsQuantityManaged);
+public sealed record CreateCostElementRequest(string Code, string Name, string Type);
 
 public sealed record CreatePlanRequest(string Label, Guid? BasePlanId);
 
 public sealed record UpsertPlanLineRequest(
-    string ElementCode, string Period, decimal Quantity, decimal UnitPrice);
+    string ElementCode, string? RevenueItem, string Period, decimal Amount);
 
 public sealed record RecordActualRequest(
-    string ElementCode, string Period, decimal Quantity, decimal UnitPrice, string? Note);
+    string ElementCode, string? RevenueItem, string Period, decimal Amount, string? Note);
 
-public sealed record UpsertRevenuePlanLineRequest(
-    string ItemName, string Period, decimal Quantity, decimal UnitPrice);
+public sealed record UpsertRevenuePlanLineRequest(string ItemName, string Period, decimal Amount);
 
 public sealed record RecordRevenueRequest(
-    string ItemName, string Period, decimal Quantity, decimal UnitPrice, string? Note);
+    string ItemName, string Period, decimal Amount, string? Note);

@@ -79,17 +79,18 @@ public sealed class CostPlanService
         _ = await _elements.FindByCodeAsync(code, ct)
             ?? throw new NotFoundException($"費目が見つかりません: {request.ElementCode}");
 
-        plan.UpsertLine(code, AccountingPeriod.Parse(request.Period),
-            request.Quantity, new Money(request.UnitPrice));
+        plan.UpsertLine(code, request.RevenueItem, AccountingPeriod.Parse(request.Period),
+            new Money(request.Amount));
         await _plans.UpdateAsync(plan, ct);
         return ToDetailDto(plan);
     }
 
     public async Task<CostPlanDetailDto> RemoveLineAsync(Guid planId, string elementCode,
-        string period, CancellationToken ct = default)
+        string? revenueItem, string period, CancellationToken ct = default)
     {
         var plan = await RequireAsync(planId, ct);
-        plan.RemoveLine(new CostElementCode(elementCode), AccountingPeriod.Parse(period));
+        plan.RemoveLine(new CostElementCode(elementCode), revenueItem,
+            AccountingPeriod.Parse(period));
         await _plans.UpdateAsync(plan, ct);
         return ToDetailDto(plan);
     }
@@ -126,7 +127,8 @@ public sealed class CostPlanService
             p.Lines
                 .OrderBy(l => l.Period)
                 .ThenBy(l => l.ElementCode.Value)
-                .Select(l => new PlanLineDto(l.Id, l.ElementCode.Value, l.Period.ToString(),
-                    l.Quantity, l.UnitPrice.Value, l.Amount.Value))
+                .ThenBy(l => l.RevenueItem)
+                .Select(l => new PlanLineDto(l.Id, l.ElementCode.Value, l.RevenueItem,
+                    l.Period.ToString(), l.Amount.Value))
                 .ToList());
 }

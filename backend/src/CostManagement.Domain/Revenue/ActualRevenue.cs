@@ -10,7 +10,7 @@ public readonly record struct ActualRevenueId(Guid Value)
 }
 
 /// <summary>
-/// 売上実績。集約ルート。
+/// 売上実績。集約ルート。金額を直接持つ(数量×単価では管理しない)。
 /// 同一の (品目, 会計期間) に複数の実績を計上でき、分析時に合算される。
 /// </summary>
 public sealed class ActualRevenue
@@ -19,44 +19,37 @@ public sealed class ActualRevenue
     public ProjectId ProjectId { get; }
     public string ItemName { get; }
     public AccountingPeriod Period { get; }
-    public decimal Quantity { get; }
-    public Money UnitPrice { get; }
+    public Money Amount { get; }
     public string? Note { get; }
     public DateTime RecordedAt { get; }
 
-    public Money Amount => UnitPrice * Quantity;
-
     private ActualRevenue(ActualRevenueId id, ProjectId projectId, string itemName,
-        AccountingPeriod period, decimal quantity, Money unitPrice, string? note,
-        DateTime recordedAt)
+        AccountingPeriod period, Money amount, string? note, DateTime recordedAt)
     {
         Id = id;
         ProjectId = projectId;
         ItemName = itemName;
         Period = period;
-        Quantity = quantity;
-        UnitPrice = unitPrice;
+        Amount = amount;
         Note = note;
         RecordedAt = recordedAt;
     }
 
     public static ActualRevenue Record(ProjectId projectId, string itemName,
-        AccountingPeriod period, decimal quantity, Money unitPrice, string? note, DateTime now)
+        AccountingPeriod period, Money amount, string? note, DateTime now)
     {
         if (string.IsNullOrWhiteSpace(itemName))
             throw new DomainException("品目名は必須です。");
-        if (quantity < 0m)
-            throw new DomainException("数量は0以上で入力してください。");
-        if (unitPrice.IsNegative)
-            throw new DomainException("単価は0以上で入力してください。");
+        if (amount.IsNegative)
+            throw new DomainException("金額は0以上で入力してください。");
         return new ActualRevenue(ActualRevenueId.New(), projectId, itemName.Trim(), period,
-            quantity, unitPrice, string.IsNullOrWhiteSpace(note) ? null : note.Trim(), now);
+            amount, string.IsNullOrWhiteSpace(note) ? null : note.Trim(), now);
     }
 
     public static ActualRevenue Restore(Guid id, Guid projectId, string itemName,
-        string period, decimal quantity, decimal unitPrice, string? note, DateTime recordedAt) =>
+        string period, decimal amount, string? note, DateTime recordedAt) =>
         new(new ActualRevenueId(id), new ProjectId(projectId), itemName,
-            AccountingPeriod.Parse(period), quantity, new Money(unitPrice), note, recordedAt);
+            AccountingPeriod.Parse(period), new Money(amount), note, recordedAt);
 }
 
 public interface IActualRevenueRepository

@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { api, formatYen, type CostElement, type CostPlanDetail } from '../api'
+import { api, formatYen, revenueItemLabel, type CostElement, type CostPlanDetail } from '../api'
 
 export default function PlanEditPage() {
   const { projectId, planId } = useParams<{ projectId: string; planId: string }>()
   const [plan, setPlan] = useState<CostPlanDetail | null>(null)
   const [elements, setElements] = useState<CostElement[]>([])
+  const [revenueItems, setRevenueItems] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const [elementCode, setElementCode] = useState('')
+  const [revenueItem, setRevenueItem] = useState('')
   const [period, setPeriod] = useState('')
-  const [quantity, setQuantity] = useState('1')
-  const [unitPrice, setUnitPrice] = useState('')
+  const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(() => {
@@ -21,7 +22,8 @@ export default function PlanEditPage() {
   useEffect(load, [load])
   useEffect(() => {
     api.listCostElements().then(setElements).catch((e: Error) => setError(e.message))
-  }, [])
+    if (projectId) api.listRevenueItems(projectId).then(setRevenueItems).catch(() => undefined)
+  }, [projectId])
 
   if (!projectId || !planId) return null
   const editable = plan?.status === 'Draft'
@@ -34,9 +36,9 @@ export default function PlanEditPage() {
     try {
       const updated = await api.upsertPlanLine(planId, {
         elementCode,
+        revenueItem: revenueItem || null,
         period,
-        quantity: Number(quantity),
-        unitPrice: Number(unitPrice),
+        amount: Number(amount),
       })
       setPlan(updated)
     } catch (err) {
@@ -46,10 +48,10 @@ export default function PlanEditPage() {
     }
   }
 
-  const remove = async (code: string, p: string) => {
+  const remove = async (code: string, item: string | null, p: string) => {
     setError(null)
     try {
-      setPlan(await api.removePlanLine(planId, code, p))
+      setPlan(await api.removePlanLine(planId, code, item, p))
     } catch (err) {
       setError((err as Error).message)
     }
@@ -68,7 +70,7 @@ export default function PlanEditPage() {
     <>
       <div className="breadcrumbs">
         <Link to="/">プロジェクト一覧</Link> /{' '}
-        <Link to={`/projects/${projectId}`}>プロジェクト</Link> / 予算編集
+        <Link to={`/projects/${projectId}`}>プロジェクト</Link> / 原価予算編集
       </div>
       {error && <div className="error-banner">{error}</div>}
 
@@ -80,7 +82,7 @@ export default function PlanEditPage() {
           </span>
         </h2>
         <p>
-          総額: <strong>¥{formatYen(plan?.totalAmount ?? 0)}</strong>
+          原価予算総額: <strong>¥{formatYen(plan?.totalAmount ?? 0)}</strong>
         </p>
         {editable && (
           <button className="primary" onClick={approve} disabled={(plan?.lines.length ?? 0) === 0}>
@@ -97,7 +99,10 @@ export default function PlanEditPage() {
       {editable && (
         <div className="card">
           <h2>明細の追加・更新</h2>
-          <p className="muted small">同じ費目・年月の明細は上書きされます。</p>
+          <p className="muted small">
+            同じ費目・売上対応品目・年月の明細は上書きされます。売上対応品目を空欄にすると
+            共通費(特定の売上に対応しない原価)として扱われます。
+          </p>
           <form onSubmit={upsert} className="form-row">
             <label>
               費目
@@ -111,26 +116,29 @@ export default function PlanEditPage() {
               </select>
             </label>
             <label>
+              売上対応品目(空欄 = 共通費)
+              <input
+                value={revenueItem}
+                onChange={(e) => setRevenueItem(e.target.value)}
+                placeholder="案件A"
+                list="revenue-items"
+              />
+              <datalist id="revenue-items">
+                {revenueItems.map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+            </label>
+            <label>
               年月
               <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} required />
             </label>
             <label>
-              数量
+              金額(円)
               <input
                 type="number"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                min={0}
-                step="any"
-                required
-              />
-            </label>
-            <label>
-              単価(円)
-              <input
-                type="number"
-                value={unitPrice}
-                onChange={(e) => setUnitPrice(e.target.value)}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
                 min={0}
                 step="any"
                 required
@@ -144,7 +152,7 @@ export default function PlanEditPage() {
       )}
 
       <div className="card">
-        <h2>予算明細</h2>
+        <h2>原価予算明細</h2>
         {!plan || plan.lines.length === 0 ? (
           <p className="muted small">明細がありません。</p>
         ) : (
@@ -153,8 +161,7 @@ export default function PlanEditPage() {
               <tr>
                 <th>年月</th>
                 <th>費目</th>
-                <th className="num">数量</th>
-                <th className="num">単価</th>
+                <th>売上対応品目</th>
                 <th className="num">金額</th>
                 {editable && <th></th>}
               </tr>
@@ -164,18 +171,19 @@ export default function PlanEditPage() {
                 <tr key={l.id}>
                   <td>{l.period}</td>
                   <td>{elementName(l.elementCode)}</td>
-                  <td className="num">{formatYen(l.quantity)}</td>
-                  <td className="num">¥{formatYen(l.unitPrice)}</td>
+                  <td className={l.revenueItem ? '' : 'muted'}>{revenueItemLabel(l.revenueItem)}</td>
                   <td className="num">¥{formatYen(l.amount)}</td>
                   {editable && (
                     <td>
-                      <button onClick={() => remove(l.elementCode, l.period)}>削除</button>
+                      <button onClick={() => remove(l.elementCode, l.revenueItem, l.period)}>
+                        削除
+                      </button>
                     </td>
                   )}
                 </tr>
               ))}
               <tr className="total-row">
-                <td colSpan={4}>合計</td>
+                <td colSpan={3}>合計</td>
                 <td className="num">¥{formatYen(plan.totalAmount)}</td>
                 {editable && <td></td>}
               </tr>

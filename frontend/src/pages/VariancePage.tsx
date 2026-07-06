@@ -4,6 +4,7 @@ import {
   api,
   formatSignedYen,
   formatYen,
+  revenueItemLabel,
   type CostElement,
   type CostPlanSummary,
   type ProfitSummary,
@@ -157,51 +158,47 @@ function CostVarianceTab({ projectId }: { projectId: string }) {
           </div>
 
           <div className="card">
-            <h2>差異明細(価格差異・数量差異の分解)</h2>
+            <h2>差異明細</h2>
             <p className="muted small">
-              価格差異 = (実際単価 − 予定単価) × 実際数量、数量差異 = (実際数量 − 予定数量) × 予定単価。
-              正の値は不利差異(予算超過)、負の値は有利差異です。
+              差異 = 実績金額 − 予算金額。正の値は不利差異(予算超過)、負の値は有利差異です。
+              明細は費目 × 売上対応品目 × 年月の粒度で突き合わせます。
             </p>
             <table>
               <thead>
                 <tr>
                   <th>年月</th>
                   <th>費目</th>
+                  <th>売上対応品目</th>
                   <th className="num">予算金額</th>
                   <th className="num">実績金額</th>
-                  <th className="num">総差異</th>
-                  <th className="num">価格差異</th>
-                  <th className="num">数量差異</th>
+                  <th className="num">差異</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 {report.lines.map((l) => (
-                  <tr key={`${l.period}-${l.elementCode}`}>
+                  <tr key={`${l.period}-${l.elementCode}-${l.revenueItem ?? ''}`}>
                     <td>{l.period}</td>
                     <td>{elementName(l.elementCode)}</td>
+                    <td className={l.revenueItem ? '' : 'muted'}>
+                      {revenueItemLabel(l.revenueItem)}
+                    </td>
                     <td className="num">¥{formatYen(l.plannedAmount)}</td>
                     <td className="num">¥{formatYen(l.actualAmount)}</td>
                     <td className={`num ${l.totalVariance > 0 ? 'adverse' : l.totalVariance < 0 ? 'favorable' : ''}`}>
                       ¥{formatSignedYen(l.totalVariance)}
                     </td>
-                    <td className="num">
-                      {l.priceVariance !== null ? `¥${formatSignedYen(l.priceVariance)}` : '—'}
-                    </td>
-                    <td className="num">
-                      {l.quantityVariance !== null ? `¥${formatSignedYen(l.quantityVariance)}` : '—'}
-                    </td>
                     <td className="small muted">{l.isUnplanned ? '予定外' : ''}</td>
                   </tr>
                 ))}
                 <tr className="total-row">
-                  <td colSpan={2}>合計</td>
+                  <td colSpan={3}>合計</td>
                   <td className="num">¥{formatYen(report.totalPlannedAmount)}</td>
                   <td className="num">¥{formatYen(report.totalActualAmount)}</td>
                   <td className={`num ${report.totalVariance > 0 ? 'adverse' : 'favorable'}`}>
                     ¥{formatSignedYen(report.totalVariance)}
                   </td>
-                  <td colSpan={3}></td>
+                  <td></td>
                 </tr>
               </tbody>
             </table>
@@ -307,7 +304,7 @@ function RevenueVarianceTab({ projectId }: { projectId: string }) {
 
           <div className="card">
             <h2>月別 売上予算 vs 実績</h2>
-            <PlannedVsActualChart data={byPeriod} />
+            <PlannedVsActualChart data={byPeriod} seriesLabels={['売上予算', '売上実績']} />
           </div>
 
           <div className="card">
@@ -320,10 +317,10 @@ function RevenueVarianceTab({ projectId }: { projectId: string }) {
           </div>
 
           <div className="card">
-            <h2>差異明細(販売価格差異・販売数量差異の分解)</h2>
+            <h2>差異明細</h2>
             <p className="muted small">
-              販売価格差異 = (実際単価 − 予定単価) × 実際数量、販売数量差異 = (実際数量 − 予定数量) ×
-              予定単価。売上は原価と逆で、正の値が有利差異(売上超過)、負の値が不利差異(未達)です。
+              差異 = 実績金額 − 予算金額。売上は原価と逆で、正の値が有利差異(売上超過)、
+              負の値が不利差異(未達)です。
             </p>
             <table>
               <thead>
@@ -332,9 +329,7 @@ function RevenueVarianceTab({ projectId }: { projectId: string }) {
                   <th>品目</th>
                   <th className="num">予算金額</th>
                   <th className="num">実績金額</th>
-                  <th className="num">総差異</th>
-                  <th className="num">販売価格差異</th>
-                  <th className="num">販売数量差異</th>
+                  <th className="num">差異</th>
                   <th></th>
                 </tr>
               </thead>
@@ -348,12 +343,6 @@ function RevenueVarianceTab({ projectId }: { projectId: string }) {
                     <td className={`num ${l.totalVariance > 0 ? 'favorable' : l.totalVariance < 0 ? 'adverse' : ''}`}>
                       ¥{formatSignedYen(l.totalVariance)}
                     </td>
-                    <td className="num">
-                      {l.priceVariance !== null ? `¥${formatSignedYen(l.priceVariance)}` : '—'}
-                    </td>
-                    <td className="num">
-                      {l.quantityVariance !== null ? `¥${formatSignedYen(l.quantityVariance)}` : '—'}
-                    </td>
                     <td className="small muted">{l.isUnplanned ? '予定外' : ''}</td>
                   </tr>
                 ))}
@@ -364,7 +353,7 @@ function RevenueVarianceTab({ projectId }: { projectId: string }) {
                   <td className={`num ${report.totalVariance >= 0 ? 'favorable' : 'adverse'}`}>
                     ¥{formatSignedYen(report.totalVariance)}
                   </td>
-                  <td colSpan={3}></td>
+                  <td></td>
                 </tr>
               </tbody>
             </table>
@@ -399,6 +388,15 @@ function ProfitTab({ projectId }: { projectId: string }) {
         label: l.period,
         planned: l.plannedProfit,
         actual: l.actualProfit,
+      })) ?? [],
+    [summary],
+  )
+
+  const profitVarianceByItem = useMemo(
+    () =>
+      summary?.itemLines.map((l) => ({
+        label: revenueItemLabel(l.itemName),
+        value: l.profitVariance,
       })) ?? [],
     [summary],
   )
@@ -438,40 +436,45 @@ function ProfitTab({ projectId }: { projectId: string }) {
           </div>
 
           <div className="card">
-            <h2>月別 粗利 予算 vs 実績</h2>
-            <PlannedVsActualChart data={profitByPeriod} seriesLabels={['粗利予算', '粗利実績']} />
-          </div>
-
-          <div className="card">
-            <h2>損益内訳</h2>
+            <h2>品目別 損益(売上対応原価との突き合わせ)</h2>
+            <p className="muted small">
+              売上の品目と、原価明細の「売上対応品目」を突き合わせて品目単位の粗利を算出します。
+              売上対応品目のない原価は「(共通)」行に集計されます。
+            </p>
             <table>
               <thead>
                 <tr>
-                  <th></th>
-                  <th className="num">予算</th>
-                  <th className="num">実績</th>
-                  <th className="num">差異</th>
+                  <th>品目</th>
+                  <th className="num">売上予算</th>
+                  <th className="num">売上実績</th>
+                  <th className="num">原価予算</th>
+                  <th className="num">原価実績</th>
+                  <th className="num">粗利予算</th>
+                  <th className="num">粗利実績</th>
+                  <th className="num">粗利差異</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>売上高</td>
+                {summary.itemLines.map((l) => (
+                  <tr key={l.itemName ?? '(common)'}>
+                    <td className={l.itemName ? '' : 'muted'}>{revenueItemLabel(l.itemName)}</td>
+                    <td className="num">¥{formatYen(l.plannedRevenue)}</td>
+                    <td className="num">¥{formatYen(l.actualRevenue)}</td>
+                    <td className="num">¥{formatYen(l.plannedCost)}</td>
+                    <td className="num">¥{formatYen(l.actualCost)}</td>
+                    <td className="num">¥{formatYen(l.plannedProfit)}</td>
+                    <td className="num">¥{formatYen(l.actualProfit)}</td>
+                    <td className={`num ${l.profitVariance >= 0 ? 'favorable' : 'adverse'}`}>
+                      ¥{formatSignedYen(l.profitVariance)}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="total-row">
+                  <td>合計</td>
                   <td className="num">¥{formatYen(summary.plannedRevenue)}</td>
                   <td className="num">¥{formatYen(summary.actualRevenue)}</td>
-                  <td className={`num ${summary.revenueVariance >= 0 ? 'favorable' : 'adverse'}`}>
-                    ¥{formatSignedYen(summary.revenueVariance)}
-                  </td>
-                </tr>
-                <tr>
-                  <td>総原価</td>
                   <td className="num">¥{formatYen(summary.plannedCost)}</td>
                   <td className="num">¥{formatYen(summary.actualCost)}</td>
-                  <td className={`num ${summary.costVariance > 0 ? 'adverse' : 'favorable'}`}>
-                    ¥{formatSignedYen(summary.costVariance)}
-                  </td>
-                </tr>
-                <tr className="total-row">
-                  <td>粗利</td>
                   <td className="num">¥{formatYen(summary.plannedProfit)}</td>
                   <td className="num">¥{formatYen(summary.actualProfit)}</td>
                   <td className={`num ${summary.profitVariance >= 0 ? 'favorable' : 'adverse'}`}>
@@ -480,6 +483,20 @@ function ProfitTab({ projectId }: { projectId: string }) {
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div className="card">
+            <h2>品目別 粗利差異</h2>
+            <VarianceBarChart
+              data={profitVarianceByItem}
+              adverseWhenPositive={false}
+              legendLabels={['有利差異(粗利改善)', '不利差異(粗利悪化)']}
+            />
+          </div>
+
+          <div className="card">
+            <h2>月別 粗利 予算 vs 実績</h2>
+            <PlannedVsActualChart data={profitByPeriod} seriesLabels={['粗利予算', '粗利実績']} />
           </div>
 
           <div className="card">

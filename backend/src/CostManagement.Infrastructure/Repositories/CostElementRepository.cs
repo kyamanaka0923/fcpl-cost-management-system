@@ -13,11 +13,10 @@ public sealed class CostElementRepository : ICostElementRepository
         _factory = factory;
     }
 
-    private sealed record Row(string Code, string Name, string ElementType, long IsQuantityManaged);
+    private sealed record Row(string Code, string Name, string ElementType);
 
     private const string SelectSql = """
-        SELECT code AS Code, name AS Name, element_type AS ElementType,
-               is_quantity_managed AS IsQuantityManaged
+        SELECT code AS Code, name AS Name, element_type AS ElementType
         FROM cost_elements
         """;
 
@@ -41,18 +40,16 @@ public sealed class CostElementRepository : ICostElementRepository
     {
         using var conn = _factory.Create();
         await conn.ExecuteAsync("""
-            INSERT INTO cost_elements (code, name, element_type, is_quantity_managed)
-            VALUES (@Code, @Name, @ElementType, @IsQuantityManaged)
+            INSERT INTO cost_elements (code, name, element_type)
+            VALUES (@Code, @Name, @ElementType)
             """, new
         {
             Code = element.Code.Value,
             element.Name,
             ElementType = element.Type.ToString(),
-            IsQuantityManaged = element.IsQuantityManaged ? 1 : 0,
         });
     }
 
     private static CostElement ToEntity(Row row) =>
-        CostElement.Restore(row.Code, row.Name,
-            Enum.Parse<CostElementType>(row.ElementType), row.IsQuantityManaged != 0);
+        CostElement.Restore(row.Code, row.Name, Enum.Parse<CostElementType>(row.ElementType));
 }

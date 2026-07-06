@@ -34,8 +34,9 @@ public sealed class ActualCostService
         _ = await _elements.FindByCodeAsync(code, ct)
             ?? throw new NotFoundException($"費目が見つかりません: {request.ElementCode}");
 
-        var actual = ActualCost.Record(pid, code, AccountingPeriod.Parse(request.Period),
-            request.Quantity, new Money(request.UnitPrice), request.Note, _clock.UtcNow);
+        var actual = ActualCost.Record(pid, code, request.RevenueItem,
+            AccountingPeriod.Parse(request.Period), new Money(request.Amount),
+            request.Note, _clock.UtcNow);
         await _actuals.AddAsync(actual, ct);
         return ToDto(actual);
     }
@@ -60,6 +61,6 @@ public sealed class ActualCostService
     }
 
     internal static ActualCostDto ToDto(ActualCost a) =>
-        new(a.Id.Value, a.ProjectId.Value, a.ElementCode.Value, a.Period.ToString(),
-            a.Quantity, a.UnitPrice.Value, a.Amount.Value, a.Note, a.RecordedAt);
+        new(a.Id.Value, a.ProjectId.Value, a.ElementCode.Value, a.RevenueItem,
+            a.Period.ToString(), a.Amount.Value, a.Note, a.RecordedAt);
 }

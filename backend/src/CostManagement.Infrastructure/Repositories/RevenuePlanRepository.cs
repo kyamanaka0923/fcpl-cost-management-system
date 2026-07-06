@@ -20,7 +20,7 @@ public sealed class RevenuePlanRepository : IRevenuePlanRepository
         string Status, DateTime CreatedAt, DateTime? ApprovedAt);
 
     private sealed record LineRow(Guid Id, Guid PlanId, string ItemName, string Period,
-        decimal Quantity, decimal UnitPrice);
+        decimal Amount);
 
     private const string SelectPlanSql = """
         SELECT id AS Id, project_id AS ProjectId, version AS Version, label AS Label,
@@ -30,7 +30,7 @@ public sealed class RevenuePlanRepository : IRevenuePlanRepository
 
     private const string SelectLineSql = """
         SELECT id AS Id, plan_id AS PlanId, item_name AS ItemName, period AS Period,
-               quantity AS Quantity, unit_price AS UnitPrice
+               amount AS Amount
         FROM revenue_plan_lines
         """;
 
@@ -55,7 +55,7 @@ public sealed class RevenuePlanRepository : IRevenuePlanRepository
             new { Pid = projectId.Value })).ToList();
         var lines = (await conn.QueryAsync<LineRow>("""
             SELECT l.id AS Id, l.plan_id AS PlanId, l.item_name AS ItemName,
-                   l.period AS Period, l.quantity AS Quantity, l.unit_price AS UnitPrice
+                   l.period AS Period, l.amount AS Amount
             FROM revenue_plan_lines l
             JOIN revenue_plans p ON p.id = l.plan_id
             WHERE p.project_id = @Pid
@@ -135,16 +135,15 @@ public sealed class RevenuePlanRepository : IRevenuePlanRepository
         foreach (var line in plan.Lines)
         {
             await conn.ExecuteAsync("""
-                INSERT INTO revenue_plan_lines (id, plan_id, item_name, period, quantity, unit_price)
-                VALUES (@Id, @PlanId, @ItemName, @Period, @Quantity, @UnitPrice)
+                INSERT INTO revenue_plan_lines (id, plan_id, item_name, period, amount)
+                VALUES (@Id, @PlanId, @ItemName, @Period, @Amount)
                 """, new
             {
                 line.Id,
                 PlanId = plan.Id.Value,
                 line.ItemName,
                 Period = line.Period.ToString(),
-                line.Quantity,
-                UnitPrice = line.UnitPrice.Value,
+                Amount = line.Amount.Value,
             }, tx);
         }
     }
@@ -152,5 +151,5 @@ public sealed class RevenuePlanRepository : IRevenuePlanRepository
     private static RevenuePlan ToEntity(PlanRow plan, IEnumerable<LineRow> lines) =>
         RevenuePlan.Restore(plan.Id, plan.ProjectId, (int)plan.Version, plan.Label,
             Enum.Parse<PlanStatus>(plan.Status), plan.CreatedAt, plan.ApprovedAt,
-            lines.Select(l => (l.Id, l.ItemName, l.Period, l.Quantity, l.UnitPrice)));
+            lines.Select(l => (l.Id, l.ItemName, l.Period, l.Amount)));
 }

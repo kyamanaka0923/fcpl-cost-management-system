@@ -67,8 +67,9 @@ api.MapPut("/plans/{planId:guid}/lines",
     (Guid planId, UpsertPlanLineRequest req, CostPlanService svc, CancellationToken ct) =>
         svc.UpsertLineAsync(planId, req, ct));
 api.MapDelete("/plans/{planId:guid}/lines",
-    (Guid planId, string elementCode, string period, CostPlanService svc, CancellationToken ct) =>
-        svc.RemoveLineAsync(planId, elementCode, period, ct));
+    (Guid planId, string elementCode, string? revenueItem, string period, CostPlanService svc,
+        CancellationToken ct) =>
+        svc.RemoveLineAsync(planId, elementCode, revenueItem, period, ct));
 api.MapPost("/plans/{planId:guid}/approve",
     (Guid planId, CostPlanService svc, CancellationToken ct) => svc.ApproveAsync(planId, ct));
 
@@ -131,5 +132,7 @@ api.MapGet("/projects/{id:guid}/revenue-plan-comparison",
 api.MapGet("/projects/{id:guid}/profit",
     (Guid id, string? from, string? to, AnalysisService svc, CancellationToken ct) =>
         svc.GetProfitSummaryAsync(id, from, to, ct));
+api.MapGet("/projects/{id:guid}/revenue-items",
+    (Guid id, AnalysisService svc, CancellationToken ct) => svc.ListRevenueItemsAsync(id, ct));
 
 app.Run();

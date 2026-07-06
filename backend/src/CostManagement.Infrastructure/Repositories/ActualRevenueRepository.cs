@@ -15,11 +15,11 @@ public sealed class ActualRevenueRepository : IActualRevenueRepository
     }
 
     private sealed record Row(Guid Id, Guid ProjectId, string ItemName, string Period,
-        decimal Quantity, decimal UnitPrice, string? Note, DateTime RecordedAt);
+        decimal Amount, string? Note, DateTime RecordedAt);
 
     private const string SelectSql = """
         SELECT id AS Id, project_id AS ProjectId, item_name AS ItemName, period AS Period,
-               quantity AS Quantity, unit_price AS UnitPrice, note AS Note, recorded_at AS RecordedAt
+               amount AS Amount, note AS Note, recorded_at AS RecordedAt
         FROM actual_revenues
         """;
 
@@ -46,16 +46,15 @@ public sealed class ActualRevenueRepository : IActualRevenueRepository
     {
         using var conn = _factory.Create();
         await conn.ExecuteAsync("""
-            INSERT INTO actual_revenues (id, project_id, item_name, period, quantity, unit_price, note, recorded_at)
-            VALUES (@Id, @ProjectId, @ItemName, @Period, @Quantity, @UnitPrice, @Note, @RecordedAt)
+            INSERT INTO actual_revenues (id, project_id, item_name, period, amount, note, recorded_at)
+            VALUES (@Id, @ProjectId, @ItemName, @Period, @Amount, @Note, @RecordedAt)
             """, new
         {
             Id = actual.Id.Value,
             ProjectId = actual.ProjectId.Value,
             actual.ItemName,
             Period = actual.Period.ToString(),
-            actual.Quantity,
-            UnitPrice = actual.UnitPrice.Value,
+            Amount = actual.Amount.Value,
             actual.Note,
             actual.RecordedAt,
         });
@@ -69,5 +68,5 @@ public sealed class ActualRevenueRepository : IActualRevenueRepository
 
     private static ActualRevenue ToEntity(Row row) =>
         ActualRevenue.Restore(row.Id, row.ProjectId, row.ItemName, row.Period,
-            row.Quantity, row.UnitPrice, row.Note, row.RecordedAt);
+            row.Amount, row.Note, row.RecordedAt);
 }

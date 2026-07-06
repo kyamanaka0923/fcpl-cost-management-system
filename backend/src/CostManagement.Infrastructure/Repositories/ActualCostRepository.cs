@@ -14,12 +14,13 @@ public sealed class ActualCostRepository : IActualCostRepository
         _factory = factory;
     }
 
-    private sealed record Row(Guid Id, Guid ProjectId, string ElementCode, string Period,
-        decimal Quantity, decimal UnitPrice, string? Note, DateTime RecordedAt);
+    private sealed record Row(Guid Id, Guid ProjectId, string ElementCode, string RevenueItem,
+        string Period, decimal Amount, string? Note, DateTime RecordedAt);
 
     private const string SelectSql = """
-        SELECT id AS Id, project_id AS ProjectId, element_code AS ElementCode, period AS Period,
-               quantity AS Quantity, unit_price AS UnitPrice, note AS Note, recorded_at AS RecordedAt
+        SELECT id AS Id, project_id AS ProjectId, element_code AS ElementCode,
+               revenue_item AS RevenueItem, period AS Period, amount AS Amount,
+               note AS Note, recorded_at AS RecordedAt
         FROM actual_costs
         """;
 
@@ -45,16 +46,16 @@ public sealed class ActualCostRepository : IActualCostRepository
     {
         using var conn = _factory.Create();
         await conn.ExecuteAsync("""
-            INSERT INTO actual_costs (id, project_id, element_code, period, quantity, unit_price, note, recorded_at)
-            VALUES (@Id, @ProjectId, @ElementCode, @Period, @Quantity, @UnitPrice, @Note, @RecordedAt)
+            INSERT INTO actual_costs (id, project_id, element_code, revenue_item, period, amount, note, recorded_at)
+            VALUES (@Id, @ProjectId, @ElementCode, @RevenueItem, @Period, @Amount, @Note, @RecordedAt)
             """, new
         {
             Id = actual.Id.Value,
             ProjectId = actual.ProjectId.Value,
             ElementCode = actual.ElementCode.Value,
+            RevenueItem = actual.RevenueItem ?? "",
             Period = actual.Period.ToString(),
-            actual.Quantity,
-            UnitPrice = actual.UnitPrice.Value,
+            Amount = actual.Amount.Value,
             actual.Note,
             actual.RecordedAt,
         });
@@ -67,6 +68,7 @@ public sealed class ActualCostRepository : IActualCostRepository
     }
 
     private static ActualCost ToEntity(Row row) =>
-        ActualCost.Restore(row.Id, row.ProjectId, row.ElementCode, row.Period,
-            row.Quantity, row.UnitPrice, row.Note, row.RecordedAt);
+        ActualCost.Restore(row.Id, row.ProjectId, row.ElementCode,
+            row.RevenueItem == "" ? null : row.RevenueItem, row.Period,
+            row.Amount, row.Note, row.RecordedAt);
 }

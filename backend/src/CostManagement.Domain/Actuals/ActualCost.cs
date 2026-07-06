@@ -1,4 +1,5 @@
 using CostManagement.Domain.CostElements;
+using CostManagement.Domain.Planning;
 using CostManagement.Domain.Projects;
 using CostManagement.Domain.Shared;
 
@@ -11,51 +12,52 @@ public readonly record struct ActualCostId(Guid Value)
 }
 
 /// <summary>
-/// 原価実績。集約ルート。
-/// 同一の (費目, 会計期間) に複数の実績を計上でき、分析時に合算される。
+/// 原価実績。集約ルート。金額を直接持つ(数量×単価では管理しない)。
+/// 同一の (費目, 売上対応品目, 会計期間) に複数の実績を計上でき、分析時に合算される。
 /// </summary>
 public sealed class ActualCost
 {
     public ActualCostId Id { get; }
     public ProjectId ProjectId { get; }
     public CostElementCode ElementCode { get; }
+
+    /// <summary>売上対応品目。どの売上(品目)に対応する原価かを表す。null = 共通費。</summary>
+    public string? RevenueItem { get; }
+
     public AccountingPeriod Period { get; }
-    public decimal Quantity { get; }
-    public Money UnitPrice { get; }
+    public Money Amount { get; }
     public string? Note { get; }
     public DateTime RecordedAt { get; }
 
-    public Money Amount => UnitPrice * Quantity;
-
     private ActualCost(ActualCostId id, ProjectId projectId, CostElementCode elementCode,
-        AccountingPeriod period, decimal quantity, Money unitPrice, string? note,
+        string? revenueItem, AccountingPeriod period, Money amount, string? note,
         DateTime recordedAt)
     {
         Id = id;
         ProjectId = projectId;
         ElementCode = elementCode;
+        RevenueItem = revenueItem;
         Period = period;
-        Quantity = quantity;
-        UnitPrice = unitPrice;
+        Amount = amount;
         Note = note;
         RecordedAt = recordedAt;
     }
 
     public static ActualCost Record(ProjectId projectId, CostElementCode elementCode,
-        AccountingPeriod period, decimal quantity, Money unitPrice, string? note, DateTime now)
+        string? revenueItem, AccountingPeriod period, Money amount, string? note, DateTime now)
     {
-        if (quantity < 0m)
-            throw new DomainException("数量は0以上で入力してください。");
-        if (unitPrice.IsNegative)
-            throw new DomainException("単価は0以上で入力してください。");
-        return new ActualCost(ActualCostId.New(), projectId, elementCode, period,
-            quantity, unitPrice, string.IsNullOrWhiteSpace(note) ? null : note.Trim(), now);
+        if (amount.IsNegative)
+            throw new DomainException("金額は0以上で入力してください。");
+        return new ActualCost(ActualCostId.New(), projectId, elementCode,
+            CostPlan.NormalizeRevenueItem(revenueItem), period, amount,
+            string.IsNullOrWhiteSpace(note) ? null : note.Trim(), now);
     }
 
     public static ActualCost Restore(Guid id, Guid projectId, string elementCode,
-        string period, decimal quantity, decimal unitPrice, string? note, DateTime recordedAt) =>
+        string? revenueItem, string period, decimal amount, string? note, DateTime recordedAt) =>
         new(new ActualCostId(id), new ProjectId(projectId), new CostElementCode(elementCode),
-            AccountingPeriod.Parse(period), quantity, new Money(unitPrice), note, recordedAt);
+            CostPlan.NormalizeRevenueItem(revenueItem), AccountingPeriod.Parse(period),
+            new Money(amount), note, recordedAt);
 }
 
 public interface IActualCostRepository

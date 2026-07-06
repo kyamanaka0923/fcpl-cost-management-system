@@ -27,11 +27,11 @@ public sealed class CostElementService
         if (await _elements.FindByCodeAsync(code, ct) is not null)
             throw new DomainException($"費目コード '{code}' は既に使用されています。");
 
-        var element = CostElement.Create(request.Code, request.Name, type, request.IsQuantityManaged);
+        var element = CostElement.Create(request.Code, request.Name, type);
         await _elements.AddAsync(element, ct);
         return ToDto(element);
     }
 
     internal static CostElementDto ToDto(CostElement e) =>
-        new(e.Code.Value, e.Name, e.Type.ToString(), e.IsQuantityManaged);
+        new(e.Code.Value, e.Name, e.Type.ToString());
 }

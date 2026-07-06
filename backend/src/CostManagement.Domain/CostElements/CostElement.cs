@@ -40,29 +40,22 @@ public sealed class CostElement
     public string Name { get; private set; }
     public CostElementType Type { get; }
 
-    /// <summary>数量×単価で管理する費目か(false の場合は金額のみで管理)。</summary>
-    public bool IsQuantityManaged { get; }
-
-    private CostElement(CostElementCode code, string name, CostElementType type,
-        bool isQuantityManaged)
+    private CostElement(CostElementCode code, string name, CostElementType type)
     {
         Code = code;
         Name = name;
         Type = type;
-        IsQuantityManaged = isQuantityManaged;
     }
 
-    public static CostElement Create(string code, string name, CostElementType type,
-        bool isQuantityManaged)
+    public static CostElement Create(string code, string name, CostElementType type)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("費目名は必須です。");
-        return new CostElement(new CostElementCode(code), name.Trim(), type, isQuantityManaged);
+        return new CostElement(new CostElementCode(code), name.Trim(), type);
     }
 
-    public static CostElement Restore(string code, string name, CostElementType type,
-        bool isQuantityManaged) =>
-        new(new CostElementCode(code), name, type, isQuantityManaged);
+    public static CostElement Restore(string code, string name, CostElementType type) =>
+        new(new CostElementCode(code), name, type);
 }
 
 public interface ICostElementRepository

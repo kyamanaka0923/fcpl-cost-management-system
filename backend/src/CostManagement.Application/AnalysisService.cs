@@ -19,12 +19,14 @@ public sealed class AnalysisService
     private readonly PlanComparisonService _planComparison;
     private readonly RevenueVarianceAnalysisService _revenueVarianceAnalysis;
     private readonly RevenuePlanComparisonService _revenuePlanComparison;
+    private readonly ProfitAnalysisService _profitAnalysis;
 
     public AnalysisService(ICostPlanRepository plans, IActualCostRepository actuals,
         IRevenuePlanRepository revenuePlans, IActualRevenueRepository actualRevenues,
         VarianceAnalysisService varianceAnalysis, PlanComparisonService planComparison,
         RevenueVarianceAnalysisService revenueVarianceAnalysis,
-        RevenuePlanComparisonService revenuePlanComparison)
+        RevenuePlanComparisonService revenuePlanComparison,
+        ProfitAnalysisService profitAnalysis)
     {
         _plans = plans;
         _actuals = actuals;
@@ -34,6 +36,7 @@ public sealed class AnalysisService
         _planComparison = planComparison;
         _revenueVarianceAnalysis = revenueVarianceAnalysis;
         _revenuePlanComparison = revenuePlanComparison;
+        _profitAnalysis = profitAnalysis;
     }
 
     /// <summary>
@@ -67,10 +70,8 @@ public sealed class AnalysisService
         return new VarianceReportDto(
             plan.Id.Value, plan.Version, plan.Label,
             report.Lines.Select(l => new VarianceLineDto(
-                l.ElementCode, l.Period.ToString(),
-                l.PlannedQuantity, l.PlannedUnitPrice, l.PlannedAmount,
-                l.ActualQuantity, l.ActualUnitPrice, l.ActualAmount,
-                l.TotalVariance, l.PriceVariance, l.QuantityVariance,
+                l.ElementCode, l.RevenueItem, l.Period.ToString(),
+                l.PlannedAmount, l.ActualAmount, l.TotalVariance,
                 l.IsUnplanned, l.IsAdverse)).ToList(),
             report.TotalPlannedAmount, report.TotalActualAmount, report.TotalVariance);
     }
@@ -91,7 +92,8 @@ public sealed class AnalysisService
         return new PlanComparisonDto(
             report.BaseVersion, report.BaseLabel, report.TargetVersion, report.TargetLabel,
             report.Lines.Select(l => new PlanComparisonLineDto(
-                l.ElementCode, l.Period.ToString(), l.BaseAmount, l.TargetAmount, l.Difference))
+                l.ElementCode, l.RevenueItem, l.Period.ToString(),
+                l.BaseAmount, l.TargetAmount, l.Difference))
                 .ToList(),
             report.BaseTotalAmount, report.TargetTotalAmount, report.TotalDifference);
     }
@@ -125,9 +127,7 @@ public sealed class AnalysisService
             plan.Id.Value, plan.Version, plan.Label,
             report.Lines.Select(l => new RevenueVarianceLineDto(
                 l.ItemName, l.Period.ToString(),
-                l.PlannedQuantity, l.PlannedUnitPrice, l.PlannedAmount,
-                l.ActualQuantity, l.ActualUnitPrice, l.ActualAmount,
-                l.TotalVariance, l.PriceVariance, l.QuantityVariance,
+                l.PlannedAmount, l.ActualAmount, l.TotalVariance,
                 l.IsUnplanned, l.IsFavorable)).ToList(),
             report.TotalPlannedAmount, report.TotalActualAmount, report.TotalVariance);
     }
@@ -155,7 +155,7 @@ public sealed class AnalysisService
 
     /// <summary>
     /// 損益(粗利)の予実サマリ。最新の承認済み売上予算・原価予算を突き合わせ、
-    /// 売上 − 原価 = 粗利 の予実と月別内訳を返す。
+    /// 全体・品目別(売上対応原価との突き合わせ)・月別の粗利予実を返す。
     /// </summary>
     public async Task<ProfitSummaryDto> GetProfitSummaryAsync(Guid projectId,
         string? from, string? to, CancellationToken ct = default)
@@ -175,47 +175,35 @@ public sealed class AnalysisService
         var costReport = _varianceAnalysis.Analyze(costPlan,
             await _actuals.ListByProjectAsync(pid, ct), fromPeriod, toPeriod);
 
-        // 月別の内訳(売上・原価どちらかに存在する期間をすべて含める)
-        var revenueByPeriod = revenueReport.Lines
-            .GroupBy(l => l.Period)
-            .ToDictionary(g => g.Key,
-                g => (Planned: g.Sum(l => l.PlannedAmount), Actual: g.Sum(l => l.ActualAmount)));
-        var costByPeriod = costReport.Lines
-            .GroupBy(l => l.Period)
-            .ToDictionary(g => g.Key,
-                g => (Planned: g.Sum(l => l.PlannedAmount), Actual: g.Sum(l => l.ActualAmount)));
-
-        var periodLines = revenueByPeriod.Keys.Union(costByPeriod.Keys)
-            .OrderBy(p => p)
-            .Select(p =>
-            {
-                var rev = revenueByPeriod.GetValueOrDefault(p);
-                var cost = costByPeriod.GetValueOrDefault(p);
-                var plannedProfit = rev.Planned - cost.Planned;
-                var actualProfit = rev.Actual - cost.Actual;
-                return new ProfitPeriodLineDto(p.ToString(),
-                    rev.Planned, rev.Actual, cost.Planned, cost.Actual,
-                    plannedProfit, actualProfit, actualProfit - plannedProfit);
-            })
-            .ToList();
-
-        var totalPlannedProfit = revenueReport.TotalPlannedAmount - costReport.TotalPlannedAmount;
-        var totalActualProfit = revenueReport.TotalActualAmount - costReport.TotalActualAmount;
+        var report = _profitAnalysis.Analyze(revenueReport, costReport);
 
         return new ProfitSummaryDto(
             revenuePlan.Version, revenuePlan.Label,
             costPlan.Version, costPlan.Label,
-            revenueReport.TotalPlannedAmount, revenueReport.TotalActualAmount,
-            revenueReport.TotalVariance,
-            costReport.TotalPlannedAmount, costReport.TotalActualAmount,
-            costReport.TotalVariance,
-            totalPlannedProfit, totalActualProfit, totalActualProfit - totalPlannedProfit,
-            revenueReport.TotalPlannedAmount != 0m
-                ? totalPlannedProfit / revenueReport.TotalPlannedAmount
-                : null,
-            revenueReport.TotalActualAmount != 0m
-                ? totalActualProfit / revenueReport.TotalActualAmount
-                : null,
-            periodLines);
+            report.PlannedRevenue, report.ActualRevenue, report.RevenueVariance,
+            report.PlannedCost, report.ActualCost, report.CostVariance,
+            report.PlannedProfit, report.ActualProfit, report.ProfitVariance,
+            report.PlannedMarginRate, report.ActualMarginRate,
+            report.ItemLines.Select(l => new ProfitItemLineDto(l.ItemName,
+                l.PlannedRevenue, l.ActualRevenue, l.PlannedCost, l.ActualCost,
+                l.PlannedProfit, l.ActualProfit, l.ProfitVariance)).ToList(),
+            report.PeriodLines.Select(l => new ProfitPeriodLineDto(l.Period.ToString(),
+                l.PlannedRevenue, l.ActualRevenue, l.PlannedCost, l.ActualCost,
+                l.PlannedProfit, l.ActualProfit, l.ProfitVariance)).ToList());
+    }
+
+    /// <summary>
+    /// 売上対応品目の候補一覧。売上予算・売上実績に登場する品目名を重複なく返す
+    /// (原価明細の「売上対応品目」入力の補完に利用)。
+    /// </summary>
+    public async Task<IReadOnlyList<string>> ListRevenueItemsAsync(Guid projectId,
+        CancellationToken ct = default)
+    {
+        var pid = new ProjectId(projectId);
+        var planItems = (await _revenuePlans.ListByProjectAsync(pid, ct))
+            .SelectMany(p => p.Lines.Select(l => l.ItemName));
+        var actualItems = (await _actualRevenues.ListByProjectAsync(pid, ct))
+            .Select(a => a.ItemName);
+        return planItems.Concat(actualItems).Distinct().OrderBy(x => x).ToList();
     }
 }

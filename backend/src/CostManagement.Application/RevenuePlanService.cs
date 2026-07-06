@@ -70,7 +70,7 @@ public sealed class RevenuePlanService
     {
         var plan = await RequireAsync(planId, ct);
         plan.UpsertLine(request.ItemName, AccountingPeriod.Parse(request.Period),
-            request.Quantity, new Money(request.UnitPrice));
+            new Money(request.Amount));
         await _plans.UpdateAsync(plan, ct);
         return ToDetailDto(plan);
     }
@@ -117,6 +117,6 @@ public sealed class RevenuePlanService
                 .OrderBy(l => l.Period)
                 .ThenBy(l => l.ItemName)
                 .Select(l => new RevenuePlanLineDto(l.Id, l.ItemName, l.Period.ToString(),
-                    l.Quantity, l.UnitPrice.Value, l.Amount.Value))
+                    l.Amount.Value))
                 .ToList());
 }
