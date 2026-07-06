@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CostManagement.Application/CostManagement.Application.csproj" />
+    <Project Path="src/CostManagement.Domain/CostManagement.Domain.csproj" />
+    <Project Path="src/CostManagement.Infrastructure/CostManagement.Infrastructure.csproj" />
+    <Project Path="src/CostManagement.WebApi/CostManagement.WebApi.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CostManagement.Domain.Tests/CostManagement.Domain.Tests.csproj" />
+  </Folder>
+</Solution>

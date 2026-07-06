@@ -1,0 +1,19 @@
+# .NET
+bin/
+obj/
+*.user
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.vs/
+.idea/
+*.swp
+*.tsbuildinfo

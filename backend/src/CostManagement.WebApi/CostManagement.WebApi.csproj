@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\CostManagement.Application\CostManagement.Application.csproj" />
+    <ProjectReference Include="..\CostManagement.Infrastructure\CostManagement.Infrastructure.csproj" />
+    <ProjectReference Include="..\CostManagement.Domain\CostManagement.Domain.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
