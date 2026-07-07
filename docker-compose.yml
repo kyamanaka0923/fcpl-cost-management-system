@@ -1,0 +1,72 @@
+# ローカルPCでのビルド・テスト・起動用。
+#
+#   アプリ起動:            docker compose up backend frontend
+#   バックエンドのテスト:  docker compose run --rm backend-test
+#   フロントエンドのビルド: docker compose run --rm frontend-build
+#
+# VS Code でのリモート開発は .devcontainer/devcontainer.json を参照
+# (同じイメージ docker/dev.Dockerfile を使う)。
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+    image: fcpl-cost-management-dev
+    working_dir: /workspace
+    command: dotnet run --project backend/src/CostManagement.WebApi
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:5100
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: Data Source=/workspace/data/costmanagement.db
+    volumes:
+      - .:/workspace
+      - nuget-cache:/home/vscode/.nuget/packages
+    ports:
+      - "5100:5100"
+
+  frontend:
+    image: fcpl-cost-management-dev
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+    working_dir: /workspace/frontend
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      # Vite の /api プロキシ先(vite.config.ts が参照)
+      BACKEND_ORIGIN: http://backend:5100
+    volumes:
+      - .:/workspace
+      - frontend-node-modules:/workspace/frontend/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+  backend-test:
+    image: fcpl-cost-management-dev
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+    working_dir: /workspace/backend
+    command: dotnet test
+    volumes:
+      - .:/workspace
+      - nuget-cache:/home/vscode/.nuget/packages
+    profiles: ["test"]
+
+  frontend-build:
+    image: fcpl-cost-management-dev
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+    working_dir: /workspace/frontend
+    command: sh -c "npm install && npm run build"
+    volumes:
+      - .:/workspace
+      - frontend-node-modules:/workspace/frontend/node_modules
+    profiles: ["test"]
+
+volumes:
+  nuget-cache:
+  frontend-node-modules:

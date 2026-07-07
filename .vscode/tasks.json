@@ -1,0 +1,50 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "backend: build",
+      "type": "shell",
+      "command": "dotnet build",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "backend: test",
+      "type": "shell",
+      "command": "dotnet test",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "backend: run (WebApi)",
+      "type": "shell",
+      "command": "dotnet run --project src/CostManagement.WebApi",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: dev",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: build",
+      "type": "shell",
+      "command": "npm run build",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "full: backend + frontend",
+      "dependsOn": ["backend: run (WebApi)", "frontend: dev"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    }
+  ]
+}

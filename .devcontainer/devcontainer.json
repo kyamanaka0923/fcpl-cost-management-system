@@ -1,0 +1,32 @@
+{
+  "name": "総合原価管理システム (.NET 10 + Node 22)",
+  "build": {
+    "dockerfile": "../docker/dev.Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "mounts": [
+    "source=fcpl-nuget-cache,target=/home/vscode/.nuget/packages,type=volume",
+    "source=fcpl-frontend-node-modules,target=/workspace/frontend/node_modules,type=volume"
+  ],
+  "forwardPorts": [5100, 5173],
+  "portsAttributes": {
+    "5100": { "label": "WebApi (ASP.NET Core)" },
+    "5173": { "label": "Frontend (Vite)" }
+  },
+  "postCreateCommand": "sudo chown -R vscode /home/vscode/.nuget/packages /workspace/frontend/node_modules && dotnet restore backend && npm --prefix frontend install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csdevkit",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "dotnet.defaultSolution": "backend/CostManagement.slnx",
+        "editor.formatOnSave": false
+      }
+    }
+  }
+}

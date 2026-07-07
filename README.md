@@ -97,7 +97,29 @@ frontend/                               # React SPA(/api を dev proxy 経由で
 
 ## 実行方法
 
-### バックエンド
+### Docker / VS Code Dev Containers(推奨)
+
+ローカルに .NET SDK / Node.js を入れなくても、Docker だけでビルド・テスト・起動できます
+(開発用イメージ `docker/dev.Dockerfile` = .NET 10 SDK + Node.js 22 を共用)。
+
+```bash
+# アプリ起動(バックエンド http://localhost:5100 / フロントエンド http://localhost:5173)
+docker compose up backend frontend
+
+# バックエンドのテスト
+docker compose run --rm backend-test
+
+# フロントエンドの型チェック + ビルド
+docker compose run --rm frontend-build
+```
+
+VS Code でのリモート開発は、拡張機能「Dev Containers」を入れてリポジトリを開き、
+「Reopen in Container」を選ぶだけです(`.devcontainer/devcontainer.json` が使われます)。
+コンテナ内で `dotnet restore` / `npm install` が自動実行され、ポート 5100/5173 が
+フォワードされます。ビルド・テストは `.vscode/tasks.json` のタスク
+(`backend: test`、`full: backend + frontend` など)から実行できます。
+
+### バックエンド(ローカルに SDK がある場合)
 
 ```bash
 cd backend
