@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, "claude/**"]
+  pull_request:
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  backend:
+    name: バックエンド(ビルド・テスト)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: .NET 10 SDK をセットアップ
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: ビルドとテスト(ドメイン + アーキテクチャ)
+        run: >
+          dotnet test backend
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      - name: テスト結果レポートを公開
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: backend-test-results
+          path: TestResults/*.trx
+          reporter: dotnet-trx
+
+  frontend:
+    name: フロントエンド(型チェック・ビルド)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 22 をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 依存関係をインストール
+        run: npm ci
+
+      - name: 型チェックとビルド
+        run: npm run build

@@ -1,5 +1,7 @@
 # 総合原価管理システム(予実管理)
 
+[![CI](https://github.com/kyamanaka0923/fcpl-cost-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/kyamanaka0923/fcpl-cost-management-system/actions/workflows/ci.yml)
+
 **原価・売上高の予算策定・実績計上・差異分析**を行うシステムです。
 ソフトウェア開発の SE 費用管理を主なユースケースとして、明細は数量×単価ではなく**金額**で直接管理します。
 
