@@ -173,6 +173,15 @@ cd backend
 dotnet test
 ```
 
+テストは2種類あります。
+
+- **ドメイン単体テスト**(`tests/CostManagement.Domain.Tests`) — 集約の不変条件、差異・損益の計算規則
+- **アーキテクチャテスト**(`tests/CostManagement.Architecture.Tests`) — NetArchTest による
+  ヘキサゴナルアーキテクチャの依存ルール検証。Domain/Application が外側の層や技術詳細
+  (Dapper・SQLite・ASP.NET Core)に依存していないこと、リポジトリがポート(Domain)と
+  アダプタ実装(Infrastructure)に正しく配置されていること、集約が公開セッターを持たない
+  こと等を、コードが増えても自動で検査します
+
 ## API 概要
 
 | メソッド/パス | 説明 |
