@@ -175,14 +175,26 @@ cd backend
 dotnet test
 ```
 
-テストは2種類あります。
+テストは5種類あります(テスト名はすべて日本語で、テスト一覧が仕様書として読めるようにしています)。
 
 - **ドメイン単体テスト**(`tests/CostManagement.Domain.Tests`) — 集約の不変条件、差異・損益の計算規則
+- **アプリケーション層テスト**(`tests/CostManagement.Application.Tests`) — ユースケース単位の検証。
+  本物のリポジトリ実装+一時 SQLite を使い、予算の策定→改定→承認、実績計上、分析の業務ルールを確認
+- **インフラ層テスト**(`tests/CostManagement.Infrastructure.Tests`) — リポジトリの永続化往復
+  (保存した集約が同じ状態で復元されること)と、旧スキーマ(数量×単価)からの自動移行の検証
+- **API E2E テスト**(`tests/CostManagement.E2E.Tests`) — WebApplicationFactory で WebApi を
+  まるごと起動し、計画策定→実績入力→分析→計画変更の一連の業務フローを HTTP 経由で検証
 - **アーキテクチャテスト**(`tests/CostManagement.Architecture.Tests`) — NetArchTest による
-  ヘキサゴナルアーキテクチャの依存ルール検証。Domain/Application が外側の層や技術詳細
-  (Dapper・SQLite・ASP.NET Core)に依存していないこと、リポジトリがポート(Domain)と
-  アダプタ実装(Infrastructure)に正しく配置されていること、集約が公開セッターを持たない
-  こと等を、コードが増えても自動で検査します
+  ヘキサゴナルアーキテクチャの依存ルール検証(層依存・ポート&アダプタ配置・ドメイン規約)
+
+さらに**ブラウザ E2E テスト**(Playwright)が `frontend/e2e/` にあります。
+バックエンドとフロントエンドを自動起動し、実際のブラウザで計画策定→実績入力→分析→計画変更を操作します。
+
+```bash
+cd frontend
+npx playwright install chromium   # 初回のみ
+npm run test:e2e
+```
 
 **カバレッジ**: CI(GitHub Actions)がテスト実行時にカバレッジを計測し、
 各実行の **Summary ページにアセンブリ別のカバレッジ表**を表示します。

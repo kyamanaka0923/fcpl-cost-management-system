@@ -6,7 +6,10 @@
     <Project Path="src/CostManagement.WebApi/CostManagement.WebApi.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/CostManagement.Application.Tests/CostManagement.Application.Tests.csproj" />
     <Project Path="tests/CostManagement.Architecture.Tests/CostManagement.Architecture.Tests.csproj" />
     <Project Path="tests/CostManagement.Domain.Tests/CostManagement.Domain.Tests.csproj" />
+    <Project Path="tests/CostManagement.E2E.Tests/CostManagement.E2E.Tests.csproj" />
+    <Project Path="tests/CostManagement.Infrastructure.Tests/CostManagement.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

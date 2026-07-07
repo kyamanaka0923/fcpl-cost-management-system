@@ -136,3 +136,8 @@ api.MapGet("/projects/{id:guid}/revenue-items",
     (Guid id, AnalysisService svc, CancellationToken ct) => svc.ListRevenueItemsAsync(id, ct));
 
 app.Run();
+
+/// <summary>E2E テスト(WebApplicationFactory)からの参照用。</summary>
+public partial class Program
+{
+}
