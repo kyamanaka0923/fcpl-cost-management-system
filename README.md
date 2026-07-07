@@ -184,6 +184,11 @@ dotnet test
   アダプタ実装(Infrastructure)に正しく配置されていること、集約が公開セッターを持たない
   こと等を、コードが増えても自動で検査します
 
+**カバレッジ**: CI(GitHub Actions)がテスト実行時にカバレッジを計測し、
+各実行の **Summary ページにアセンブリ別のカバレッジ表**を表示します。
+詳細な HTML レポートは実行のアーティファクト `coverage-report` からダウンロードできます。
+ローカルでは `dotnet test --collect:"XPlat Code Coverage"` で計測できます。
+
 ## API 概要
 
 | メソッド/パス | 説明 |
