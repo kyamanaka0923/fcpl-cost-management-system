@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "backend: デバッグ実行 (WebApi)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "backend: build",
+      "program": "${workspaceFolder}/backend/src/CostManagement.WebApi/bin/Debug/net10.0/CostManagement.WebApi.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/backend/src/CostManagement.WebApi",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5100"
+      },
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+      }
+    },
+    {
+      "name": "frontend: Chrome にアタッチ (Vite)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend",
+      "preLaunchTask": "frontend: dev"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "full: backend デバッグ + frontend",
+      "configurations": ["backend: デバッグ実行 (WebApi)", "frontend: Chrome にアタッチ (Vite)"]
+    }
+  ]
+}
