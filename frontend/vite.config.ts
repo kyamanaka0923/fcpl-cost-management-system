@@ -8,6 +8,7 @@ const backendOrigin = process.env.BACKEND_ORIGIN ?? 'http://localhost:5100'
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: true, // IPv4/IPv6両方でlisten(Dev Container等のポートフォワーディングがIPv4を見るため必須)
     port: 5173,
     proxy: {
       '/api': {
