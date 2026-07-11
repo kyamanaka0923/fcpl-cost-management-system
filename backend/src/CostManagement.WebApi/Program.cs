@@ -40,13 +40,25 @@ app.Use(async (context, next) =>
 
 var api = app.MapGroup("/api");
 
-// ---- 課 ----
-api.MapGet("/departments", (DepartmentService svc, CancellationToken ct) => svc.ListAsync(ct));
+// ---- 部 ----
+api.MapGet("/divisions", (DivisionService svc, CancellationToken ct) => svc.ListAsync(ct));
+api.MapGet("/divisions/{id:guid}", (Guid id, DivisionService svc, CancellationToken ct) =>
+    svc.GetAsync(id, ct));
+api.MapPost("/divisions",
+    async (CreateDivisionRequest req, DivisionService svc, CancellationToken ct) =>
+        Results.Created((string?)null, await svc.CreateAsync(req, ct)));
+api.MapGet("/divisions/{id:guid}/budget-summary",
+    (Guid id, string fiscalHalf, AnalysisService svc, CancellationToken ct) =>
+        svc.GetDivisionBudgetSummaryAsync(id, fiscalHalf, ct));
+
+// ---- 課(部に属する) ----
+api.MapGet("/divisions/{id:guid}/departments",
+    (Guid id, DepartmentService svc, CancellationToken ct) => svc.ListByDivisionAsync(id, ct));
+api.MapPost("/divisions/{id:guid}/departments",
+    async (Guid id, CreateDepartmentRequest req, DepartmentService svc, CancellationToken ct) =>
+        Results.Created((string?)null, await svc.CreateAsync(id, req, ct)));
 api.MapGet("/departments/{id:guid}", (Guid id, DepartmentService svc, CancellationToken ct) =>
     svc.GetAsync(id, ct));
-api.MapPost("/departments",
-    async (CreateDepartmentRequest req, DepartmentService svc, CancellationToken ct) =>
-        Results.Created((string?)null, await svc.CreateAsync(req, ct)));
 
 // ---- 案件(課に属するマスタ) ----
 api.MapGet("/departments/{id:guid}/projects",

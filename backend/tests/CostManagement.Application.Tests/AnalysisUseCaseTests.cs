@@ -11,7 +11,7 @@ public class 差異分析と損益 : IDisposable
 
     private async Task<(Guid DeptId, Guid ProjectAId, Guid ProjectBId)> 予算と実績が揃った課を準備()
     {
-        var dept = await _fx.課を作成();
+        var dept = await _fx.部と課を作成();
         var projectA = await _fx.案件を作成(dept.Id, "PJ-A", "案件A");
         var projectB = await _fx.案件を作成(dept.Id, "PJ-B", "案件B");
         await _fx.承認済み予算を作成(dept.Id, "2026-H1",
@@ -69,7 +69,7 @@ public class 差異分析と損益 : IDisposable
     [Fact]
     public async Task 承認済み予算がなければ差異分析はエラーになる()
     {
-        var dept = await _fx.課を作成();
+        var dept = await _fx.部と課を作成();
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
             _fx.Analysis.AnalyzeVarianceAsync(dept.Id, "2026-H1", null));

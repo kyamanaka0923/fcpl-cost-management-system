@@ -5,6 +5,7 @@ using CostManagement.Domain.Analysis;
 using CostManagement.Domain.Budgeting;
 using CostManagement.Domain.CostElements;
 using CostManagement.Domain.Departments;
+using CostManagement.Domain.Divisions;
 using CostManagement.Domain.Projects;
 using CostManagement.Infrastructure.Persistence;
 using CostManagement.Infrastructure.Repositories;
@@ -26,6 +27,7 @@ public static class DependencyInjection
         // 永続化アダプタ
         services.AddSingleton(new SqliteConnectionFactory(connectionString));
         services.AddSingleton<DatabaseInitializer>();
+        services.AddSingleton<IDivisionRepository, DivisionRepository>();
         services.AddSingleton<IDepartmentRepository, DepartmentRepository>();
         services.AddSingleton<IProjectRepository, ProjectRepository>();
         services.AddSingleton<ICostElementRepository, CostElementRepository>();
@@ -37,8 +39,10 @@ public static class DependencyInjection
         services.AddSingleton<BudgetVarianceAnalysisService>();
         services.AddSingleton<BudgetComparisonService>();
         services.AddSingleton<ProfitAnalysisService>();
+        services.AddSingleton<DivisionBudgetSummaryService>();
 
         // ユースケース(アプリケーションサービス)
+        services.AddSingleton<DivisionService>();
         services.AddSingleton<DepartmentService>();
         services.AddSingleton<ProjectService>();
         services.AddSingleton<CostElementService>();

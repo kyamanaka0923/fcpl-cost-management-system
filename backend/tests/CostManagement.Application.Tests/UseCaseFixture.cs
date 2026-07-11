@@ -22,6 +22,7 @@ public sealed class UseCaseFixture : IDisposable
 
     public FixedClock Clock { get; } = new();
 
+    public DivisionService Divisions { get; }
     public DepartmentService Departments { get; }
     public ProjectService Projects { get; }
     public CostElementService CostElements { get; }
@@ -35,26 +36,39 @@ public sealed class UseCaseFixture : IDisposable
         var factory = new SqliteConnectionFactory($"Data Source={_dbPath}");
         new DatabaseInitializer(factory).Initialize();
 
+        var divisions = new DivisionRepository(factory);
         var departments = new DepartmentRepository(factory);
         var projects = new ProjectRepository(factory);
         var elements = new CostElementRepository(factory);
         var budgets = new DepartmentBudgetRepository(factory);
         var actuals = new ActualEntryRepository(factory);
 
-        Departments = new DepartmentService(departments, Clock);
+        Divisions = new DivisionService(divisions, Clock);
+        Departments = new DepartmentService(departments, divisions, Clock);
         Projects = new ProjectService(projects, departments, Clock);
         CostElements = new CostElementService(elements);
         Budgets = new DepartmentBudgetService(budgets, departments, projects, elements, Clock);
         Actuals = new ActualEntryService(actuals, departments, projects, elements, Clock);
-        Analysis = new AnalysisService(budgets, actuals, projects, elements,
+        Analysis = new AnalysisService(budgets, actuals, projects, elements, departments, divisions,
             new BudgetVarianceAnalysisService(), new BudgetComparisonService(),
-            new ProfitAnalysisService());
+            new ProfitAnalysisService(), new DivisionBudgetSummaryService());
     }
 
     // ---- よく使う操作のヘルパ(テストを読みやすく保つ) ----
 
-    public async Task<DepartmentDto> 課を作成(string code = "DEV-1", string name = "開発1課") =>
-        await Departments.CreateAsync(new CreateDepartmentRequest(code, name));
+    public async Task<DivisionDto> 部を作成(string code = "SALES", string name = "営業本部") =>
+        await Divisions.CreateAsync(new CreateDivisionRequest(code, name));
+
+    public async Task<DepartmentDto> 課を作成(Guid divisionId, string code = "DEV-1",
+        string name = "開発1課") =>
+        await Departments.CreateAsync(divisionId, new CreateDepartmentRequest(code, name));
+
+    /// <summary>部を意識しないテスト向けに、課ごとに専用の部を自動生成して課を作る。</summary>
+    public async Task<DepartmentDto> 部と課を作成(string code = "DEV-1", string name = "開発1課")
+    {
+        var division = await 部を作成($"DIV-{code}", $"{name}を含む部");
+        return await 課を作成(division.Id, code, name);
+    }
 
     public async Task<ProjectDto> 案件を作成(Guid departmentId, string code = "PJ-001",
         string name = "受託開発A") =>

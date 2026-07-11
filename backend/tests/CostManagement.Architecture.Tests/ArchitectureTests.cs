@@ -120,8 +120,8 @@ public class PortAndAdapterTests
     [Fact]
     public void リポジトリポートはドメイン層に定義されている()
     {
-        // 5つの集約リポジトリ(Department/Project/CostElement/DepartmentBudget/ActualEntry)
-        Assert.Equal(5, RepositoryPorts().Count());
+        // 6つの集約リポジトリ(Division/Department/Project/CostElement/DepartmentBudget/ActualEntry)
+        Assert.Equal(6, RepositoryPorts().Count());
     }
 
     [Fact]
@@ -178,6 +178,7 @@ public class DomainModelConventionTests
         {
             typeof(Money),
             typeof(FiscalHalf),
+            typeof(Domain.Divisions.DivisionId),
             typeof(Domain.Departments.DepartmentId),
             typeof(Domain.Projects.ProjectId),
             typeof(Domain.Budgeting.DepartmentBudgetId),
@@ -201,6 +202,7 @@ public class DomainModelConventionTests
         // すべての公開プロパティは set 不可(private set / init / get-only)であること。
         var aggregates = new[]
         {
+            typeof(Domain.Divisions.Division),
             typeof(Domain.Departments.Department),
             typeof(Domain.Projects.Project),
             typeof(Domain.Budgeting.DepartmentBudget),

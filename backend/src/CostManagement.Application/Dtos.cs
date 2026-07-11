@@ -2,8 +2,15 @@ namespace CostManagement.Application;
 
 // ---- 応答 DTO ----
 
+public sealed record DivisionDto(
+    Guid Id,
+    string Code,
+    string Name,
+    DateTime CreatedAt);
+
 public sealed record DepartmentDto(
     Guid Id,
+    Guid DivisionId,
     string Code,
     string Name,
     DateTime CreatedAt);
@@ -155,7 +162,41 @@ public sealed record ProfitSummaryDto(
     decimal? ActualMarginRate,
     IReadOnlyList<ProjectProfitLineDto> ProjectLines);
 
+public sealed record CategorySummaryDto(
+    string Category,
+    decimal PlannedAmount,
+    decimal ActualAmount,
+    decimal Variance);
+
+public sealed record DepartmentSummaryLineDto(
+    Guid DepartmentId,
+    string DepartmentCode,
+    string DepartmentName,
+    bool HasApprovedBudget,
+    decimal PlannedRevenue,
+    decimal ActualRevenue,
+    decimal PlannedCost,
+    decimal ActualCost,
+    decimal PlannedProfit,
+    decimal ActualProfit,
+    decimal ProfitVariance);
+
+public sealed record DivisionBudgetSummaryDto(
+    IReadOnlyList<CategorySummaryDto> Categories,
+    decimal PlannedRevenue,
+    decimal ActualRevenue,
+    decimal RevenueVariance,
+    decimal PlannedCost,
+    decimal ActualCost,
+    decimal CostVariance,
+    decimal PlannedProfit,
+    decimal ActualProfit,
+    decimal ProfitVariance,
+    IReadOnlyList<DepartmentSummaryLineDto> DepartmentLines);
+
 // ---- リクエスト ----
+
+public sealed record CreateDivisionRequest(string Code, string Name);
 
 public sealed record CreateDepartmentRequest(string Code, string Name);
 

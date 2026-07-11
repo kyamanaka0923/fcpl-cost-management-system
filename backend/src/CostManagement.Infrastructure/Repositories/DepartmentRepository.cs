@@ -1,4 +1,5 @@
 using CostManagement.Domain.Departments;
+using CostManagement.Domain.Divisions;
 using CostManagement.Infrastructure.Persistence;
 using Dapper;
 
@@ -13,10 +14,10 @@ public sealed class DepartmentRepository : IDepartmentRepository
         _factory = factory;
     }
 
-    private sealed record Row(Guid Id, string Code, string Name, DateTime CreatedAt);
+    private sealed record Row(Guid Id, Guid DivisionId, string Code, string Name, DateTime CreatedAt);
 
     private const string SelectSql = """
-        SELECT id AS Id, code AS Code, name AS Name, created_at AS CreatedAt
+        SELECT id AS Id, division_id AS DivisionId, code AS Code, name AS Name, created_at AS CreatedAt
         FROM departments
         """;
 
@@ -36,10 +37,12 @@ public sealed class DepartmentRepository : IDepartmentRepository
         return row is null ? null : ToEntity(row);
     }
 
-    public async Task<IReadOnlyList<Department>> ListAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<Department>> ListByDivisionAsync(DivisionId divisionId,
+        CancellationToken ct = default)
     {
         using var conn = _factory.Create();
-        var rows = await conn.QueryAsync<Row>($"{SelectSql} ORDER BY code");
+        var rows = await conn.QueryAsync<Row>(
+            $"{SelectSql} WHERE division_id = @Div ORDER BY code", new { Div = divisionId.Value });
         return rows.Select(ToEntity).ToList();
     }
 
@@ -47,11 +50,12 @@ public sealed class DepartmentRepository : IDepartmentRepository
     {
         using var conn = _factory.Create();
         await conn.ExecuteAsync("""
-            INSERT INTO departments (id, code, name, created_at)
-            VALUES (@Id, @Code, @Name, @CreatedAt)
+            INSERT INTO departments (id, division_id, code, name, created_at)
+            VALUES (@Id, @DivisionId, @Code, @Name, @CreatedAt)
             """, new
         {
             Id = department.Id.Value,
+            DivisionId = department.DivisionId.Value,
             department.Code,
             department.Name,
             department.CreatedAt,
@@ -67,5 +71,5 @@ public sealed class DepartmentRepository : IDepartmentRepository
     }
 
     private static Department ToEntity(Row row) =>
-        Department.Restore(row.Id, row.Code, row.Name, row.CreatedAt);
+        Department.Restore(row.Id, row.DivisionId, row.Code, row.Name, row.CreatedAt);
 }

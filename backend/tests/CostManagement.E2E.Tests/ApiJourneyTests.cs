@@ -69,8 +69,12 @@ public class 業務フロー全体のE2E : IDisposable
     {
         // ---- 1. 計画策定 ----
 
-        // 1-1. 課と案件を登録する
-        var dept = await PostAsync("/api/departments", new { code = "DEV-1", name = "開発1課" });
+        // 1-1. 部・課・案件を登録する
+        var division = await PostAsync("/api/divisions", new { code = "SALES", name = "営業本部" });
+        var divisionId = division.GetProperty("id").GetString();
+
+        var dept = await PostAsync($"/api/divisions/{divisionId}/departments",
+            new { code = "DEV-1", name = "開発1課" });
         var deptId = dept.GetProperty("id").GetString();
 
         var projectA = await PostAsync($"/api/departments/{deptId}/projects",
@@ -179,12 +183,23 @@ public class 業務フロー全体のE2E : IDisposable
         // 差異分析の既定基準は最新承認版(v2)に切り替わる
         var varianceAfter = await GetAsync($"/api/departments/{deptId}/variance?fiscalHalf=2026-H1");
         Assert.Equal(2, varianceAfter.GetProperty("budgetVersion").GetInt32());
+
+        // ---- 5. 部の予実サマリに配下課の予実が合計される ----
+        var divisionSummary = await GetAsync(
+            $"/api/divisions/{divisionId}/budget-summary?fiscalHalf=2026-H1");
+        Assert.Equal(3_000_000, divisionSummary.GetProperty("plannedRevenue").GetDecimal());
+        var deptLine = divisionSummary.GetProperty("departmentLines").EnumerateArray().Single();
+        Assert.True(deptLine.GetProperty("hasApprovedBudget").GetBoolean());
+        Assert.Equal(deptId, deptLine.GetProperty("departmentId").GetString());
     }
 
     [Fact]
     public async Task 費目マスタを拡張して期間費用に利用できる()
     {
-        var dept = await PostAsync("/api/departments", new { code = "DEV-9", name = "開発9課" });
+        var division = await PostAsync("/api/divisions", new { code = "SALES", name = "営業本部" });
+        var divisionId = division.GetProperty("id").GetString();
+        var dept = await PostAsync($"/api/divisions/{divisionId}/departments",
+            new { code = "DEV-9", name = "開発9課" });
         var deptId = dept.GetProperty("id").GetString();
 
         // シード済みの標準費目(人件費・ライセンス費)を確認
@@ -231,7 +246,11 @@ public class エラー応答のE2E : IDisposable
     [Fact]
     public async Task ドメインルール違反は400とエラーメッセージを返す()
     {
-        var dept = await _client.PostAsJsonAsync("/api/departments",
+        var division = await _client.PostAsJsonAsync("/api/divisions",
+            new { code = "SALES", name = "営業本部" });
+        var divisionId = (await division.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetString();
+        var dept = await _client.PostAsJsonAsync($"/api/divisions/{divisionId}/departments",
             new { code = "DEV-1", name = "開発1課" });
         var deptId = (await dept.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("id").GetString();
@@ -251,7 +270,11 @@ public class エラー応答のE2E : IDisposable
     [Fact]
     public async Task 不正な半期の形式は400を返す()
     {
-        var dept = await _client.PostAsJsonAsync("/api/departments",
+        var division = await _client.PostAsJsonAsync("/api/divisions",
+            new { code = "SALES", name = "営業本部" });
+        var divisionId = (await division.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetString();
+        var dept = await _client.PostAsJsonAsync($"/api/divisions/{divisionId}/departments",
             new { code = "DEV-2", name = "開発2課" });
         var deptId = (await dept.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("id").GetString();

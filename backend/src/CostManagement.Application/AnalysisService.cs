@@ -4,34 +4,42 @@ using CostManagement.Domain.Analysis;
 using CostManagement.Domain.Budgeting;
 using CostManagement.Domain.CostElements;
 using CostManagement.Domain.Departments;
+using CostManagement.Domain.Divisions;
 using CostManagement.Domain.Projects;
 using CostManagement.Domain.Shared;
 
 namespace CostManagement.Application;
 
-/// <summary>予実差異分析・予算バージョン間比較・損益サマリのユースケース。</summary>
+/// <summary>予実差異分析・予算バージョン間比較・損益サマリ・部集計のユースケース。</summary>
 public sealed class AnalysisService
 {
     private readonly IDepartmentBudgetRepository _budgets;
     private readonly IActualEntryRepository _actuals;
     private readonly IProjectRepository _projects;
     private readonly ICostElementRepository _elements;
+    private readonly IDepartmentRepository _departments;
+    private readonly IDivisionRepository _divisions;
     private readonly BudgetVarianceAnalysisService _varianceAnalysis;
     private readonly BudgetComparisonService _budgetComparison;
     private readonly ProfitAnalysisService _profitAnalysis;
+    private readonly DivisionBudgetSummaryService _divisionSummary;
 
     public AnalysisService(IDepartmentBudgetRepository budgets, IActualEntryRepository actuals,
         IProjectRepository projects, ICostElementRepository elements,
+        IDepartmentRepository departments, IDivisionRepository divisions,
         BudgetVarianceAnalysisService varianceAnalysis, BudgetComparisonService budgetComparison,
-        ProfitAnalysisService profitAnalysis)
+        ProfitAnalysisService profitAnalysis, DivisionBudgetSummaryService divisionSummary)
     {
         _budgets = budgets;
         _actuals = actuals;
         _projects = projects;
         _elements = elements;
+        _departments = departments;
+        _divisions = divisions;
         _varianceAnalysis = varianceAnalysis;
         _budgetComparison = budgetComparison;
         _profitAnalysis = profitAnalysis;
+        _divisionSummary = divisionSummary;
     }
 
     /// <summary>予実差異分析。budgetId 未指定時は最新の承認済み予算を基準とする。</summary>
@@ -114,6 +122,63 @@ public sealed class AnalysisService
                 l.PlannedProcessing, l.ActualProcessing,
                 l.PlannedOutsourcing, l.ActualOutsourcing,
                 l.PlannedProfit, l.ActualProfit, l.ProfitVariance)).ToList());
+    }
+
+    /// <summary>
+    /// 部の予実サマリ。配下課の最新承認済み予算と実績を突き合わせて合計する。
+    /// 承認済み予算のない課は合計に含めず、課別内訳に未策定として表示する。
+    /// </summary>
+    public async Task<DivisionBudgetSummaryDto> GetDivisionBudgetSummaryAsync(Guid divisionId,
+        string fiscalHalf, CancellationToken ct = default)
+    {
+        var divId = new DivisionId(divisionId);
+        _ = await _divisions.FindByIdAsync(divId, ct)
+            ?? throw new NotFoundException($"部が見つかりません: {divisionId}");
+        var half = FiscalHalf.Parse(fiscalHalf);
+        var departments = (await _departments.ListByDivisionAsync(divId, ct))
+            .OrderBy(d => d.Code)
+            .ToList();
+
+        var inputs = new List<DepartmentVarianceInput>();
+        var reportByDepartment = new Dictionary<Guid, VarianceReport>();
+        foreach (var dept in departments)
+        {
+            var budget = await _budgets.FindLatestApprovedAsync(dept.Id, half, ct);
+            if (budget is null)
+                continue;
+            var actuals = await _actuals.ListAsync(dept.Id, half, ct);
+            var report = _varianceAnalysis.Analyze(budget, actuals);
+            inputs.Add(new DepartmentVarianceInput(dept.Id, report));
+            reportByDepartment[dept.Id.Value] = report;
+        }
+
+        var summary = _divisionSummary.Summarize(inputs);
+
+        var lines = departments
+            .Select(d =>
+            {
+                if (reportByDepartment.TryGetValue(d.Id.Value, out var r))
+                {
+                    var plannedProfit = r.PlannedRevenue - r.PlannedCost;
+                    var actualProfit = r.ActualRevenue - r.ActualCost;
+                    return new DepartmentSummaryLineDto(d.Id.Value, d.Code, d.Name, true,
+                        r.PlannedRevenue, r.ActualRevenue, r.PlannedCost, r.ActualCost,
+                        plannedProfit, actualProfit, actualProfit - plannedProfit);
+                }
+                return new DepartmentSummaryLineDto(d.Id.Value, d.Code, d.Name, false,
+                    0m, 0m, 0m, 0m, 0m, 0m, 0m);
+            })
+            .ToList();
+
+        return new DivisionBudgetSummaryDto(
+            summary.Categories
+                .Select(c => new CategorySummaryDto(c.Category.ToString(),
+                    c.PlannedAmount, c.ActualAmount, c.Variance))
+                .ToList(),
+            summary.PlannedRevenue, summary.ActualRevenue, summary.RevenueVariance,
+            summary.PlannedCost, summary.ActualCost, summary.CostVariance,
+            summary.PlannedProfit, summary.ActualProfit, summary.ProfitVariance,
+            lines);
     }
 
     private async Task<DepartmentBudget> ResolveBudgetAsync(DepartmentId departmentId,

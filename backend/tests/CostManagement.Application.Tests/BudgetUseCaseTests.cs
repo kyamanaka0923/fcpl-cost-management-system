@@ -13,7 +13,7 @@ public class 課予算の策定と改定 : IDisposable
     [Fact]
     public async Task 課と案件を登録して予算を策定できる()
     {
-        var dept = await _fx.課を作成();
+        var dept = await _fx.部と課を作成();
         var project = await _fx.案件を作成(dept.Id);
 
         var budget = await _fx.Budgets.CreateDraftAsync(dept.Id,
@@ -35,7 +35,7 @@ public class 課予算の策定と改定 : IDisposable
     [Fact]
     public async Task 策定中のドラフトがあると新しいドラフトは起票できない()
     {
-        var dept = await _fx.課を作成();
+        var dept = await _fx.部と課を作成();
         await _fx.Budgets.CreateDraftAsync(dept.Id, new CreateBudgetRequest("2026-H1", "当初予算"));
 
         await Assert.ThrowsAsync<DomainException>(() =>
@@ -45,7 +45,7 @@ public class 課予算の策定と改定 : IDisposable
     [Fact]
     public async Task 半期が異なれば同じ課でも独立して予算を策定できる()
     {
-        var dept = await _fx.課を作成();
+        var dept = await _fx.部と課を作成();
         var project = await _fx.案件を作成(dept.Id);
         await _fx.承認済み予算を作成(dept.Id, "2026-H1",
             ("Revenue", project.Id, null, 5_000_000m));
@@ -60,8 +60,8 @@ public class 課予算の策定と改定 : IDisposable
     [Fact]
     public async Task 他の課の案件は明細に登録できない()
     {
-        var dept1 = await _fx.課を作成("DEV-1", "開発1課");
-        var dept2 = await _fx.課を作成("DEV-2", "開発2課");
+        var dept1 = await _fx.部と課を作成("DEV-1", "開発1課");
+        var dept2 = await _fx.部と課を作成("DEV-2", "開発2課");
         var otherProject = await _fx.案件を作成(dept2.Id, "PJ-OTHER", "他課の案件");
 
         var budget = await _fx.Budgets.CreateDraftAsync(dept1.Id,
@@ -76,7 +76,7 @@ public class 課予算の策定と改定 : IDisposable
     [Fact]
     public async Task 存在しない費目は期間費用に登録できない()
     {
-        var dept = await _fx.課を作成();
+        var dept = await _fx.部と課を作成();
         var budget = await _fx.Budgets.CreateDraftAsync(dept.Id,
             new CreateBudgetRequest("2026-H1", "当初予算"));
 
@@ -88,7 +88,7 @@ public class 課予算の策定と改定 : IDisposable
     [Fact]
     public async Task 改定版の承認で旧バージョンは失効する()
     {
-        var dept = await _fx.課を作成();
+        var dept = await _fx.部と課を作成();
         var project = await _fx.案件を作成(dept.Id);
         var v1 = await _fx.承認済み予算を作成(dept.Id, "2026-H1",
             ("Revenue", project.Id, null, 5_000_000m));
@@ -108,7 +108,7 @@ public class 課予算の策定と改定 : IDisposable
     [Fact]
     public async Task 費目マスタに費目を追加して期間費用に使える()
     {
-        var dept = await _fx.課を作成();
+        var dept = await _fx.部と課を作成();
         await _fx.CostElements.CreateAsync(new CreateCostElementRequest("TRAINING", "教育研修費"));
 
         var budget = await _fx.Budgets.CreateDraftAsync(dept.Id,
@@ -122,7 +122,7 @@ public class 課予算の策定と改定 : IDisposable
     [Fact]
     public async Task 実績は同一キーに複数計上できる()
     {
-        var dept = await _fx.課を作成();
+        var dept = await _fx.部と課を作成();
         var project = await _fx.案件を作成(dept.Id);
 
         await _fx.Actuals.RecordAsync(dept.Id,
@@ -137,8 +137,8 @@ public class 課予算の策定と改定 : IDisposable
     [Fact]
     public async Task 他の課の案件に実績は計上できない()
     {
-        var dept1 = await _fx.課を作成("DEV-1", "開発1課");
-        var dept2 = await _fx.課を作成("DEV-2", "開発2課");
+        var dept1 = await _fx.部と課を作成("DEV-1", "開発1課");
+        var dept2 = await _fx.部と課を作成("DEV-2", "開発2課");
         var otherProject = await _fx.案件を作成(dept2.Id, "PJ-OTHER", "他課の案件");
 
         await Assert.ThrowsAsync<DomainException>(() =>
@@ -149,10 +149,11 @@ public class 課予算の策定と改定 : IDisposable
     [Fact]
     public async Task 課コードと案件コードは重複できない()
     {
-        var dept = await _fx.課を作成("DEV-1", "開発1課");
+        var div = await _fx.部を作成();
+        var dept = await _fx.課を作成(div.Id, "DEV-1", "開発1課");
         await _fx.案件を作成(dept.Id, "PJ-001", "案件A");
 
-        await Assert.ThrowsAsync<DomainException>(() => _fx.課を作成("DEV-1", "別の課"));
+        await Assert.ThrowsAsync<DomainException>(() => _fx.課を作成(div.Id, "DEV-1", "別の課"));
         await Assert.ThrowsAsync<DomainException>(() => _fx.案件を作成(dept.Id, "PJ-001", "別の案件"));
     }
 }

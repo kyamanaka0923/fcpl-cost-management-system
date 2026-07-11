@@ -109,6 +109,7 @@ public class スキーマの作り直し : IDisposable
         Assert.False(カラムが存在する("cost_elements", "element_type"));
 
         // 新スキーマのテーブルが揃う
+        Assert.Equal(1, テーブル数("divisions"));
         Assert.Equal(1, テーブル数("departments"));
         Assert.Equal(1, テーブル数("department_budgets"));
         Assert.Equal(1, テーブル数("department_budget_lines"));
@@ -141,8 +142,10 @@ public class スキーマの作り直し : IDisposable
     {
         new DatabaseInitializer(_factory).Initialize();
 
+        Assert.Equal(1, テーブル数("divisions"));
         Assert.Equal(1, テーブル数("departments"));
         Assert.Equal(1, テーブル数("department_budgets"));
+        Assert.True(カラムが存在する("departments", "division_id"));
         Assert.True(カラムが存在する("projects", "department_id"));
     }
 
@@ -154,13 +157,49 @@ public class スキーマの作り直し : IDisposable
 
         using (var conn = _factory.Create())
         {
-            conn.Execute(
-                "INSERT INTO departments VALUES ('d1', 'DEV-1', '開発1課', '2026-04-01')");
+            conn.Execute("""
+                INSERT INTO divisions VALUES ('v1', 'SALES', '営業本部', '2026-04-01');
+                INSERT INTO departments VALUES ('d1', 'v1', 'DEV-1', '開発1課', '2026-04-01');
+                """);
         }
 
         initializer.Initialize(); // 新スキーマの既存データは破棄されない
 
         using var check = _factory.Create();
         Assert.Equal(1, check.ExecuteScalar<long>("SELECT COUNT(*) FROM departments"));
+    }
+
+    [Fact]
+    public void 部を持たない課スキーマは部あり新スキーマに作り直される()
+    {
+        using (var conn = _factory.Create())
+        {
+            // division_id を持たない旧世代の departments とその配下。
+            conn.Execute("""
+                CREATE TABLE departments (
+                    id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, created_at TEXT NOT NULL
+                );
+                CREATE TABLE projects (id TEXT PRIMARY KEY, department_id TEXT NOT NULL);
+                CREATE TABLE department_budgets (id TEXT PRIMARY KEY, department_id TEXT NOT NULL);
+                CREATE TABLE department_budget_lines (id TEXT PRIMARY KEY, budget_id TEXT NOT NULL);
+                CREATE TABLE actual_entries (id TEXT PRIMARY KEY, department_id TEXT NOT NULL);
+                INSERT INTO departments VALUES ('d1', 'DEV-1', '旧課', '2026-04-01');
+                """);
+        }
+        Assert.False(カラムが存在する("departments", "division_id"));
+
+        var initializer = new DatabaseInitializer(_factory);
+        initializer.Initialize();
+
+        Assert.True(カラムが存在する("departments", "division_id"));
+        Assert.Equal(1, テーブル数("divisions"));
+        using (var conn = _factory.Create())
+        {
+            // 旧 departments のデータは引き継がず作り直す
+            Assert.Equal(0, conn.ExecuteScalar<long>("SELECT COUNT(*) FROM departments"));
+        }
+
+        initializer.Initialize(); // 冪等
+        Assert.True(カラムが存在する("departments", "division_id"));
     }
 }

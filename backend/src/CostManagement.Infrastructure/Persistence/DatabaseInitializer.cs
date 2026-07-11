@@ -24,11 +24,19 @@ public sealed class DatabaseInitializer
         DropLegacyTables(connection);
 
         connection.Execute("""
-            CREATE TABLE IF NOT EXISTS departments (
+            CREATE TABLE IF NOT EXISTS divisions (
                 id         TEXT PRIMARY KEY,
                 code       TEXT NOT NULL UNIQUE,
                 name       TEXT NOT NULL,
                 created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS departments (
+                id          TEXT PRIMARY KEY,
+                division_id TEXT NOT NULL REFERENCES divisions(id),
+                code        TEXT NOT NULL UNIQUE,
+                name        TEXT NOT NULL,
+                created_at  TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS projects (
@@ -82,6 +90,7 @@ public sealed class DatabaseInitializer
                 recorded_at   TEXT NOT NULL
             );
 
+            CREATE INDEX IF NOT EXISTS ix_departments_division ON departments(division_id);
             CREATE INDEX IF NOT EXISTS ix_projects_department ON projects(department_id);
             CREATE INDEX IF NOT EXISTS ix_budgets_dept_half
                 ON department_budgets(department_id, fiscal_half);
@@ -109,6 +118,11 @@ public sealed class DatabaseInitializer
                 "SELECT COUNT(*) FROM pragma_table_info(@Table) WHERE name = @Column",
                 new { Table = table, Column = column }) > 0;
 
+        bool TableExists(string table) =>
+            connection.ExecuteScalar<long>(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @Table",
+                new { Table = table }) > 0;
+
         using var tx = connection.BeginTransaction();
 
         // 旧世代専用のテーブルは無条件に破棄する(子 → 親の順)。
@@ -132,6 +146,18 @@ public sealed class DatabaseInitializer
         // 旧: 原価要素分類つきの費目マスタ(element_type 列を持つ)
         if (HasColumn("cost_elements", "element_type"))
             connection.Execute("DROP TABLE cost_elements;", transaction: tx);
+
+        // 旧: 部を持たない課(division_id 列がない)。departments と配下テーブルを作り直す(子 → 親の順)。
+        if (TableExists("departments") && !HasColumn("departments", "division_id"))
+        {
+            connection.Execute("""
+                DROP TABLE IF EXISTS department_budget_lines;
+                DROP TABLE IF EXISTS department_budgets;
+                DROP TABLE IF EXISTS actual_entries;
+                DROP TABLE IF EXISTS projects;
+                DROP TABLE IF EXISTS departments;
+                """, transaction: tx);
+        }
 
         tx.Commit();
     }

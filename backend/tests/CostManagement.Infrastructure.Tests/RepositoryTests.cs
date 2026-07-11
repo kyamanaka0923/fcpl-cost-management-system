@@ -2,6 +2,7 @@ using CostManagement.Domain.Actuals;
 using CostManagement.Domain.Budgeting;
 using CostManagement.Domain.CostElements;
 using CostManagement.Domain.Departments;
+using CostManagement.Domain.Divisions;
 using CostManagement.Domain.Projects;
 using CostManagement.Domain.Shared;
 using CostManagement.Infrastructure.Persistence;
@@ -27,9 +28,17 @@ public sealed class RepositoryFixture : IDisposable
         new DatabaseInitializer(Factory).Initialize();
     }
 
+    public async Task<Division> 部を保存(string code = "SALES")
+    {
+        var division = Division.Create(code, "営業本部", Now);
+        await new DivisionRepository(Factory).AddAsync(division);
+        return division;
+    }
+
     public async Task<Department> 課を保存(string code = "DEV-1")
     {
-        var department = Department.Create(code, "開発1課", Now);
+        var division = await 部を保存($"DIV-{code}");
+        var department = Department.Create(division.Id, code, "開発1課", Now);
         await new DepartmentRepository(Factory).AddAsync(department);
         return department;
     }
@@ -56,18 +65,36 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
     public void Dispose() => _fx.Dispose();
 
     [Fact]
-    public async Task 課は作成時の状態のまま復元される()
+    public async Task 部は作成時の状態のまま復元される()
     {
+        var repo = new DivisionRepository(_fx.Factory);
+        var division = Division.Create("SALES", "営業本部", _fx.Now);
+        await repo.AddAsync(division);
+
+        var restored = await repo.FindByIdAsync(division.Id);
+
+        Assert.NotNull(restored);
+        Assert.Equal(division.Code, restored.Code);
+        Assert.Equal(division.Name, restored.Name);
+        Assert.Equal(division.CreatedAt, restored.CreatedAt);
+    }
+
+    [Fact]
+    public async Task 課は所属する部を含めて復元される()
+    {
+        var division = await _fx.部を保存();
         var repo = new DepartmentRepository(_fx.Factory);
-        var department = Department.Create("DEV-1", "開発1課", _fx.Now);
+        var department = Department.Create(division.Id, "DEV-1", "開発1課", _fx.Now);
         await repo.AddAsync(department);
 
         var restored = await repo.FindByIdAsync(department.Id);
 
         Assert.NotNull(restored);
+        Assert.Equal(division.Id, restored.DivisionId);
         Assert.Equal(department.Code, restored.Code);
-        Assert.Equal(department.Name, restored.Name);
-        Assert.Equal(department.CreatedAt, restored.CreatedAt);
+
+        var listed = await repo.ListByDivisionAsync(division.Id);
+        Assert.Contains(listed, d => d.Id == department.Id);
     }
 
     [Fact]
