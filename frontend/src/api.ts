@@ -1,10 +1,20 @@
 // バックエンド API クライアント。DTO はサーバ側 (CostManagement.Application) と対応する。
 
-export interface Project {
+export type BudgetCategory = 'Revenue' | 'Processing' | 'Outsourcing' | 'PeriodCost'
+export type BudgetStatus = 'Draft' | 'Approved' | 'Superseded'
+
+export interface Department {
   id: string
   code: string
   name: string
-  fiscalYear: number
+  createdAt: string
+}
+
+export interface Project {
+  id: string
+  departmentId: string
+  code: string
+  name: string
   status: 'Active' | 'Completed'
   createdAt: string
 }
@@ -12,195 +22,140 @@ export interface Project {
 export interface CostElement {
   code: string
   name: string
-  type: 'Material' | 'Labor' | 'Overhead' | 'Expense'
 }
 
-export interface PlanLine {
+export interface BudgetLine {
   id: string
-  elementCode: string
-  revenueItem: string | null
-  period: string
+  category: BudgetCategory
+  projectId: string | null
+  elementCode: string | null
   amount: number
 }
 
-export interface CostPlanSummary {
+export interface BudgetSummary {
   id: string
-  projectId: string
+  departmentId: string
+  fiscalHalf: string
   version: number
   label: string
-  status: 'Draft' | 'Approved' | 'Superseded'
+  status: BudgetStatus
   createdAt: string
   approvedAt: string | null
-  totalAmount: number
+  revenueTotal: number
+  processingTotal: number
+  outsourcingTotal: number
+  periodCostTotal: number
+  plannedProfit: number
 }
 
-export interface CostPlanDetail extends CostPlanSummary {
-  lines: PlanLine[]
+export interface BudgetDetail extends BudgetSummary {
+  lines: BudgetLine[]
 }
 
-export interface ActualCost {
+export interface ActualEntry {
   id: string
-  projectId: string
-  elementCode: string
-  revenueItem: string | null
-  period: string
+  departmentId: string
+  fiscalHalf: string
+  category: BudgetCategory
+  projectId: string | null
+  elementCode: string | null
   amount: number
   note: string | null
   recordedAt: string
 }
 
 export interface VarianceLine {
-  elementCode: string
-  revenueItem: string | null
-  period: string
+  category: BudgetCategory
+  projectId: string | null
+  projectName: string | null
+  elementCode: string | null
+  elementName: string | null
   plannedAmount: number
   actualAmount: number
-  totalVariance: number
+  variance: number
   isUnplanned: boolean
+  isFavorable: boolean
   isAdverse: boolean
 }
 
-export interface VarianceReport {
-  planId: string
-  planVersion: number
-  planLabel: string
+export interface CategoryVariance {
+  category: BudgetCategory
   lines: VarianceLine[]
-  totalPlannedAmount: number
-  totalActualAmount: number
-  totalVariance: number
-}
-
-export interface PlanComparisonLine {
-  elementCode: string
-  revenueItem: string | null
-  period: string
-  baseAmount: number
-  targetAmount: number
-  difference: number
-}
-
-export interface PlanComparison {
-  baseVersion: number
-  baseLabel: string
-  targetVersion: number
-  targetLabel: string
-  lines: PlanComparisonLine[]
-  baseTotalAmount: number
-  targetTotalAmount: number
-  totalDifference: number
-}
-
-export interface RevenuePlanLine {
-  id: string
-  itemName: string
-  period: string
-  amount: number
-}
-
-export interface RevenuePlanSummary {
-  id: string
-  projectId: string
-  version: number
-  label: string
-  status: 'Draft' | 'Approved' | 'Superseded'
-  createdAt: string
-  approvedAt: string | null
-  totalAmount: number
-}
-
-export interface RevenuePlanDetail extends RevenuePlanSummary {
-  lines: RevenuePlanLine[]
-}
-
-export interface ActualRevenue {
-  id: string
-  projectId: string
-  itemName: string
-  period: string
-  amount: number
-  note: string | null
-  recordedAt: string
-}
-
-export interface RevenueVarianceLine {
-  itemName: string
-  period: string
   plannedAmount: number
   actualAmount: number
-  totalVariance: number
-  isUnplanned: boolean
-  isFavorable: boolean
+  variance: number
 }
 
-export interface RevenueVarianceReport {
-  planId: string
-  planVersion: number
-  planLabel: string
-  lines: RevenueVarianceLine[]
-  totalPlannedAmount: number
-  totalActualAmount: number
-  totalVariance: number
-}
-
-export interface RevenuePlanComparisonLine {
-  itemName: string
-  period: string
-  baseAmount: number
-  targetAmount: number
-  difference: number
-}
-
-export interface RevenuePlanComparison {
-  baseVersion: number
-  baseLabel: string
-  targetVersion: number
-  targetLabel: string
-  lines: RevenuePlanComparisonLine[]
-  baseTotalAmount: number
-  targetTotalAmount: number
-  totalDifference: number
-}
-
-export interface ProfitItemLine {
-  itemName: string | null
-  plannedRevenue: number
-  actualRevenue: number
-  plannedCost: number
-  actualCost: number
-  plannedProfit: number
-  actualProfit: number
-  profitVariance: number
-}
-
-export interface ProfitPeriodLine {
-  period: string
-  plannedRevenue: number
-  actualRevenue: number
-  plannedCost: number
-  actualCost: number
-  plannedProfit: number
-  actualProfit: number
-  profitVariance: number
-}
-
-export interface ProfitSummary {
-  revenuePlanVersion: number
-  revenuePlanLabel: string
-  costPlanVersion: number
-  costPlanLabel: string
+export interface VarianceReport {
+  budgetId: string
+  budgetVersion: number
+  budgetLabel: string
+  categories: CategoryVariance[]
   plannedRevenue: number
   actualRevenue: number
   revenueVariance: number
   plannedCost: number
   actualCost: number
   costVariance: number
+}
+
+export interface BudgetComparisonLine {
+  category: BudgetCategory
+  projectId: string | null
+  projectName: string | null
+  elementCode: string | null
+  elementName: string | null
+  baseAmount: number
+  targetAmount: number
+  difference: number
+}
+
+export interface CategoryComparison {
+  category: BudgetCategory
+  lines: BudgetComparisonLine[]
+  baseAmount: number
+  targetAmount: number
+  difference: number
+}
+
+export interface BudgetComparison {
+  baseVersion: number
+  baseLabel: string
+  targetVersion: number
+  targetLabel: string
+  categories: CategoryComparison[]
+}
+
+export interface ProjectProfitLine {
+  projectId: string
+  projectCode: string
+  projectName: string
+  plannedRevenue: number
+  actualRevenue: number
+  plannedProcessing: number
+  actualProcessing: number
+  plannedOutsourcing: number
+  actualOutsourcing: number
+  plannedProfit: number
+  actualProfit: number
+  profitVariance: number
+}
+
+export interface ProfitSummary {
+  budgetVersion: number
+  budgetLabel: string
+  plannedRevenue: number
+  actualRevenue: number
+  plannedTotalCost: number
+  actualTotalCost: number
+  plannedPeriodCost: number
+  actualPeriodCost: number
   plannedProfit: number
   actualProfit: number
   profitVariance: number
   plannedMarginRate: number | null
   actualMarginRate: number | null
-  itemLines: ProfitItemLine[]
-  periodLines: ProfitPeriodLine[]
+  projectLines: ProjectProfitLine[]
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -223,135 +178,115 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  listProjects: () => request<Project[]>('/projects'),
-  getProject: (id: string) => request<Project>(`/projects/${id}`),
-  createProject: (body: { code: string; name: string; fiscalYear: number }) =>
-    request<Project>('/projects', { method: 'POST', body: JSON.stringify(body) }),
+  // ---- 課 ----
+  listDepartments: () => request<Department[]>('/departments'),
+  getDepartment: (id: string) => request<Department>(`/departments/${id}`),
+  createDepartment: (body: { code: string; name: string }) =>
+    request<Department>('/departments', { method: 'POST', body: JSON.stringify(body) }),
 
-  listCostElements: () => request<CostElement[]>('/cost-elements'),
-  listRevenueItems: (projectId: string) =>
-    request<string[]>(`/projects/${projectId}/revenue-items`),
-
-  // ---- 原価予算 ----
-  listPlans: (projectId: string) =>
-    request<CostPlanSummary[]>(`/projects/${projectId}/plans`),
-  getPlan: (planId: string) => request<CostPlanDetail>(`/plans/${planId}`),
-  createPlan: (projectId: string, body: { label: string; basePlanId?: string | null }) =>
-    request<CostPlanDetail>(`/projects/${projectId}/plans`, {
+  // ---- 案件(課に属するマスタ) ----
+  listProjects: (departmentId: string) =>
+    request<Project[]>(`/departments/${departmentId}/projects`),
+  createProject: (departmentId: string, body: { code: string; name: string }) =>
+    request<Project>(`/departments/${departmentId}/projects`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  upsertPlanLine: (
-    planId: string,
-    body: { elementCode: string; revenueItem?: string | null; period: string; amount: number },
+  completeProject: (projectId: string) =>
+    request<Project>(`/projects/${projectId}/complete`, { method: 'POST' }),
+
+  // ---- 費目マスタ(期間費用) ----
+  listCostElements: () => request<CostElement[]>('/cost-elements'),
+  createCostElement: (body: { code: string; name: string }) =>
+    request<CostElement>('/cost-elements', { method: 'POST', body: JSON.stringify(body) }),
+
+  // ---- 課予算 ----
+  listBudgets: (departmentId: string, fiscalHalf: string) =>
+    request<BudgetSummary[]>(
+      `/departments/${departmentId}/budgets?fiscalHalf=${encodeURIComponent(fiscalHalf)}`,
+    ),
+  getBudget: (budgetId: string) => request<BudgetDetail>(`/budgets/${budgetId}`),
+  createBudget: (
+    departmentId: string,
+    body: { fiscalHalf: string; label: string; baseBudgetId?: string | null },
   ) =>
-    request<CostPlanDetail>(`/plans/${planId}/lines`, {
+    request<BudgetDetail>(`/departments/${departmentId}/budgets`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  upsertBudgetLine: (
+    budgetId: string,
+    body: {
+      category: BudgetCategory
+      projectId?: string | null
+      elementCode?: string | null
+      amount: number
+    },
+  ) =>
+    request<BudgetDetail>(`/budgets/${budgetId}/lines`, {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
-  removePlanLine: (planId: string, elementCode: string, revenueItem: string | null, period: string) => {
-    const params = new URLSearchParams({ elementCode, period })
-    if (revenueItem) params.set('revenueItem', revenueItem)
-    return request<CostPlanDetail>(`/plans/${planId}/lines?${params}`, { method: 'DELETE' })
+  removeBudgetLine: (
+    budgetId: string,
+    category: BudgetCategory,
+    projectId: string | null,
+    elementCode: string | null,
+  ) => {
+    const params = new URLSearchParams({ category })
+    if (projectId) params.set('projectId', projectId)
+    if (elementCode) params.set('elementCode', elementCode)
+    return request<BudgetDetail>(`/budgets/${budgetId}/lines?${params}`, { method: 'DELETE' })
   },
-  approvePlan: (planId: string) =>
-    request<CostPlanDetail>(`/plans/${planId}/approve`, { method: 'POST' }),
+  approveBudget: (budgetId: string) =>
+    request<BudgetDetail>(`/budgets/${budgetId}/approve`, { method: 'POST' }),
 
-  // ---- 原価実績 ----
-  listActuals: (projectId: string) =>
-    request<ActualCost[]>(`/projects/${projectId}/actuals`),
+  // ---- 実績 ----
+  listActuals: (departmentId: string, fiscalHalf: string) =>
+    request<ActualEntry[]>(
+      `/departments/${departmentId}/actuals?fiscalHalf=${encodeURIComponent(fiscalHalf)}`,
+    ),
   recordActual: (
-    projectId: string,
+    departmentId: string,
     body: {
-      elementCode: string
-      revenueItem?: string | null
-      period: string
+      fiscalHalf: string
+      category: BudgetCategory
+      projectId?: string | null
+      elementCode?: string | null
       amount: number
       note?: string | null
     },
   ) =>
-    request<ActualCost>(`/projects/${projectId}/actuals`, {
+    request<ActualEntry>(`/departments/${departmentId}/actuals`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
   deleteActual: (actualId: string) =>
     request<void>(`/actuals/${actualId}`, { method: 'DELETE' }),
 
-  // ---- 売上予算 ----
-  listRevenuePlans: (projectId: string) =>
-    request<RevenuePlanSummary[]>(`/projects/${projectId}/revenue-plans`),
-  getRevenuePlan: (planId: string) => request<RevenuePlanDetail>(`/revenue-plans/${planId}`),
-  createRevenuePlan: (projectId: string, body: { label: string; basePlanId?: string | null }) =>
-    request<RevenuePlanDetail>(`/projects/${projectId}/revenue-plans`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  upsertRevenuePlanLine: (
-    planId: string,
-    body: { itemName: string; period: string; amount: number },
-  ) =>
-    request<RevenuePlanDetail>(`/revenue-plans/${planId}/lines`, {
-      method: 'PUT',
-      body: JSON.stringify(body),
-    }),
-  removeRevenuePlanLine: (planId: string, itemName: string, period: string) =>
-    request<RevenuePlanDetail>(
-      `/revenue-plans/${planId}/lines?itemName=${encodeURIComponent(itemName)}&period=${encodeURIComponent(period)}`,
-      { method: 'DELETE' },
-    ),
-  approveRevenuePlan: (planId: string) =>
-    request<RevenuePlanDetail>(`/revenue-plans/${planId}/approve`, { method: 'POST' }),
-
-  // ---- 売上実績 ----
-  listActualRevenues: (projectId: string) =>
-    request<ActualRevenue[]>(`/projects/${projectId}/actual-revenues`),
-  recordActualRevenue: (
-    projectId: string,
-    body: { itemName: string; period: string; amount: number; note?: string | null },
-  ) =>
-    request<ActualRevenue>(`/projects/${projectId}/actual-revenues`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  deleteActualRevenue: (actualId: string) =>
-    request<void>(`/actual-revenues/${actualId}`, { method: 'DELETE' }),
-
   // ---- 分析 ----
-  getVariance: (projectId: string, opts?: { planId?: string; from?: string; to?: string }) => {
-    const params = new URLSearchParams()
-    if (opts?.planId) params.set('planId', opts.planId)
-    if (opts?.from) params.set('from', opts.from)
-    if (opts?.to) params.set('to', opts.to)
-    const qs = params.toString()
-    return request<VarianceReport>(`/projects/${projectId}/variance${qs ? `?${qs}` : ''}`)
+  getVariance: (departmentId: string, fiscalHalf: string, opts?: { budgetId?: string }) => {
+    const params = new URLSearchParams({ fiscalHalf })
+    if (opts?.budgetId) params.set('budgetId', opts.budgetId)
+    return request<VarianceReport>(`/departments/${departmentId}/variance?${params}`)
   },
-  getRevenueVariance: (
-    projectId: string,
-    opts?: { planId?: string; from?: string; to?: string },
+  compareBudgets: (
+    departmentId: string,
+    fiscalHalf: string,
+    baseVersion: number,
+    targetVersion: number,
   ) => {
-    const params = new URLSearchParams()
-    if (opts?.planId) params.set('planId', opts.planId)
-    if (opts?.from) params.set('from', opts.from)
-    if (opts?.to) params.set('to', opts.to)
-    const qs = params.toString()
-    return request<RevenueVarianceReport>(
-      `/projects/${projectId}/revenue-variance${qs ? `?${qs}` : ''}`,
-    )
+    const params = new URLSearchParams({
+      fiscalHalf,
+      baseVersion: String(baseVersion),
+      targetVersion: String(targetVersion),
+    })
+    return request<BudgetComparison>(`/departments/${departmentId}/budget-comparison?${params}`)
   },
-  comparePlans: (projectId: string, baseVersion: number, targetVersion: number) =>
-    request<PlanComparison>(
-      `/projects/${projectId}/plan-comparison?baseVersion=${baseVersion}&targetVersion=${targetVersion}`,
-    ),
-  compareRevenuePlans: (projectId: string, baseVersion: number, targetVersion: number) =>
-    request<RevenuePlanComparison>(
-      `/projects/${projectId}/revenue-plan-comparison?baseVersion=${baseVersion}&targetVersion=${targetVersion}`,
-    ),
-  getProfit: (projectId: string, opts?: { from?: string; to?: string }) => {
-    const params = new URLSearchParams()
-    if (opts?.from) params.set('from', opts.from)
-    if (opts?.to) params.set('to', opts.to)
-    const qs = params.toString()
-    return request<ProfitSummary>(`/projects/${projectId}/profit${qs ? `?${qs}` : ''}`)
+  getProfit: (departmentId: string, fiscalHalf: string, opts?: { budgetId?: string }) => {
+    const params = new URLSearchParams({ fiscalHalf })
+    if (opts?.budgetId) params.set('budgetId', opts.budgetId)
+    return request<ProfitSummary>(`/departments/${departmentId}/profit?${params}`)
   },
 }
 
@@ -361,5 +296,38 @@ export const formatYen = (value: number): string =>
 export const formatSignedYen = (value: number): string =>
   (value > 0 ? '+' : '') + formatYen(value)
 
-/** 売上対応品目の表示名(null = 共通費)。 */
-export const revenueItemLabel = (item: string | null): string => item ?? '(共通)'
+/** 予算区分の表示名。 */
+export const categoryLabel: Record<BudgetCategory, string> = {
+  Revenue: '売上高',
+  Processing: '加工費',
+  Outsourcing: '外注費',
+  PeriodCost: '期間費用',
+}
+
+/** 案件別に明細を持つ区分(売上高・加工費・外注費)。 */
+export const projectCategories: BudgetCategory[] = ['Revenue', 'Processing', 'Outsourcing']
+
+/** "2026-H1" → "2026年度 上期" の表示名。 */
+export const halfLabel = (fiscalHalf: string): string => {
+  const [year, half] = fiscalHalf.split('-')
+  return `${year}年度 ${half === 'H1' ? '上期' : '下期'}`
+}
+
+/** 今日の日付が属する会計半期(年度は4月始まり: 4〜9月 = 上期、10〜3月 = 前年度の下期)。 */
+export const currentFiscalHalf = (): string => {
+  const now = new Date()
+  const month = now.getMonth() + 1
+  const year = now.getFullYear()
+  if (month >= 4 && month <= 9) return `${year}-H1`
+  return month >= 10 ? `${year}-H2` : `${year - 1}-H2`
+}
+
+/** 半期セレクタ用の候補(前年度〜翌年度の6半期)。 */
+export const fiscalHalfOptions = (): string[] => {
+  const currentYear = Number(currentFiscalHalf().split('-')[0])
+  const options: string[] = []
+  for (let y = currentYear - 1; y <= currentYear + 1; y++) {
+    options.push(`${y}-H1`, `${y}-H2`)
+  }
+  return options
+}

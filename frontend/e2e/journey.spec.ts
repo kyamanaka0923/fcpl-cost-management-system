@@ -1,131 +1,149 @@
 import { expect, test, type Page } from '@playwright/test'
 
-// 実行のたびに一意なプロジェクトコードを使う(同じDBで再実行しても衝突しない)
-const projectCode = `SE-${Date.now() % 1_000_000}`
-const projectName = `受託開発E2E-${projectCode}`
+// 実行のたびに一意なコードを使う(同じDBで再実行しても衝突しない)
+const suffix = Date.now() % 1_000_000
+const deptCode = `DEV-${suffix}`
+const deptName = `開発課E2E-${suffix}`
+const projectACode = `PJA-${suffix}`
+const projectBCode = `PJB-${suffix}`
 
 test.describe.configure({ mode: 'serial' })
 
-async function プロジェクト詳細を開く(page: Page) {
+async function 課詳細を開く(page: Page) {
   await page.goto('/')
-  await page.getByRole('link', { name: projectName }).click()
-  await expect(page.getByRole('heading', { name: new RegExp(projectCode) })).toBeVisible()
+  await page.getByRole('link', { name: deptName }).click()
+  await expect(page.getByRole('heading', { name: new RegExp(deptCode) })).toBeVisible()
 }
 
-test('計画策定: プロジェクトを登録し売上予算と原価予算を承認できる', async ({ page }) => {
-  // ---- プロジェクト登録 ----
+test('計画策定: 課と案件を登録し半期予算(4区分)を承認できる', async ({ page }) => {
+  // ---- 課の登録 ----
   await page.goto('/')
-  await page.getByLabel('コード').fill(projectCode)
-  await page.getByLabel('名称').fill(projectName)
-  await page.getByRole('button', { name: '作成' }).click()
-  await expect(page.getByRole('link', { name: projectName })).toBeVisible()
-
-  await プロジェクト詳細を開く(page)
-
-  // ---- 売上予算(当初)の策定と承認 ----
-  const 売上予算カード = page.locator('.card', { hasText: '売上予算バージョン' })
-  await 売上予算カード.getByLabel('予算名').fill('当初売上予算')
-  await 売上予算カード.getByRole('button', { name: 'ドラフト作成' }).click()
-
-  // 明細: 案件A 200万
-  await page.getByLabel('品目(案件名など)').fill('案件A')
-  await page.getByLabel('年月').fill('2026-04')
-  await page.getByLabel('金額(円)').fill('2000000')
+  await page.getByLabel('課コード').fill(deptCode)
+  await page.getByLabel('課名').fill(deptName)
   await page.getByRole('button', { name: '登録' }).click()
-  await expect(page.getByRole('cell', { name: '案件A' })).toBeVisible()
+  await expect(page.getByRole('link', { name: deptName })).toBeVisible()
 
-  await page.getByRole('button', { name: 'この予算を承認する' }).click()
-  await expect(page.getByText('承認済')).toBeVisible()
+  await 課詳細を開く(page)
 
-  // ---- 原価予算(当初)の策定と承認 ----
-  await プロジェクト詳細を開く(page)
-  const 原価予算カード = page.locator('.card', { hasText: '原価予算バージョン' })
-  await 原価予算カード.getByLabel('予算名').fill('当初原価予算')
-  await 原価予算カード.getByRole('button', { name: 'ドラフト作成' }).click()
+  // ---- 案件マスタの登録 ----
+  const 案件カード = page.locator('.card', { hasText: '案件マスタ' })
+  await 案件カード.getByLabel('案件コード').fill(projectACode)
+  await 案件カード.getByLabel('案件名').fill('案件A')
+  await 案件カード.getByRole('button', { name: '登録' }).click()
+  await expect(案件カード.getByRole('cell', { name: '案件A' })).toBeVisible()
 
-  // 明細1: SE人件費 × 案件A × 140万
-  await page.getByLabel('費目').selectOption({ label: 'SE人件費(LAB-SE)' })
-  await page.getByLabel('売上対応品目(空欄 = 共通費)').fill('案件A')
-  await page.getByLabel('年月').fill('2026-04')
-  await page.getByLabel('金額(円)').fill('1400000')
-  await page.getByRole('button', { name: '登録' }).click()
-  await expect(page.getByRole('cell', { name: 'SE人件費' })).toBeVisible()
+  await 案件カード.getByLabel('案件コード').fill(projectBCode)
+  await 案件カード.getByLabel('案件名').fill('案件B')
+  await 案件カード.getByRole('button', { name: '登録' }).click()
+  await expect(案件カード.getByRole('cell', { name: '案件B' })).toBeVisible()
 
-  // 明細2: 共通間接費(売上対応品目なし = 共通費)× 30万
-  await page.getByLabel('費目').selectOption({ label: '共通間接費(OVH-COM)' })
-  await page.getByLabel('売上対応品目(空欄 = 共通費)').fill('')
-  await page.getByLabel('年月').fill('2026-04')
-  await page.getByLabel('金額(円)').fill('300000')
-  await page.getByRole('button', { name: '登録' }).click()
-  await expect(page.getByRole('cell', { name: '(共通)' })).toBeVisible()
+  // ---- 当初予算のドラフト作成(予算編集ページへ遷移) ----
+  const 予算カード = page.locator('.card', { hasText: '予算バージョン' })
+  await 予算カード.getByLabel('予算名').fill('当初予算')
+  await 予算カード.getByRole('button', { name: 'ドラフト作成' }).click()
+  await expect(page.getByRole('heading', { name: /当初予算/ })).toBeVisible()
 
+  // ---- 明細の登録(売上高・加工費・外注費は案件別、期間費用は費目別) ----
+  const 明細を登録 = async (区分: string, 相手: string, 金額: string) => {
+    await page.getByLabel('区分').selectOption({ label: 区分 })
+    if (区分 === '期間費用') {
+      await page.getByLabel('費目').selectOption({ label: 相手 })
+    } else {
+      await page.getByLabel('案件').selectOption({ label: 相手 })
+    }
+    await page.getByLabel(/金額/).fill(金額)
+    await page.getByRole('button', { name: '登録' }).click()
+  }
+
+  await 明細を登録('売上高', `案件A(${projectACode})`, '2000000')
+  await 明細を登録('売上高', `案件B(${projectBCode})`, '1000000')
+  await 明細を登録('加工費', `案件A(${projectACode})`, '1400000')
+  await 明細を登録('外注費', `案件B(${projectBCode})`, '700000')
+  await 明細を登録('期間費用', '人件費(PERSONNEL)', '300000')
+
+  // 課の区分合計 = 案件明細の合計(サマリタイルで確認)
+  await expect(page.getByText('¥3,000,000').first()).toBeVisible() // 売上高
+  await expect(page.getByText('¥600,000').first()).toBeVisible()   // 計画損益
+
+  // ---- 承認 ----
   await page.getByRole('button', { name: 'この予算を承認する' }).click()
   await expect(page.getByText('承認済')).toBeVisible()
 })
 
-test('実績入力: 売上実績と原価実績を計上できる', async ({ page }) => {
-  // ---- 売上実績 ----
-  await プロジェクト詳細を開く(page)
-  await page.getByRole('button', { name: '売上実績入力' }).click()
-  await page.getByLabel('品目(案件名など)').fill('案件A')
-  await page.getByLabel('年月').fill('2026-04')
-  await page.getByLabel('金額(円)').fill('2100000')
-  await page.getByRole('button', { name: '計上' }).click()
+test('実績入力: 区分ごとに案件別・費目別の実績を計上できる', async ({ page }) => {
+  await 課詳細を開く(page)
+  await page.getByRole('button', { name: '実績入力' }).click()
+
+  const 実績を計上 = async (区分: string, 相手: string, 金額: string) => {
+    await page.getByLabel('区分').selectOption({ label: 区分 })
+    if (区分 === '期間費用') {
+      await page.getByLabel('費目').selectOption({ label: 相手 })
+    } else {
+      await page.getByLabel('案件').selectOption({ label: 相手 })
+    }
+    await page.getByLabel(/金額/).fill(金額)
+    await page.getByRole('button', { name: '計上' }).click()
+  }
+
+  await 実績を計上('売上高', `案件A(${projectACode})`, '2100000')
+  await 実績を計上('売上高', `案件B(${projectBCode})`, '900000')
+  await 実績を計上('加工費', `案件A(${projectACode})`, '1480000')
+  await 実績を計上('外注費', `案件B(${projectBCode})`, '650000')
+  await 実績を計上('期間費用', '人件費(PERSONNEL)', '320000')
+
   // 明細行と合計行の両方に同額が出るため first で確認
   await expect(page.getByRole('cell', { name: '¥2,100,000' }).first()).toBeVisible()
-
-  // ---- 原価実績 ----
-  await プロジェクト詳細を開く(page)
-  await page.getByRole('button', { name: '原価実績入力' }).click()
-  await page.getByLabel('費目').selectOption({ label: 'SE人件費(LAB-SE)' })
-  await page.getByLabel('売上対応品目(空欄 = 共通費)').fill('案件A')
-  await page.getByLabel('年月').fill('2026-04')
-  await page.getByLabel('金額(円)').fill('1480000')
-  await page.getByRole('button', { name: '計上' }).click()
-  await expect(page.getByRole('cell', { name: '¥1,480,000' }).first()).toBeVisible()
+  await expect(page.getByRole('cell', { name: '¥320,000' }).first()).toBeVisible()
 })
 
-test('分析: 原価差異と品目別の損益が表示される', async ({ page }) => {
-  await プロジェクト詳細を開く(page)
+test('分析: 区分別の予実差異と案件別の損益が表示される', async ({ page }) => {
+  await 課詳細を開く(page)
   await page.getByRole('button', { name: '予実差異分析・損益' }).click()
 
-  // ---- 原価差異タブ(既定) ----
-  // 予算170万(140万+30万) / 実績148万 → 総差異 -22万(有利)。
+  // ---- 予実差異タブ(既定) ----
+  // コスト: 予算240万(140万+70万+30万) / 実績245万 → 差異 +5万(不利)。
   // 集計タイルと明細テーブルの両方に出るため first で確認
-  await expect(page.getByText('¥1,700,000').first()).toBeVisible()
-  await expect(page.getByText('¥-220,000').first()).toBeVisible()
+  await expect(page.getByText('¥2,400,000').first()).toBeVisible()
+  await expect(page.getByText('¥+50,000').first()).toBeVisible()
 
-  // ---- 損益(粗利)タブ ----
-  await page.getByRole('button', { name: '損益(粗利)' }).click()
-  const 品目別損益 = page.locator('.card', { hasText: '品目別 損益' })
-  await expect(品目別損益.getByRole('cell', { name: '案件A' })).toBeVisible()
-  await expect(品目別損益.getByRole('cell', { name: '(共通)' })).toBeVisible()
-  // 案件Aの粗利実績: 210万 − 148万 = 62万
-  await expect(品目別損益.getByRole('cell', { name: '¥620,000' }).first()).toBeVisible()
+  // 加工費の明細に案件名が表示される
+  const 加工費カード = page.locator('.card', { hasText: '加工費 差異明細' })
+  await expect(加工費カード.getByRole('cell', { name: '案件A' })).toBeVisible()
+
+  // ---- 損益タブ ----
+  await page.getByRole('button', { name: '損益', exact: true }).click()
+  const 案件別損益 = page.locator('.card', { hasText: '案件別 損益' }).first()
+  await expect(案件別損益.getByRole('cell', { name: /案件A/ })).toBeVisible()
+  await expect(案件別損益.getByRole('cell', { name: '期間費用(課共通)' })).toBeVisible()
+  // 案件Aの損益実績: 210万 − 148万 = 62万
+  await expect(案件別損益.getByRole('cell', { name: '¥620,000' }).first()).toBeVisible()
+  // 課全体の損益実績: 300万 − 245万 = 55万
+  await expect(page.getByText('¥550,000').first()).toBeVisible()
 })
 
 test('計画変更: 改定版の承認で旧バージョンが失効しバージョン比較で増減を確認できる', async ({ page }) => {
-  // ---- 改定版(v2)を作成して増額・承認 ----
-  await プロジェクト詳細を開く(page)
-  const 原価予算カード = page.locator('.card', { hasText: '原価予算バージョン' })
-  await 原価予算カード.getByLabel('予算名').fill('第2四半期改定')
-  await 原価予算カード.getByRole('button', { name: 'ドラフト作成' }).click()
+  // ---- 改定版(v2)を作成して加工費を増額・承認 ----
+  await 課詳細を開く(page)
+  const 予算カード = page.locator('.card', { hasText: '予算バージョン' })
+  await 予算カード.getByLabel('予算名').fill('上期見直し')
+  await 予算カード.getByRole('button', { name: 'ドラフト作成' }).click()
+  await expect(page.getByRole('heading', { name: /上期見直し/ })).toBeVisible()
 
-  await page.getByLabel('費目').selectOption({ label: 'SE人件費(LAB-SE)' })
-  await page.getByLabel('売上対応品目(空欄 = 共通費)').fill('案件A')
-  await page.getByLabel('年月').fill('2026-04')
-  await page.getByLabel('金額(円)').fill('1500000')
+  await page.getByLabel('区分').selectOption({ label: '加工費' })
+  await page.getByLabel('案件').selectOption({ label: `案件A(${projectACode})` })
+  await page.getByLabel(/金額/).fill('1500000')
   await page.getByRole('button', { name: '登録' }).click()
   await page.getByRole('button', { name: 'この予算を承認する' }).click()
   await expect(page.getByText('承認済')).toBeVisible()
 
   // ---- 旧バージョンは失効として履歴に残る ----
-  await プロジェクト詳細を開く(page)
-  const 一覧 = page.locator('.card', { hasText: '原価予算バージョン' })
+  await 課詳細を開く(page)
+  const 一覧 = page.locator('.card', { hasText: '予算バージョン' })
   await expect(一覧.locator('.badge', { hasText: '失効' })).toBeVisible()
-  await expect(一覧.getByRole('link', { name: '第2四半期改定' })).toBeVisible()
+  await expect(一覧.getByRole('link', { name: '上期見直し' })).toBeVisible()
 
-  // ---- バージョン比較: v1 → v2 で +10万 ----
+  // ---- バージョン比較: v1 → v2 で加工費 +10万 ----
   await page.getByRole('button', { name: '予算バージョン比較' }).click()
-  await expect(page.getByText('¥+100,000').first()).toBeVisible()
+  const 加工費増減 = page.locator('.stat-tile', { hasText: '加工費 増減' })
+  await expect(加工費増減.getByText('¥+100,000')).toBeVisible()
 })

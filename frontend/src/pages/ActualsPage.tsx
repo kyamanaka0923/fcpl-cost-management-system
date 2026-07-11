@@ -1,47 +1,65 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { api, formatYen, revenueItemLabel, type ActualCost, type CostElement } from '../api'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import {
+  api,
+  categoryLabel,
+  currentFiscalHalf,
+  formatYen,
+  halfLabel,
+  type ActualEntry,
+  type BudgetCategory,
+  type CostElement,
+  type Project,
+} from '../api'
 
 export default function ActualsPage() {
-  const { projectId } = useParams<{ projectId: string }>()
-  const [actuals, setActuals] = useState<ActualCost[]>([])
+  const { departmentId } = useParams<{ departmentId: string }>()
+  const [searchParams] = useSearchParams()
+  const half = searchParams.get('half') ?? currentFiscalHalf()
+
+  const [entries, setEntries] = useState<ActualEntry[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [elements, setElements] = useState<CostElement[]>([])
-  const [revenueItems, setRevenueItems] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
 
+  const [category, setCategory] = useState<BudgetCategory>('Revenue')
+  const [projectId, setProjectId] = useState('')
   const [elementCode, setElementCode] = useState('')
-  const [revenueItem, setRevenueItem] = useState('')
-  const [period, setPeriod] = useState('')
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(() => {
-    if (!projectId) return
-    api.listActuals(projectId).then(setActuals).catch((e: Error) => setError(e.message))
-  }, [projectId])
+    if (!departmentId) return
+    api.listActuals(departmentId, half).then(setEntries).catch((e: Error) => setError(e.message))
+  }, [departmentId, half])
   useEffect(load, [load])
   useEffect(() => {
+    if (!departmentId) return
+    api.listProjects(departmentId).then(setProjects).catch((e: Error) => setError(e.message))
     api.listCostElements().then(setElements).catch((e: Error) => setError(e.message))
-    if (projectId) api.listRevenueItems(projectId).then(setRevenueItems).catch(() => undefined)
-  }, [projectId])
+  }, [departmentId])
 
-  if (!projectId) return null
-  const elementName = (code: string) => elements.find((e) => e.code === code)?.name ?? code
-  const total = actuals.reduce((sum, a) => sum + a.amount, 0)
+  if (!departmentId) return null
+  const isProjectCategory = category !== 'PeriodCost'
+  const projectName = (id: string | null) => projects.find((p) => p.id === id)?.name ?? id ?? ''
+  const elementName = (code: string | null) =>
+    elements.find((e) => e.code === code)?.name ?? code ?? ''
 
   const record = async (e: FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
     try {
-      await api.recordActual(projectId, {
-        elementCode,
-        revenueItem: revenueItem || null,
-        period,
+      await api.recordActual(departmentId, {
+        fiscalHalf: half,
+        category,
+        projectId: isProjectCategory ? projectId : null,
+        elementCode: isProjectCategory ? null : elementCode,
         amount: Number(amount),
         note: note || null,
       })
+      setAmount('')
       setNote('')
       load()
     } catch (err) {
@@ -51,60 +69,68 @@ export default function ActualsPage() {
     }
   }
 
-  const remove = async (id: string) => {
+  const remove = async (actualId: string) => {
     setError(null)
     try {
-      await api.deleteActual(id)
+      await api.deleteActual(actualId)
       load()
     } catch (err) {
       setError((err as Error).message)
     }
   }
 
+  const total = entries.reduce((sum, e) => sum + e.amount, 0)
+
   return (
     <>
       <div className="breadcrumbs">
-        <Link to="/">プロジェクト一覧</Link> /{' '}
-        <Link to={`/projects/${projectId}`}>プロジェクト</Link> / 原価実績入力
+        <Link to="/">課一覧</Link> /{' '}
+        <Link to={`/departments/${departmentId}?half=${half}`}>課詳細</Link> / 実績入力
       </div>
       {error && <div className="error-banner">{error}</div>}
 
       <div className="card">
-        <h2>原価実績の計上</h2>
+        <h2>実績の計上({halfLabel(half)})</h2>
         <p className="muted small">
-          同じ費目・売上対応品目・年月に複数回計上でき、分析時には合算されます。
-          売上対応品目を空欄にすると共通費として扱われます。
+          売上高・加工費・外注費は案件ごとに、期間費用は費目ごとに計上します。
+          同じ案件(または費目)に複数回計上でき、分析時に合算されます。
         </p>
         <form onSubmit={record} className="form-row">
           <label>
-            費目
-            <select value={elementCode} onChange={(e) => setElementCode(e.target.value)} required>
-              <option value="">選択してください</option>
-              {elements.map((el) => (
-                <option key={el.code} value={el.code}>
-                  {el.name}({el.code})
+            区分
+            <select value={category} onChange={(e) => setCategory(e.target.value as BudgetCategory)}>
+              {(Object.keys(categoryLabel) as BudgetCategory[]).map((c) => (
+                <option key={c} value={c}>
+                  {categoryLabel[c]}
                 </option>
               ))}
             </select>
           </label>
-          <label>
-            売上対応品目(空欄 = 共通費)
-            <input
-              value={revenueItem}
-              onChange={(e) => setRevenueItem(e.target.value)}
-              placeholder="案件A"
-              list="revenue-items-actual"
-            />
-            <datalist id="revenue-items-actual">
-              {revenueItems.map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
-          </label>
-          <label>
-            年月
-            <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} required />
-          </label>
+          {isProjectCategory ? (
+            <label>
+              案件
+              <select value={projectId} onChange={(e) => setProjectId(e.target.value)} required>
+                <option value="">選択してください</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}({p.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label>
+              費目
+              <select value={elementCode} onChange={(e) => setElementCode(e.target.value)} required>
+                <option value="">選択してください</option>
+                {elements.map((el) => (
+                  <option key={el.code} value={el.code}>
+                    {el.name}({el.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label>
             金額(円)
             <input
@@ -117,8 +143,8 @@ export default function ActualsPage() {
             />
           </label>
           <label>
-            摘要
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="任意" />
+            備考
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="4月分 など" />
           </label>
           <button type="submit" className="primary" disabled={saving}>
             計上
@@ -127,36 +153,40 @@ export default function ActualsPage() {
       </div>
 
       <div className="card">
-        <h2>原価実績一覧</h2>
-        {actuals.length === 0 ? (
+        <h2>実績一覧</h2>
+        {entries.length === 0 ? (
           <p className="muted small">実績がありません。</p>
         ) : (
           <table>
             <thead>
               <tr>
-                <th>年月</th>
-                <th>費目</th>
-                <th>売上対応品目</th>
+                <th>計上日時</th>
+                <th>区分</th>
+                <th>案件 / 費目</th>
                 <th className="num">金額</th>
-                <th>摘要</th>
+                <th>備考</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {actuals.map((a) => (
-                <tr key={a.id}>
-                  <td>{a.period}</td>
-                  <td>{elementName(a.elementCode)}</td>
-                  <td className={a.revenueItem ? '' : 'muted'}>{revenueItemLabel(a.revenueItem)}</td>
-                  <td className="num">¥{formatYen(a.amount)}</td>
-                  <td className="small muted">{a.note ?? ''}</td>
+              {entries.map((e) => (
+                <tr key={e.id}>
+                  <td className="small muted">{new Date(e.recordedAt).toLocaleString('ja-JP')}</td>
+                  <td>{categoryLabel[e.category]}</td>
                   <td>
-                    <button onClick={() => remove(a.id)}>削除</button>
+                    {e.category === 'PeriodCost'
+                      ? elementName(e.elementCode)
+                      : projectName(e.projectId)}
+                  </td>
+                  <td className="num">¥{formatYen(e.amount)}</td>
+                  <td className="small muted">{e.note ?? ''}</td>
+                  <td>
+                    <button onClick={() => remove(e.id)}>削除</button>
                   </td>
                 </tr>
               ))}
               <tr className="total-row">
-                <td colSpan={3}>合計</td>
+                <td colSpan={3}>合計(全区分)</td>
                 <td className="num">¥{formatYen(total)}</td>
                 <td colSpan={2}></td>
               </tr>
