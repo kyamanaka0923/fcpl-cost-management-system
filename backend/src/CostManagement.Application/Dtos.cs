@@ -1,120 +1,180 @@
 namespace CostManagement.Application;
 
+// ---- 応答 DTO ----
+
+public sealed record DepartmentDto(
+    Guid Id,
+    string Code,
+    string Name,
+    DateTime CreatedAt);
+
 public sealed record ProjectDto(
-    Guid Id, string Code, string Name, int FiscalYear, string Status, DateTime CreatedAt);
+    Guid Id,
+    Guid DepartmentId,
+    string Code,
+    string Name,
+    string Status,
+    DateTime CreatedAt);
 
-public sealed record CostElementDto(string Code, string Name, string Type);
+public sealed record CostElementDto(
+    string Code,
+    string Name);
 
-public sealed record PlanLineDto(
-    Guid Id, string ElementCode, string? RevenueItem, string Period, decimal Amount);
+public sealed record BudgetLineDto(
+    Guid Id,
+    string Category,
+    Guid? ProjectId,
+    string? ElementCode,
+    decimal Amount);
 
-public sealed record CostPlanSummaryDto(
-    Guid Id, Guid ProjectId, int Version, string Label, string Status,
-    DateTime CreatedAt, DateTime? ApprovedAt, decimal TotalAmount);
+public sealed record BudgetSummaryDto(
+    Guid Id,
+    Guid DepartmentId,
+    string FiscalHalf,
+    int Version,
+    string Label,
+    string Status,
+    DateTime CreatedAt,
+    DateTime? ApprovedAt,
+    decimal RevenueTotal,
+    decimal ProcessingTotal,
+    decimal OutsourcingTotal,
+    decimal PeriodCostTotal,
+    decimal PlannedProfit);
 
-public sealed record CostPlanDetailDto(
-    Guid Id, Guid ProjectId, int Version, string Label, string Status,
-    DateTime CreatedAt, DateTime? ApprovedAt, decimal TotalAmount,
-    IReadOnlyList<PlanLineDto> Lines);
+public sealed record BudgetDetailDto(
+    Guid Id,
+    Guid DepartmentId,
+    string FiscalHalf,
+    int Version,
+    string Label,
+    string Status,
+    DateTime CreatedAt,
+    DateTime? ApprovedAt,
+    decimal RevenueTotal,
+    decimal ProcessingTotal,
+    decimal OutsourcingTotal,
+    decimal PeriodCostTotal,
+    decimal PlannedProfit,
+    IReadOnlyList<BudgetLineDto> Lines);
 
-public sealed record ActualCostDto(
-    Guid Id, Guid ProjectId, string ElementCode, string? RevenueItem, string Period,
-    decimal Amount, string? Note, DateTime RecordedAt);
+public sealed record ActualEntryDto(
+    Guid Id,
+    Guid DepartmentId,
+    string FiscalHalf,
+    string Category,
+    Guid? ProjectId,
+    string? ElementCode,
+    decimal Amount,
+    string? Note,
+    DateTime RecordedAt);
 
 public sealed record VarianceLineDto(
-    string ElementCode, string? RevenueItem, string Period,
-    decimal PlannedAmount, decimal ActualAmount, decimal TotalVariance,
-    bool IsUnplanned, bool IsAdverse);
+    string Category,
+    Guid? ProjectId,
+    string? ProjectName,
+    string? ElementCode,
+    string? ElementName,
+    decimal PlannedAmount,
+    decimal ActualAmount,
+    decimal Variance,
+    bool IsUnplanned,
+    bool IsFavorable,
+    bool IsAdverse);
+
+public sealed record CategoryVarianceDto(
+    string Category,
+    IReadOnlyList<VarianceLineDto> Lines,
+    decimal PlannedAmount,
+    decimal ActualAmount,
+    decimal Variance);
 
 public sealed record VarianceReportDto(
-    Guid PlanId, int PlanVersion, string PlanLabel,
-    IReadOnlyList<VarianceLineDto> Lines,
-    decimal TotalPlannedAmount, decimal TotalActualAmount, decimal TotalVariance);
+    Guid BudgetId,
+    int BudgetVersion,
+    string BudgetLabel,
+    IReadOnlyList<CategoryVarianceDto> Categories,
+    decimal PlannedRevenue,
+    decimal ActualRevenue,
+    decimal RevenueVariance,
+    decimal PlannedCost,
+    decimal ActualCost,
+    decimal CostVariance);
 
-public sealed record PlanComparisonLineDto(
-    string ElementCode, string? RevenueItem, string Period,
-    decimal BaseAmount, decimal TargetAmount, decimal Difference);
+public sealed record BudgetComparisonLineDto(
+    string Category,
+    Guid? ProjectId,
+    string? ProjectName,
+    string? ElementCode,
+    string? ElementName,
+    decimal BaseAmount,
+    decimal TargetAmount,
+    decimal Difference);
 
-public sealed record PlanComparisonDto(
-    int BaseVersion, string BaseLabel, int TargetVersion, string TargetLabel,
-    IReadOnlyList<PlanComparisonLineDto> Lines,
-    decimal BaseTotalAmount, decimal TargetTotalAmount, decimal TotalDifference);
+public sealed record CategoryComparisonDto(
+    string Category,
+    IReadOnlyList<BudgetComparisonLineDto> Lines,
+    decimal BaseAmount,
+    decimal TargetAmount,
+    decimal Difference);
 
-// ---- 売上 ----
+public sealed record BudgetComparisonDto(
+    int BaseVersion,
+    string BaseLabel,
+    int TargetVersion,
+    string TargetLabel,
+    IReadOnlyList<CategoryComparisonDto> Categories);
 
-public sealed record RevenuePlanLineDto(
-    Guid Id, string ItemName, string Period, decimal Amount);
-
-public sealed record RevenuePlanSummaryDto(
-    Guid Id, Guid ProjectId, int Version, string Label, string Status,
-    DateTime CreatedAt, DateTime? ApprovedAt, decimal TotalAmount);
-
-public sealed record RevenuePlanDetailDto(
-    Guid Id, Guid ProjectId, int Version, string Label, string Status,
-    DateTime CreatedAt, DateTime? ApprovedAt, decimal TotalAmount,
-    IReadOnlyList<RevenuePlanLineDto> Lines);
-
-public sealed record ActualRevenueDto(
-    Guid Id, Guid ProjectId, string ItemName, string Period,
-    decimal Amount, string? Note, DateTime RecordedAt);
-
-public sealed record RevenueVarianceLineDto(
-    string ItemName, string Period,
-    decimal PlannedAmount, decimal ActualAmount, decimal TotalVariance,
-    bool IsUnplanned, bool IsFavorable);
-
-public sealed record RevenueVarianceReportDto(
-    Guid PlanId, int PlanVersion, string PlanLabel,
-    IReadOnlyList<RevenueVarianceLineDto> Lines,
-    decimal TotalPlannedAmount, decimal TotalActualAmount, decimal TotalVariance);
-
-public sealed record RevenuePlanComparisonLineDto(
-    string ItemName, string Period, decimal BaseAmount, decimal TargetAmount, decimal Difference);
-
-public sealed record RevenuePlanComparisonDto(
-    int BaseVersion, string BaseLabel, int TargetVersion, string TargetLabel,
-    IReadOnlyList<RevenuePlanComparisonLineDto> Lines,
-    decimal BaseTotalAmount, decimal TargetTotalAmount, decimal TotalDifference);
-
-// ---- 損益(粗利) ----
-
-public sealed record ProfitItemLineDto(
-    string? ItemName,
-    decimal PlannedRevenue, decimal ActualRevenue,
-    decimal PlannedCost, decimal ActualCost,
-    decimal PlannedProfit, decimal ActualProfit, decimal ProfitVariance);
-
-public sealed record ProfitPeriodLineDto(
-    string Period,
-    decimal PlannedRevenue, decimal ActualRevenue,
-    decimal PlannedCost, decimal ActualCost,
-    decimal PlannedProfit, decimal ActualProfit, decimal ProfitVariance);
+public sealed record ProjectProfitLineDto(
+    Guid ProjectId,
+    string ProjectCode,
+    string ProjectName,
+    decimal PlannedRevenue,
+    decimal ActualRevenue,
+    decimal PlannedProcessing,
+    decimal ActualProcessing,
+    decimal PlannedOutsourcing,
+    decimal ActualOutsourcing,
+    decimal PlannedProfit,
+    decimal ActualProfit,
+    decimal ProfitVariance);
 
 public sealed record ProfitSummaryDto(
-    int RevenuePlanVersion, string RevenuePlanLabel,
-    int CostPlanVersion, string CostPlanLabel,
-    decimal PlannedRevenue, decimal ActualRevenue, decimal RevenueVariance,
-    decimal PlannedCost, decimal ActualCost, decimal CostVariance,
-    decimal PlannedProfit, decimal ActualProfit, decimal ProfitVariance,
-    decimal? PlannedMarginRate, decimal? ActualMarginRate,
-    IReadOnlyList<ProfitItemLineDto> ItemLines,
-    IReadOnlyList<ProfitPeriodLineDto> PeriodLines);
+    int BudgetVersion,
+    string BudgetLabel,
+    decimal PlannedRevenue,
+    decimal ActualRevenue,
+    decimal PlannedTotalCost,
+    decimal ActualTotalCost,
+    decimal PlannedPeriodCost,
+    decimal ActualPeriodCost,
+    decimal PlannedProfit,
+    decimal ActualProfit,
+    decimal ProfitVariance,
+    decimal? PlannedMarginRate,
+    decimal? ActualMarginRate,
+    IReadOnlyList<ProjectProfitLineDto> ProjectLines);
 
 // ---- リクエスト ----
 
-public sealed record CreateProjectRequest(string Code, string Name, int FiscalYear);
+public sealed record CreateDepartmentRequest(string Code, string Name);
 
-public sealed record CreateCostElementRequest(string Code, string Name, string Type);
+public sealed record CreateProjectRequest(string Code, string Name);
 
-public sealed record CreatePlanRequest(string Label, Guid? BasePlanId);
+public sealed record CreateCostElementRequest(string Code, string Name);
 
-public sealed record UpsertPlanLineRequest(
-    string ElementCode, string? RevenueItem, string Period, decimal Amount);
+public sealed record CreateBudgetRequest(string FiscalHalf, string Label, Guid? BaseBudgetId = null);
+
+public sealed record UpsertBudgetLineRequest(
+    string Category,
+    Guid? ProjectId,
+    string? ElementCode,
+    decimal Amount);
 
 public sealed record RecordActualRequest(
-    string ElementCode, string? RevenueItem, string Period, decimal Amount, string? Note);
-
-public sealed record UpsertRevenuePlanLineRequest(string ItemName, string Period, decimal Amount);
-
-public sealed record RecordRevenueRequest(
-    string ItemName, string Period, decimal Amount, string? Note);
+    string FiscalHalf,
+    string Category,
+    Guid? ProjectId,
+    string? ElementCode,
+    decimal Amount,
+    string? Note = null);

@@ -1,127 +1,85 @@
-using CostManagement.Domain.Shared;
+using CostManagement.Domain.Budgeting;
 
 namespace CostManagement.Domain.Analysis;
 
-/// <summary>品目別の損益。ItemName が null の行は売上対応品目のない原価(共通費)。</summary>
-public sealed record ProfitItemLine(
-    string? ItemName,
+/// <summary>
+/// 案件別の損益。案件損益 = 売上高 − 加工費 − 外注費(期間費用は課共通のため含めない)。
+/// </summary>
+public sealed record ProjectProfitLine(
+    Guid ProjectId,
     decimal PlannedRevenue,
     decimal ActualRevenue,
-    decimal PlannedCost,
-    decimal ActualCost,
+    decimal PlannedProcessing,
+    decimal ActualProcessing,
+    decimal PlannedOutsourcing,
+    decimal ActualOutsourcing,
     decimal PlannedProfit,
     decimal ActualProfit,
     decimal ProfitVariance);
 
-/// <summary>月別の損益。</summary>
-public sealed record ProfitPeriodLine(
-    AccountingPeriod Period,
-    decimal PlannedRevenue,
-    decimal ActualRevenue,
-    decimal PlannedCost,
-    decimal ActualCost,
-    decimal PlannedProfit,
-    decimal ActualProfit,
-    decimal ProfitVariance);
-
-/// <summary>損益(粗利)予実分析の結果。</summary>
+/// <summary>
+/// 課の損益分析の結果。
+/// 全体損益 = 売上高 −(加工費 + 外注費 + 期間費用)。
+/// 粗利率は損益 ÷ 売上高(売上高が 0 のときは null)。
+/// </summary>
 public sealed record ProfitReport(
     decimal PlannedRevenue,
     decimal ActualRevenue,
-    decimal RevenueVariance,
-    decimal PlannedCost,
-    decimal ActualCost,
-    decimal CostVariance,
+    decimal PlannedTotalCost,
+    decimal ActualTotalCost,
+    decimal PlannedPeriodCost,
+    decimal ActualPeriodCost,
     decimal PlannedProfit,
     decimal ActualProfit,
     decimal ProfitVariance,
     decimal? PlannedMarginRate,
     decimal? ActualMarginRate,
-    IReadOnlyList<ProfitItemLine> ItemLines,
-    IReadOnlyList<ProfitPeriodLine> PeriodLines);
+    IReadOnlyList<ProjectProfitLine> ProjectLines);
 
 /// <summary>
-/// 損益(粗利)の予実分析を行うドメインサービス。
-/// 売上と、売上対応品目で紐付けられた原価を品目単位で突き合わせ、
-/// 品目別・月別の粗利を算出する。対応品目のない原価は「共通費」として扱う。
+/// 課の損益(予算・実績)を分析するドメインサービス。
+/// 予実差異分析の結果(VarianceReport)を入力とし、案件別損益と課全体の損益を算出する。
 /// </summary>
 public sealed class ProfitAnalysisService
 {
-    public ProfitReport Analyze(RevenueVarianceReport revenue, VarianceReport cost)
+    public ProfitReport Analyze(VarianceReport variance)
     {
-        // ---- 品目別 ----
-        var revenueByItem = revenue.Lines
-            .GroupBy(l => l.ItemName)
-            .ToDictionary(g => g.Key,
-                g => (Planned: g.Sum(l => l.PlannedAmount), Actual: g.Sum(l => l.ActualAmount)));
-        var costByItem = cost.Lines
-            .Where(l => l.RevenueItem is not null)
-            .GroupBy(l => l.RevenueItem!)
-            .ToDictionary(g => g.Key,
-                g => (Planned: g.Sum(l => l.PlannedAmount), Actual: g.Sum(l => l.ActualAmount)));
-
-        var itemLines = revenueByItem.Keys.Union(costByItem.Keys)
-            .OrderBy(k => k)
-            .Select(item =>
+        var projectLines = variance.Categories
+            .Where(c => c.Category.IsProjectBased())
+            .SelectMany(c => c.Lines)
+            .GroupBy(l => l.ProjectId!.Value)
+            .OrderBy(g => g.Key)
+            .Select(g =>
             {
-                var rev = revenueByItem.GetValueOrDefault(item);
-                var c = costByItem.GetValueOrDefault(item);
-                return BuildItemLine(item, rev, c);
-            })
-            .ToList();
+                decimal Planned(BudgetCategory category) =>
+                    g.Where(l => l.Category == category).Sum(l => l.PlannedAmount);
+                decimal Actual(BudgetCategory category) =>
+                    g.Where(l => l.Category == category).Sum(l => l.ActualAmount);
 
-        // 売上対応品目のない原価は共通費として末尾に置く。
-        var commonCosts = cost.Lines.Where(l => l.RevenueItem is null).ToList();
-        if (commonCosts.Count > 0)
-        {
-            itemLines.Add(BuildItemLine(null, (0m, 0m),
-                (commonCosts.Sum(l => l.PlannedAmount), commonCosts.Sum(l => l.ActualAmount))));
-        }
+                var plannedProfit = Planned(BudgetCategory.Revenue)
+                    - Planned(BudgetCategory.Processing) - Planned(BudgetCategory.Outsourcing);
+                var actualProfit = Actual(BudgetCategory.Revenue)
+                    - Actual(BudgetCategory.Processing) - Actual(BudgetCategory.Outsourcing);
 
-        // ---- 月別 ----
-        var revenueByPeriod = revenue.Lines
-            .GroupBy(l => l.Period)
-            .ToDictionary(g => g.Key,
-                g => (Planned: g.Sum(l => l.PlannedAmount), Actual: g.Sum(l => l.ActualAmount)));
-        var costByPeriod = cost.Lines
-            .GroupBy(l => l.Period)
-            .ToDictionary(g => g.Key,
-                g => (Planned: g.Sum(l => l.PlannedAmount), Actual: g.Sum(l => l.ActualAmount)));
-
-        var periodLines = revenueByPeriod.Keys.Union(costByPeriod.Keys)
-            .OrderBy(p => p)
-            .Select(p =>
-            {
-                var rev = revenueByPeriod.GetValueOrDefault(p);
-                var c = costByPeriod.GetValueOrDefault(p);
-                var plannedProfit = rev.Planned - c.Planned;
-                var actualProfit = rev.Actual - c.Actual;
-                return new ProfitPeriodLine(p,
-                    rev.Planned, rev.Actual, c.Planned, c.Actual,
+                return new ProjectProfitLine(g.Key,
+                    Planned(BudgetCategory.Revenue), Actual(BudgetCategory.Revenue),
+                    Planned(BudgetCategory.Processing), Actual(BudgetCategory.Processing),
+                    Planned(BudgetCategory.Outsourcing), Actual(BudgetCategory.Outsourcing),
                     plannedProfit, actualProfit, actualProfit - plannedProfit);
             })
             .ToList();
 
-        // ---- 合計 ----
-        var totalPlannedProfit = revenue.TotalPlannedAmount - cost.TotalPlannedAmount;
-        var totalActualProfit = revenue.TotalActualAmount - cost.TotalActualAmount;
+        var periodCost = variance.Categories.Single(c => c.Category == BudgetCategory.PeriodCost);
+        var plannedProfitTotal = variance.PlannedRevenue - variance.PlannedCost;
+        var actualProfitTotal = variance.ActualRevenue - variance.ActualCost;
 
         return new ProfitReport(
-            revenue.TotalPlannedAmount, revenue.TotalActualAmount, revenue.TotalVariance,
-            cost.TotalPlannedAmount, cost.TotalActualAmount, cost.TotalVariance,
-            totalPlannedProfit, totalActualProfit, totalActualProfit - totalPlannedProfit,
-            revenue.TotalPlannedAmount != 0m ? totalPlannedProfit / revenue.TotalPlannedAmount : null,
-            revenue.TotalActualAmount != 0m ? totalActualProfit / revenue.TotalActualAmount : null,
-            itemLines, periodLines);
-    }
-
-    private static ProfitItemLine BuildItemLine(string? item,
-        (decimal Planned, decimal Actual) revenue, (decimal Planned, decimal Actual) cost)
-    {
-        var plannedProfit = revenue.Planned - cost.Planned;
-        var actualProfit = revenue.Actual - cost.Actual;
-        return new ProfitItemLine(item,
-            revenue.Planned, revenue.Actual, cost.Planned, cost.Actual,
-            plannedProfit, actualProfit, actualProfit - plannedProfit);
+            variance.PlannedRevenue, variance.ActualRevenue,
+            variance.PlannedCost, variance.ActualCost,
+            periodCost.PlannedAmount, periodCost.ActualAmount,
+            plannedProfitTotal, actualProfitTotal, actualProfitTotal - plannedProfitTotal,
+            variance.PlannedRevenue != 0m ? plannedProfitTotal / variance.PlannedRevenue : null,
+            variance.ActualRevenue != 0m ? actualProfitTotal / variance.ActualRevenue : null,
+            projectLines);
     }
 }

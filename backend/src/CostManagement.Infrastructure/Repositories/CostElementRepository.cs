@@ -13,10 +13,10 @@ public sealed class CostElementRepository : ICostElementRepository
         _factory = factory;
     }
 
-    private sealed record Row(string Code, string Name, string ElementType);
+    private sealed record Row(string Code, string Name);
 
     private const string SelectSql = """
-        SELECT code AS Code, name AS Name, element_type AS ElementType
+        SELECT code AS Code, name AS Name
         FROM cost_elements
         """;
 
@@ -32,7 +32,7 @@ public sealed class CostElementRepository : ICostElementRepository
     public async Task<IReadOnlyList<CostElement>> ListAsync(CancellationToken ct = default)
     {
         using var conn = _factory.Create();
-        var rows = await conn.QueryAsync<Row>($"{SelectSql} ORDER BY element_type, code");
+        var rows = await conn.QueryAsync<Row>($"{SelectSql} ORDER BY code");
         return rows.Select(ToEntity).ToList();
     }
 
@@ -40,16 +40,9 @@ public sealed class CostElementRepository : ICostElementRepository
     {
         using var conn = _factory.Create();
         await conn.ExecuteAsync("""
-            INSERT INTO cost_elements (code, name, element_type)
-            VALUES (@Code, @Name, @ElementType)
-            """, new
-        {
-            Code = element.Code.Value,
-            element.Name,
-            ElementType = element.Type.ToString(),
-        });
+            INSERT INTO cost_elements (code, name) VALUES (@Code, @Name)
+            """, new { Code = element.Code.Value, element.Name });
     }
 
-    private static CostElement ToEntity(Row row) =>
-        CostElement.Restore(row.Code, row.Name, Enum.Parse<CostElementType>(row.ElementType));
+    private static CostElement ToEntity(Row row) => CostElement.Restore(row.Code, row.Name);
 }

@@ -2,10 +2,10 @@ using CostManagement.Application;
 using CostManagement.Application.Common;
 using CostManagement.Domain.Actuals;
 using CostManagement.Domain.Analysis;
+using CostManagement.Domain.Budgeting;
 using CostManagement.Domain.CostElements;
-using CostManagement.Domain.Planning;
+using CostManagement.Domain.Departments;
 using CostManagement.Domain.Projects;
-using CostManagement.Domain.Revenue;
 using CostManagement.Infrastructure.Persistence;
 using CostManagement.Infrastructure.Repositories;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,28 +26,24 @@ public static class DependencyInjection
         // 永続化アダプタ
         services.AddSingleton(new SqliteConnectionFactory(connectionString));
         services.AddSingleton<DatabaseInitializer>();
+        services.AddSingleton<IDepartmentRepository, DepartmentRepository>();
         services.AddSingleton<IProjectRepository, ProjectRepository>();
         services.AddSingleton<ICostElementRepository, CostElementRepository>();
-        services.AddSingleton<ICostPlanRepository, CostPlanRepository>();
-        services.AddSingleton<IActualCostRepository, ActualCostRepository>();
-        services.AddSingleton<IRevenuePlanRepository, RevenuePlanRepository>();
-        services.AddSingleton<IActualRevenueRepository, ActualRevenueRepository>();
+        services.AddSingleton<IDepartmentBudgetRepository, DepartmentBudgetRepository>();
+        services.AddSingleton<IActualEntryRepository, ActualEntryRepository>();
         services.AddSingleton<ISystemClock, SystemClock>();
 
         // ドメインサービス
-        services.AddSingleton<VarianceAnalysisService>();
-        services.AddSingleton<PlanComparisonService>();
-        services.AddSingleton<RevenueVarianceAnalysisService>();
-        services.AddSingleton<RevenuePlanComparisonService>();
+        services.AddSingleton<BudgetVarianceAnalysisService>();
+        services.AddSingleton<BudgetComparisonService>();
         services.AddSingleton<ProfitAnalysisService>();
 
         // ユースケース(アプリケーションサービス)
+        services.AddSingleton<DepartmentService>();
         services.AddSingleton<ProjectService>();
         services.AddSingleton<CostElementService>();
-        services.AddSingleton<CostPlanService>();
-        services.AddSingleton<ActualCostService>();
-        services.AddSingleton<RevenuePlanService>();
-        services.AddSingleton<ActualRevenueService>();
+        services.AddSingleton<DepartmentBudgetService>();
+        services.AddSingleton<ActualEntryService>();
         services.AddSingleton<AnalysisService>();
 
         return services;

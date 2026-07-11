@@ -17,45 +17,27 @@ public readonly record struct CostElementCode
     public override string ToString() => Value;
 }
 
-/// <summary>費目の分類(総合原価計算の原価要素)。</summary>
-public enum CostElementType
-{
-    /// <summary>材料費</summary>
-    Material,
-
-    /// <summary>労務費</summary>
-    Labor,
-
-    /// <summary>製造間接費</summary>
-    Overhead,
-
-    /// <summary>経費</summary>
-    Expense,
-}
-
-/// <summary>費目マスタ。集約ルート。</summary>
+/// <summary>期間費用の費目マスタ(人件費・ライセンス費など)。集約ルート。</summary>
 public sealed class CostElement
 {
     public CostElementCode Code { get; }
     public string Name { get; private set; }
-    public CostElementType Type { get; }
 
-    private CostElement(CostElementCode code, string name, CostElementType type)
+    private CostElement(CostElementCode code, string name)
     {
         Code = code;
         Name = name;
-        Type = type;
     }
 
-    public static CostElement Create(string code, string name, CostElementType type)
+    public static CostElement Create(string code, string name)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("費目名は必須です。");
-        return new CostElement(new CostElementCode(code), name.Trim(), type);
+        return new CostElement(new CostElementCode(code), name.Trim());
     }
 
-    public static CostElement Restore(string code, string name, CostElementType type) =>
-        new(new CostElementCode(code), name, type);
+    public static CostElement Restore(string code, string name) =>
+        new(new CostElementCode(code), name);
 }
 
 public interface ICostElementRepository

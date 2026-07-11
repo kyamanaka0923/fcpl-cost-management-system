@@ -2,45 +2,46 @@ using CostManagement.Domain.Shared;
 
 namespace CostManagement.Domain.Tests;
 
-public class AccountingPeriodTests
+public class FiscalHalfTests
 {
     [Theory]
-    [InlineData("2026-04", 2026, 4)]
-    [InlineData("2026-12", 2026, 12)]
-    public void 文字列から生成できる(string input, int year, int month)
+    [InlineData("2026-H1", 2026, HalfTerm.H1)]
+    [InlineData("2026-H2", 2026, HalfTerm.H2)]
+    public void 文字列から生成できる(string input, int year, HalfTerm half)
     {
-        var period = AccountingPeriod.Parse(input);
+        var fiscalHalf = FiscalHalf.Parse(input);
 
-        Assert.Equal(year, period.Year);
-        Assert.Equal(month, period.Month);
-        Assert.Equal(input, period.ToString());
+        Assert.Equal(year, fiscalHalf.Year);
+        Assert.Equal(half, fiscalHalf.Half);
+        Assert.Equal(input, fiscalHalf.ToString());
     }
 
     [Theory]
-    [InlineData("2026-13")]
-    [InlineData("2026/04")]
+    [InlineData("2026-H3")]
+    [InlineData("2026-1")]
+    [InlineData("2026/H1")]
+    [InlineData("2026")]
     [InlineData("abc")]
+    [InlineData("")]
     public void 不正な形式は拒否される(string input)
     {
-        Assert.Throws<DomainException>(() => AccountingPeriod.Parse(input));
+        Assert.Throws<DomainException>(() => FiscalHalf.Parse(input));
+    }
+
+    [Theory]
+    [InlineData(1999)]
+    [InlineData(2101)]
+    public void 不正な年度は拒否される(int year)
+    {
+        Assert.Throws<DomainException>(() => new FiscalHalf(year, HalfTerm.H1));
     }
 
     [Fact]
     public void 大小比較ができる()
     {
-        Assert.True(new AccountingPeriod(2026, 4) < new AccountingPeriod(2026, 5));
-        Assert.True(new AccountingPeriod(2026, 12) < new AccountingPeriod(2027, 1));
-        Assert.True(new AccountingPeriod(2026, 4) <= new AccountingPeriod(2026, 4));
-    }
-
-    [Theory]
-    [InlineData(1, 1)]
-    [InlineData(3, 1)]
-    [InlineData(4, 2)]
-    [InlineData(10, 4)]
-    public void 四半期を判定できる(int month, int expectedQuarter)
-    {
-        Assert.Equal(expectedQuarter, new AccountingPeriod(2026, month).Quarter);
+        Assert.True(new FiscalHalf(2026, HalfTerm.H1) < new FiscalHalf(2026, HalfTerm.H2));
+        Assert.True(new FiscalHalf(2026, HalfTerm.H2) < new FiscalHalf(2027, HalfTerm.H1));
+        Assert.True(new FiscalHalf(2026, HalfTerm.H1) <= new FiscalHalf(2026, HalfTerm.H1));
     }
 }
 

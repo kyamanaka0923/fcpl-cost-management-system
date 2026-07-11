@@ -1,7 +1,8 @@
 using CostManagement.Domain.Actuals;
 using CostManagement.Domain.Analysis;
+using CostManagement.Domain.Budgeting;
 using CostManagement.Domain.CostElements;
-using CostManagement.Domain.Planning;
+using CostManagement.Domain.Departments;
 using CostManagement.Domain.Projects;
 using CostManagement.Domain.Shared;
 
@@ -10,184 +11,163 @@ namespace CostManagement.Domain.Tests;
 public class VarianceAnalysisTests
 {
     private static readonly DateTime Now = new(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc);
-    private static readonly ProjectId Pid = ProjectId.New();
-    private static readonly CostElementCode Labor = new("LAB-SE");
-    private static readonly CostElementCode Sub = new("SUB-DEV");
-    private static readonly AccountingPeriod Apr = new(2026, 4);
-    private static readonly AccountingPeriod May = new(2026, 5);
+    private static readonly DepartmentId Dept = DepartmentId.New();
+    private static readonly FiscalHalf Half = new(2026, HalfTerm.H1);
+    private static readonly ProjectId ProjectA = ProjectId.New();
+    private static readonly ProjectId ProjectB = ProjectId.New();
+    private static readonly CostElementCode Personnel = new("PERSONNEL");
 
-    private readonly VarianceAnalysisService _service = new();
-
-    private static CostPlan ApprovedPlan(params (CostElementCode Code, string? Item,
-        AccountingPeriod Period, decimal Amount)[] lines)
+    private static DepartmentBudget ApprovedBudget(
+        params (BudgetCategory Category, ProjectId? Project, CostElementCode? Element, decimal Amount)[] lines)
     {
-        var plan = CostPlan.CreateInitial(Pid, "当初予算", Now);
-        foreach (var (code, item, period, amount) in lines)
-            plan.UpsertLine(code, item, period, new Money(amount));
-        plan.Approve(Now);
-        return plan;
+        var budget = DepartmentBudget.CreateInitial(Dept, Half, "当初予算", Now);
+        foreach (var (category, project, element, amount) in lines)
+        {
+            if (project is { } pid)
+                budget.UpsertProjectLine(category, pid, new Money(amount));
+            else
+                budget.UpsertPeriodCostLine(element!.Value, new Money(amount));
+        }
+        budget.Approve(Now);
+        return budget;
     }
+
+    private static ActualEntry Actual(BudgetCategory category, ProjectId? project,
+        CostElementCode? element, decimal amount) =>
+        ActualEntry.Record(Dept, Half, category, project, element, new Money(amount), null, Now);
+
+    private static readonly BudgetVarianceAnalysisService Service = new();
 
     [Fact]
     public void 差異は実績金額と予算金額の差として算出される()
     {
-        var plan = ApprovedPlan((Labor, "案件A", Apr, 500_000m));
-        var actuals = new[]
-        {
-            ActualCost.Record(Pid, Labor, "案件A", Apr, new Money(560_000m), null, Now),
-        };
+        var budget = ApprovedBudget((BudgetCategory.Processing, ProjectA, null, 1_000_000m));
+        var report = Service.Analyze(budget, [Actual(BudgetCategory.Processing, ProjectA, null, 1_200_000m)]);
 
-        var report = _service.Analyze(plan, actuals);
-
-        var line = Assert.Single(report.Lines);
-        Assert.Equal(60_000m, line.TotalVariance);
-        Assert.True(line.IsAdverse);
-        Assert.Equal("案件A", line.RevenueItem);
+        var processing = report.Categories.Single(c => c.Category == BudgetCategory.Processing);
+        var line = Assert.Single(processing.Lines);
+        Assert.Equal(1_000_000m, line.PlannedAmount);
+        Assert.Equal(1_200_000m, line.ActualAmount);
+        Assert.Equal(200_000m, line.Variance);
+        Assert.False(line.IsUnplanned);
     }
 
     [Fact]
-    public void 売上対応品目が異なる原価は別の行として差異が算出される()
+    public void 同一キーの実績は合算される()
     {
-        var plan = ApprovedPlan(
-            (Labor, "案件A", Apr, 500_000m),
-            (Labor, "案件B", Apr, 300_000m),
-            (Labor, null, Apr, 100_000m));
-        var actuals = new[]
-        {
-            ActualCost.Record(Pid, Labor, "案件A", Apr, new Money(520_000m), null, Now),
-            ActualCost.Record(Pid, Labor, "案件B", Apr, new Money(250_000m), null, Now),
-            ActualCost.Record(Pid, Labor, null, Apr, new Money(120_000m), null, Now),
-        };
+        var budget = ApprovedBudget((BudgetCategory.PeriodCost, null, Personnel, 1_000_000m));
+        var report = Service.Analyze(budget,
+        [
+            Actual(BudgetCategory.PeriodCost, null, Personnel, 400_000m),
+            Actual(BudgetCategory.PeriodCost, null, Personnel, 500_000m),
+        ]);
 
-        var report = _service.Analyze(plan, actuals);
-
-        Assert.Equal(3, report.Lines.Count);
-        Assert.Equal(20_000m, report.Lines.Single(l => l.RevenueItem == "案件A").TotalVariance);
-        Assert.Equal(-50_000m, report.Lines.Single(l => l.RevenueItem == "案件B").TotalVariance);
-        Assert.Equal(20_000m, report.Lines.Single(l => l.RevenueItem is null).TotalVariance);
+        var periodCost = report.Categories.Single(c => c.Category == BudgetCategory.PeriodCost);
+        var line = Assert.Single(periodCost.Lines);
+        Assert.Equal(900_000m, line.ActualAmount);
+        Assert.Equal(-100_000m, line.Variance);
     }
 
     [Fact]
-    public void 同一キーの複数実績は合算される()
+    public void 予算にない実績は予定外として区別される()
     {
-        var plan = ApprovedPlan((Labor, "案件A", Apr, 500_000m));
-        var actuals = new[]
-        {
-            ActualCost.Record(Pid, Labor, "案件A", Apr, new Money(300_000m), "前半", Now),
-            ActualCost.Record(Pid, Labor, "案件A", Apr, new Money(220_000m), "後半", Now),
-        };
+        var budget = ApprovedBudget((BudgetCategory.Revenue, ProjectA, null, 3_000_000m));
+        var report = Service.Analyze(budget, [Actual(BudgetCategory.Revenue, ProjectB, null, 500_000m)]);
 
-        var report = _service.Analyze(plan, actuals);
-
-        var line = Assert.Single(report.Lines);
-        Assert.Equal(520_000m, line.ActualAmount);
-        Assert.Equal(20_000m, line.TotalVariance);
-    }
-
-    [Fact]
-    public void 予算のない実績は予定外として報告される()
-    {
-        var plan = ApprovedPlan((Labor, "案件A", Apr, 500_000m));
-        var actuals = new[]
-        {
-            ActualCost.Record(Pid, Sub, "案件A", Apr, new Money(80_000m), null, Now),
-        };
-
-        var report = _service.Analyze(plan, actuals);
-
-        var unplanned = report.Lines.Single(l => l.ElementCode == "SUB-DEV");
+        var revenue = report.Categories.Single(c => c.Category == BudgetCategory.Revenue);
+        Assert.Equal(2, revenue.Lines.Count);
+        var unplanned = revenue.Lines.Single(l => l.ProjectId == ProjectB.Value);
         Assert.True(unplanned.IsUnplanned);
-        Assert.Equal(80_000m, unplanned.TotalVariance);
+        Assert.Equal(0m, unplanned.PlannedAmount);
     }
 
     [Fact]
-    public void 実績のない予算明細も差異として報告される()
+    public void 有利差異の向きは売上とコストで逆になる()
     {
-        var plan = ApprovedPlan((Labor, "案件A", Apr, 500_000m));
+        var budget = ApprovedBudget(
+            (BudgetCategory.Revenue, ProjectA, null, 3_000_000m),
+            (BudgetCategory.Processing, ProjectA, null, 1_000_000m));
+        var report = Service.Analyze(budget,
+        [
+            Actual(BudgetCategory.Revenue, ProjectA, null, 3_500_000m),    // 売上超過 = 有利
+            Actual(BudgetCategory.Processing, ProjectA, null, 1_200_000m), // コスト超過 = 不利
+        ]);
 
-        var report = _service.Analyze(plan, []);
+        var revenueLine = report.Categories.Single(c => c.Category == BudgetCategory.Revenue).Lines.Single();
+        Assert.True(revenueLine.IsFavorable);
+        Assert.False(revenueLine.IsAdverse);
 
-        var line = Assert.Single(report.Lines);
-        Assert.Equal(-500_000m, line.TotalVariance); // 未消化 = 有利差異
-        Assert.False(line.IsAdverse);
+        var processingLine = report.Categories.Single(c => c.Category == BudgetCategory.Processing).Lines.Single();
+        Assert.False(processingLine.IsFavorable);
+        Assert.True(processingLine.IsAdverse);
     }
 
     [Fact]
-    public void 期間で絞り込みできる()
+    public void 区分サブトータルの合計は全体の売上とコストに一致する()
     {
-        var plan = ApprovedPlan(
-            (Labor, "案件A", Apr, 500_000m),
-            (Labor, "案件A", May, 500_000m));
-        var actuals = new[]
-        {
-            ActualCost.Record(Pid, Labor, "案件A", Apr, new Money(500_000m), null, Now),
-            ActualCost.Record(Pid, Labor, "案件A", May, new Money(450_000m), null, Now),
-        };
+        var budget = ApprovedBudget(
+            (BudgetCategory.Revenue, ProjectA, null, 3_000_000m),
+            (BudgetCategory.Revenue, ProjectB, null, 2_000_000m),
+            (BudgetCategory.Processing, ProjectA, null, 1_000_000m),
+            (BudgetCategory.Outsourcing, ProjectB, null, 800_000m),
+            (BudgetCategory.PeriodCost, null, Personnel, 700_000m));
+        var report = Service.Analyze(budget,
+        [
+            Actual(BudgetCategory.Revenue, ProjectA, null, 3_100_000m),
+            Actual(BudgetCategory.Processing, ProjectA, null, 900_000m),
+            Actual(BudgetCategory.PeriodCost, null, Personnel, 750_000m),
+        ]);
 
-        var report = _service.Analyze(plan, actuals, from: May, to: May);
-
-        var line = Assert.Single(report.Lines);
-        Assert.Equal(May, line.Period);
-        Assert.Equal(-50_000m, report.TotalVariance);
-    }
-
-    [Fact]
-    public void レポート合計は明細の合計と一致する()
-    {
-        var plan = ApprovedPlan(
-            (Labor, "案件A", Apr, 500_000m),
-            (Sub, "案件B", Apr, 200_000m));
-        var actuals = new[]
-        {
-            ActualCost.Record(Pid, Labor, "案件A", Apr, new Money(510_000m), null, Now),
-            ActualCost.Record(Pid, Sub, "案件B", Apr, new Money(180_000m), null, Now),
-        };
-
-        var report = _service.Analyze(plan, actuals);
-
-        Assert.Equal(700_000m, report.TotalPlannedAmount);
-        Assert.Equal(690_000m, report.TotalActualAmount);
-        Assert.Equal(-10_000m, report.TotalVariance);
-        Assert.Equal(report.TotalVariance, report.Lines.Sum(l => l.TotalVariance));
+        Assert.Equal(5_000_000m, report.PlannedRevenue);
+        Assert.Equal(3_100_000m, report.ActualRevenue);
+        Assert.Equal(2_500_000m, report.PlannedCost);
+        Assert.Equal(1_650_000m, report.ActualCost);
+        // 区分サブトータルの合計 = 全体
+        var costCategories = report.Categories.Where(c => c.Category != BudgetCategory.Revenue).ToList();
+        Assert.Equal(report.PlannedCost, costCategories.Sum(c => c.PlannedAmount));
+        Assert.Equal(report.ActualCost, costCategories.Sum(c => c.ActualAmount));
     }
 }
 
-public class PlanComparisonTests
+public class BudgetComparisonTests
 {
     private static readonly DateTime Now = new(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc);
-    private static readonly CostElementCode Labor = new("LAB-SE");
-    private static readonly AccountingPeriod Apr = new(2026, 4);
-    private static readonly AccountingPeriod May = new(2026, 5);
+    private static readonly DepartmentId Dept = DepartmentId.New();
+    private static readonly FiscalHalf Half = new(2026, HalfTerm.H1);
+    private static readonly ProjectId ProjectA = ProjectId.New();
+    private static readonly CostElementCode Personnel = new("PERSONNEL");
+
+    private static readonly BudgetComparisonService Service = new();
 
     [Fact]
-    public void 予算バージョン間の変動を明細単位で比較できる()
+    public void バージョン間の増減を区分ごとに算出できる()
     {
-        var pid = ProjectId.New();
-        var v1 = CostPlan.CreateInitial(pid, "当初予算", Now);
-        v1.UpsertLine(Labor, "案件A", Apr, new Money(500_000m));
-        v1.UpsertLine(Labor, "案件A", May, new Money(500_000m));
+        var v1 = DepartmentBudget.CreateInitial(Dept, Half, "当初予算", Now);
+        v1.UpsertProjectLine(BudgetCategory.Revenue, ProjectA, new Money(3_000_000m));
+        v1.UpsertPeriodCostLine(Personnel, new Money(1_000_000m));
         v1.Approve(Now);
 
-        var v2 = CostPlan.ReviseFrom(v1, 2, "第2四半期改定", Now);
-        v2.UpsertLine(Labor, "案件A", May, new Money(620_000m)); // 5月分を増額改定
+        var v2 = DepartmentBudget.ReviseFrom(v1, 2, "見直し", Now);
+        v2.UpsertProjectLine(BudgetCategory.Revenue, ProjectA, new Money(3_500_000m));
 
-        var report = new PlanComparisonService().Compare(v1, v2);
+        var report = Service.Compare(v1, v2);
 
-        Assert.Equal(2, report.Lines.Count);
-        var may = report.Lines.Single(l => l.Period == May);
-        Assert.Equal(500_000m, may.BaseAmount);
-        Assert.Equal(620_000m, may.TargetAmount);
-        Assert.Equal(120_000m, may.Difference);
-        Assert.Equal(120_000m, report.TotalDifference);
-        Assert.Equal("案件A", may.RevenueItem);
+        Assert.Equal(1, report.BaseVersion);
+        Assert.Equal(2, report.TargetVersion);
+        var revenue = report.Categories.Single(c => c.Category == BudgetCategory.Revenue);
+        Assert.Equal(500_000m, revenue.Difference);
+        var periodCost = report.Categories.Single(c => c.Category == BudgetCategory.PeriodCost);
+        Assert.Equal(0m, periodCost.Difference);
     }
 
     [Fact]
-    public void 異なるプロジェクトの予算は比較できない()
+    public void 異なる課や半期の予算は比較できない()
     {
-        var a = CostPlan.CreateInitial(ProjectId.New(), "A", Now);
-        var b = CostPlan.CreateInitial(ProjectId.New(), "B", Now);
+        var a = DepartmentBudget.CreateInitial(Dept, Half, "A", Now);
+        var otherDept = DepartmentBudget.CreateInitial(DepartmentId.New(), Half, "B", Now);
+        var otherHalf = DepartmentBudget.CreateInitial(Dept, new FiscalHalf(2026, HalfTerm.H2), "C", Now);
 
-        Assert.Throws<DomainException>(() => new PlanComparisonService().Compare(a, b));
+        Assert.Throws<DomainException>(() => Service.Compare(a, otherDept));
+        Assert.Throws<DomainException>(() => Service.Compare(a, otherHalf));
     }
 }

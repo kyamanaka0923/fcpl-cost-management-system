@@ -1,3 +1,4 @@
+using CostManagement.Domain.Departments;
 using CostManagement.Domain.Projects;
 using CostManagement.Infrastructure.Persistence;
 using Dapper;
@@ -13,11 +14,11 @@ public sealed class ProjectRepository : IProjectRepository
         _factory = factory;
     }
 
-    private sealed record Row(Guid Id, string Code, string Name, long FiscalYear,
+    private sealed record Row(Guid Id, Guid DepartmentId, string Code, string Name,
         string Status, DateTime CreatedAt);
 
     private const string SelectSql = """
-        SELECT id AS Id, code AS Code, name AS Name, fiscal_year AS FiscalYear,
+        SELECT id AS Id, department_id AS DepartmentId, code AS Code, name AS Name,
                status AS Status, created_at AS CreatedAt
         FROM projects
         """;
@@ -38,10 +39,13 @@ public sealed class ProjectRepository : IProjectRepository
         return row is null ? null : ToEntity(row);
     }
 
-    public async Task<IReadOnlyList<Project>> ListAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<Project>> ListByDepartmentAsync(DepartmentId departmentId,
+        CancellationToken ct = default)
     {
         using var conn = _factory.Create();
-        var rows = await conn.QueryAsync<Row>($"{SelectSql} ORDER BY created_at DESC");
+        var rows = await conn.QueryAsync<Row>(
+            $"{SelectSql} WHERE department_id = @Did ORDER BY code",
+            new { Did = departmentId.Value });
         return rows.Select(ToEntity).ToList();
     }
 
@@ -49,32 +53,33 @@ public sealed class ProjectRepository : IProjectRepository
     {
         using var conn = _factory.Create();
         await conn.ExecuteAsync("""
-            INSERT INTO projects (id, code, name, fiscal_year, status, created_at)
-            VALUES (@Id, @Code, @Name, @FiscalYear, @Status, @CreatedAt)
-            """, ToParams(project));
+            INSERT INTO projects (id, department_id, code, name, status, created_at)
+            VALUES (@Id, @DepartmentId, @Code, @Name, @Status, @CreatedAt)
+            """, new
+        {
+            Id = project.Id.Value,
+            DepartmentId = project.DepartmentId.Value,
+            project.Code,
+            project.Name,
+            Status = project.Status.ToString(),
+            project.CreatedAt,
+        });
     }
 
     public async Task UpdateAsync(Project project, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
         await conn.ExecuteAsync("""
-            UPDATE projects
-            SET name = @Name, status = @Status
-            WHERE id = @Id
-            """, ToParams(project));
+            UPDATE projects SET name = @Name, status = @Status WHERE id = @Id
+            """, new
+        {
+            Id = project.Id.Value,
+            project.Name,
+            Status = project.Status.ToString(),
+        });
     }
 
-    private static object ToParams(Project p) => new
-    {
-        Id = p.Id.Value,
-        p.Code,
-        p.Name,
-        p.FiscalYear,
-        Status = p.Status.ToString(),
-        p.CreatedAt,
-    };
-
     private static Project ToEntity(Row row) =>
-        Project.Restore(row.Id, row.Code, row.Name, (int)row.FiscalYear,
+        Project.Restore(row.Id, row.DepartmentId, row.Code, row.Name,
             Enum.Parse<ProjectStatus>(row.Status), row.CreatedAt);
 }

@@ -69,91 +69,140 @@ public class 業務フロー全体のE2E : IDisposable
     {
         // ---- 1. 計画策定 ----
 
-        // 1-1. プロジェクトを登録する
-        var project = await PostAsync("/api/projects",
-            new { code = "SE-001", name = "受託開発2026", fiscalYear = 2026 });
-        var projectId = project.GetProperty("id").GetString();
+        // 1-1. 課と案件を登録する
+        var dept = await PostAsync("/api/departments", new { code = "DEV-1", name = "開発1課" });
+        var deptId = dept.GetProperty("id").GetString();
 
-        // 1-2. 売上予算(当初)を策定して承認する
-        var revenuePlan = await PostAsync($"/api/projects/{projectId}/revenue-plans",
-            new { label = "当初売上予算" });
-        var revenuePlanId = revenuePlan.GetProperty("id").GetString();
-        await PutAsync($"/api/revenue-plans/{revenuePlanId}/lines",
-            new { itemName = "案件A", period = "2026-04", amount = 2_000_000 });
-        await PutAsync($"/api/revenue-plans/{revenuePlanId}/lines",
-            new { itemName = "案件B", period = "2026-04", amount = 1_000_000 });
-        var approvedRevenue = await PostAsync($"/api/revenue-plans/{revenuePlanId}/approve",
+        var projectA = await PostAsync($"/api/departments/{deptId}/projects",
+            new { code = "PJ-A", name = "案件A" });
+        var projectAId = projectA.GetProperty("id").GetString();
+        var projectB = await PostAsync($"/api/departments/{deptId}/projects",
+            new { code = "PJ-B", name = "案件B" });
+        var projectBId = projectB.GetProperty("id").GetString();
+
+        // 1-2. 2026年度上期の予算を策定する(4区分)
+        var budget = await PostAsync($"/api/departments/{deptId}/budgets",
+            new { fiscalHalf = "2026-H1", label = "当初予算" });
+        var budgetId = budget.GetProperty("id").GetString();
+        Assert.Equal(1, budget.GetProperty("version").GetInt32());
+
+        await PutAsync($"/api/budgets/{budgetId}/lines",
+            new { category = "Revenue", projectId = projectAId, amount = 2_000_000 });
+        await PutAsync($"/api/budgets/{budgetId}/lines",
+            new { category = "Revenue", projectId = projectBId, amount = 1_000_000 });
+        await PutAsync($"/api/budgets/{budgetId}/lines",
+            new { category = "Processing", projectId = projectAId, amount = 1_400_000 });
+        await PutAsync($"/api/budgets/{budgetId}/lines",
+            new { category = "Outsourcing", projectId = projectBId, amount = 700_000 });
+        var withPeriodCost = await PutAsync($"/api/budgets/{budgetId}/lines",
+            new { category = "PeriodCost", elementCode = "PERSONNEL", amount = 300_000 });
+
+        // 課の区分合計 = 案件明細の合計
+        Assert.Equal(3_000_000, withPeriodCost.GetProperty("revenueTotal").GetDecimal());
+        Assert.Equal(1_400_000, withPeriodCost.GetProperty("processingTotal").GetDecimal());
+        Assert.Equal(700_000, withPeriodCost.GetProperty("outsourcingTotal").GetDecimal());
+        Assert.Equal(300_000, withPeriodCost.GetProperty("periodCostTotal").GetDecimal());
+        Assert.Equal(600_000, withPeriodCost.GetProperty("plannedProfit").GetDecimal());
+
+        // 1-3. 予算を承認する
+        var approved = await PostAsync($"/api/budgets/{budgetId}/approve",
             new { }, HttpStatusCode.OK);
-        Assert.Equal("Approved", approvedRevenue.GetProperty("status").GetString());
-
-        // 1-3. 原価予算(当初)を策定して承認する(売上対応品目つき + 共通費)
-        var costPlan = await PostAsync($"/api/projects/{projectId}/plans",
-            new { label = "当初原価予算" });
-        var costPlanId = costPlan.GetProperty("id").GetString();
-        await PutAsync($"/api/plans/{costPlanId}/lines",
-            new { elementCode = "LAB-SE", revenueItem = "案件A", period = "2026-04", amount = 1_400_000 });
-        await PutAsync($"/api/plans/{costPlanId}/lines",
-            new { elementCode = "LAB-SE", revenueItem = "案件B", period = "2026-04", amount = 700_000 });
-        await PutAsync($"/api/plans/{costPlanId}/lines",
-            new { elementCode = "OVH-COM", period = "2026-04", amount = 300_000 });
-        await PostAsync($"/api/plans/{costPlanId}/approve", new { }, HttpStatusCode.OK);
+        Assert.Equal("Approved", approved.GetProperty("status").GetString());
 
         // ---- 2. 実績入力 ----
 
-        await PostAsync($"/api/projects/{projectId}/actual-revenues",
-            new { itemName = "案件A", period = "2026-04", amount = 2_100_000, note = "検収" });
-        await PostAsync($"/api/projects/{projectId}/actual-revenues",
-            new { itemName = "案件B", period = "2026-04", amount = 900_000 });
-        await PostAsync($"/api/projects/{projectId}/actuals",
-            new { elementCode = "LAB-SE", revenueItem = "案件A", period = "2026-04", amount = 1_480_000 });
-        await PostAsync($"/api/projects/{projectId}/actuals",
-            new { elementCode = "LAB-SE", revenueItem = "案件B", period = "2026-04", amount = 650_000 });
-        await PostAsync($"/api/projects/{projectId}/actuals",
-            new { elementCode = "OVH-COM", period = "2026-04", amount = 320_000 });
+        await PostAsync($"/api/departments/{deptId}/actuals",
+            new { fiscalHalf = "2026-H1", category = "Revenue", projectId = projectAId,
+                amount = 2_100_000, note = "検収" });
+        await PostAsync($"/api/departments/{deptId}/actuals",
+            new { fiscalHalf = "2026-H1", category = "Revenue", projectId = projectBId,
+                amount = 900_000 });
+        await PostAsync($"/api/departments/{deptId}/actuals",
+            new { fiscalHalf = "2026-H1", category = "Processing", projectId = projectAId,
+                amount = 1_480_000 });
+        await PostAsync($"/api/departments/{deptId}/actuals",
+            new { fiscalHalf = "2026-H1", category = "Outsourcing", projectId = projectBId,
+                amount = 650_000 });
+        await PostAsync($"/api/departments/{deptId}/actuals",
+            new { fiscalHalf = "2026-H1", category = "PeriodCost", elementCode = "PERSONNEL",
+                amount = 320_000 });
 
         // ---- 3. 分析: 差異と損益 ----
 
-        // 原価差異: 実績245万 − 予算240万 = +5万(不利)
-        var variance = await GetAsync($"/api/projects/{projectId}/variance");
-        Assert.Equal(50_000, variance.GetProperty("totalVariance").GetDecimal());
+        // コスト差異: 実績245万 − 予算240万 = +5万(不利)
+        var variance = await GetAsync($"/api/departments/{deptId}/variance?fiscalHalf=2026-H1");
+        Assert.Equal(50_000, variance.GetProperty("costVariance").GetDecimal());
+        Assert.Equal(0, variance.GetProperty("revenueVariance").GetDecimal());
 
-        // 損益: 品目別の粗利と共通費行が返る
-        var profit = await GetAsync($"/api/projects/{projectId}/profit");
+        // 案件名が差異明細で解決される
+        var revenueCategory = variance.GetProperty("categories").EnumerateArray()
+            .Single(c => c.GetProperty("category").GetString() == "Revenue");
+        Assert.Contains(revenueCategory.GetProperty("lines").EnumerateArray(),
+            l => l.GetProperty("projectName").GetString() == "案件A");
+
+        // 損益: 全体は期間費用込み、案件別は売上 − 加工費 − 外注費
+        var profit = await GetAsync($"/api/departments/{deptId}/profit?fiscalHalf=2026-H1");
         Assert.Equal(550_000, profit.GetProperty("actualProfit").GetDecimal());
-        var itemLines = profit.GetProperty("itemLines").EnumerateArray().ToList();
-        Assert.Equal(3, itemLines.Count); // 案件A・案件B・共通費
-        Assert.Contains(itemLines, l =>
-            l.GetProperty("itemName").ValueKind == JsonValueKind.Null &&
-            l.GetProperty("actualCost").GetDecimal() == 320_000);
+        Assert.Equal(320_000, profit.GetProperty("actualPeriodCost").GetDecimal());
+        var projectLines = profit.GetProperty("projectLines").EnumerateArray().ToList();
+        Assert.Equal(2, projectLines.Count);
+        var 案件A損益 = projectLines.Single(l => l.GetProperty("projectCode").GetString() == "PJ-A");
+        Assert.Equal(620_000, 案件A損益.GetProperty("actualProfit").GetDecimal()); // 210万−148万
 
-        // ---- 4. 計画変更(四半期改定) ----
+        // ---- 4. 計画変更(半期途中の見直し) ----
 
-        var revised = await PostAsync($"/api/projects/{projectId}/plans",
-            new { label = "第2四半期改定" });
+        var revised = await PostAsync($"/api/departments/{deptId}/budgets",
+            new { fiscalHalf = "2026-H1", label = "上期見直し" });
         var revisedId = revised.GetProperty("id").GetString();
         Assert.Equal(2, revised.GetProperty("version").GetInt32());
-        Assert.Equal(3, revised.GetProperty("lines").GetArrayLength()); // 明細を引き継ぐ
+        Assert.Equal(5, revised.GetProperty("lines").GetArrayLength()); // 明細を引き継ぐ
 
-        await PutAsync($"/api/plans/{revisedId}/lines",
-            new { elementCode = "LAB-SE", revenueItem = "案件A", period = "2026-04", amount = 1_500_000 });
-        await PostAsync($"/api/plans/{revisedId}/approve", new { }, HttpStatusCode.OK);
+        await PutAsync($"/api/budgets/{revisedId}/lines",
+            new { category = "Processing", projectId = projectAId, amount = 1_500_000 });
+        await PostAsync($"/api/budgets/{revisedId}/approve", new { }, HttpStatusCode.OK);
 
         // 旧バージョンは失効として履歴に残る
-        var plans = await GetAsync($"/api/projects/{projectId}/plans");
-        var statusByVersion = plans.EnumerateArray()
-            .ToDictionary(p => p.GetProperty("version").GetInt32(),
-                p => p.GetProperty("status").GetString());
+        var budgets = await GetAsync($"/api/departments/{deptId}/budgets?fiscalHalf=2026-H1");
+        var statusByVersion = budgets.EnumerateArray()
+            .ToDictionary(b => b.GetProperty("version").GetInt32(),
+                b => b.GetProperty("status").GetString());
         Assert.Equal("Approved", statusByVersion[2]);
         Assert.Equal("Superseded", statusByVersion[1]);
 
-        // バージョン比較: 増減 +10万
+        // バージョン比較: 加工費 +10万
         var comparison = await GetAsync(
-            $"/api/projects/{projectId}/plan-comparison?baseVersion=1&targetVersion=2");
-        Assert.Equal(100_000, comparison.GetProperty("totalDifference").GetDecimal());
+            $"/api/departments/{deptId}/budget-comparison?fiscalHalf=2026-H1&baseVersion=1&targetVersion=2");
+        var processingDiff = comparison.GetProperty("categories").EnumerateArray()
+            .Single(c => c.GetProperty("category").GetString() == "Processing");
+        Assert.Equal(100_000, processingDiff.GetProperty("difference").GetDecimal());
 
         // 差異分析の既定基準は最新承認版(v2)に切り替わる
-        var varianceAfter = await GetAsync($"/api/projects/{projectId}/variance");
-        Assert.Equal(2, varianceAfter.GetProperty("planVersion").GetInt32());
+        var varianceAfter = await GetAsync($"/api/departments/{deptId}/variance?fiscalHalf=2026-H1");
+        Assert.Equal(2, varianceAfter.GetProperty("budgetVersion").GetInt32());
+    }
+
+    [Fact]
+    public async Task 費目マスタを拡張して期間費用に利用できる()
+    {
+        var dept = await PostAsync("/api/departments", new { code = "DEV-9", name = "開発9課" });
+        var deptId = dept.GetProperty("id").GetString();
+
+        // シード済みの標準費目(人件費・ライセンス費)を確認
+        var elements = await GetAsync("/api/cost-elements");
+        var codes = elements.EnumerateArray()
+            .Select(e => e.GetProperty("code").GetString()).ToList();
+        Assert.Contains("PERSONNEL", codes);
+        Assert.Contains("LICENSE", codes);
+
+        // 費目を追加して期間費用の明細に使う
+        await PostAsync("/api/cost-elements", new { code = "TRAINING", name = "教育研修費" });
+        var budget = await PostAsync($"/api/departments/{deptId}/budgets",
+            new { fiscalHalf = "2026-H1", label = "当初予算" });
+        var budgetId = budget.GetProperty("id").GetString();
+        var updated = await PutAsync($"/api/budgets/{budgetId}/lines",
+            new { category = "PeriodCost", elementCode = "TRAINING", amount = 250_000 });
+
+        Assert.Equal(250_000, updated.GetProperty("periodCostTotal").GetDecimal());
     }
 }
 
@@ -172,7 +221,7 @@ public class エラー応答のE2E : IDisposable
     [Fact]
     public async Task 存在しないリソースは404とエラーメッセージを返す()
     {
-        var res = await _client.GetAsync($"/api/projects/{Guid.NewGuid()}");
+        var res = await _client.GetAsync($"/api/departments/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
         var body = await res.Content.ReadFromJsonAsync<JsonElement>();
@@ -182,20 +231,36 @@ public class エラー応答のE2E : IDisposable
     [Fact]
     public async Task ドメインルール違反は400とエラーメッセージを返す()
     {
-        var project = await _client.PostAsJsonAsync("/api/projects",
-            new { code = "SE-001", name = "テスト", fiscalYear = 2026 });
-        var projectId = (await project.Content.ReadFromJsonAsync<JsonElement>())
+        var dept = await _client.PostAsJsonAsync("/api/departments",
+            new { code = "DEV-1", name = "開発1課" });
+        var deptId = (await dept.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("id").GetString();
 
         // 明細のない予算は承認できない
-        var plan = await _client.PostAsJsonAsync($"/api/projects/{projectId}/plans",
-            new { label = "空の予算" });
-        var planId = (await plan.Content.ReadFromJsonAsync<JsonElement>())
+        var budget = await _client.PostAsJsonAsync($"/api/departments/{deptId}/budgets",
+            new { fiscalHalf = "2026-H1", label = "空の予算" });
+        var budgetId = (await budget.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("id").GetString();
-        var res = await _client.PostAsJsonAsync($"/api/plans/{planId}/approve", new { });
+        var res = await _client.PostAsJsonAsync($"/api/budgets/{budgetId}/approve", new { });
 
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
         var body = await res.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Contains("承認できません", body.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task 不正な半期の形式は400を返す()
+    {
+        var dept = await _client.PostAsJsonAsync("/api/departments",
+            new { code = "DEV-2", name = "開発2課" });
+        var deptId = (await dept.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetString();
+
+        var res = await _client.PostAsJsonAsync($"/api/departments/{deptId}/budgets",
+            new { fiscalHalf = "2026-04", label = "不正な半期" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+        var body = await res.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Contains("半期の形式が不正です", body.GetProperty("error").GetString());
     }
 }

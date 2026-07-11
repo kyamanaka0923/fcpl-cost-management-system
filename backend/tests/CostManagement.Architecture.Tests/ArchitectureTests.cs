@@ -120,8 +120,8 @@ public class PortAndAdapterTests
     [Fact]
     public void リポジトリポートはドメイン層に定義されている()
     {
-        // 6つの集約リポジトリ(Project/CostElement/CostPlan/ActualCost/RevenuePlan/ActualRevenue)
-        Assert.Equal(6, RepositoryPorts().Count());
+        // 5つの集約リポジトリ(Department/Project/CostElement/DepartmentBudget/ActualEntry)
+        Assert.Equal(5, RepositoryPorts().Count());
     }
 
     [Fact]
@@ -177,12 +177,11 @@ public class DomainModelConventionTests
         var valueObjects = new[]
         {
             typeof(Money),
-            typeof(AccountingPeriod),
+            typeof(FiscalHalf),
+            typeof(Domain.Departments.DepartmentId),
             typeof(Domain.Projects.ProjectId),
-            typeof(Domain.Planning.CostPlanId),
-            typeof(Domain.Actuals.ActualCostId),
-            typeof(Domain.Revenue.RevenuePlanId),
-            typeof(Domain.Revenue.ActualRevenueId),
+            typeof(Domain.Budgeting.DepartmentBudgetId),
+            typeof(Domain.Actuals.ActualEntryId),
             typeof(Domain.CostElements.CostElementCode),
         };
 
@@ -202,13 +201,11 @@ public class DomainModelConventionTests
         // すべての公開プロパティは set 不可(private set / init / get-only)であること。
         var aggregates = new[]
         {
+            typeof(Domain.Departments.Department),
             typeof(Domain.Projects.Project),
-            typeof(Domain.Planning.CostPlan),
-            typeof(Domain.Planning.PlanLine),
-            typeof(Domain.Actuals.ActualCost),
-            typeof(Domain.Revenue.RevenuePlan),
-            typeof(Domain.Revenue.RevenuePlanLine),
-            typeof(Domain.Revenue.ActualRevenue),
+            typeof(Domain.Budgeting.DepartmentBudget),
+            typeof(Domain.Budgeting.BudgetLine),
+            typeof(Domain.Actuals.ActualEntry),
             typeof(Domain.CostElements.CostElement),
         };
 

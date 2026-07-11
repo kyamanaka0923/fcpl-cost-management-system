@@ -1,0 +1,200 @@
+using CostManagement.Application.Common;
+using CostManagement.Domain.Budgeting;
+using CostManagement.Domain.CostElements;
+using CostManagement.Domain.Departments;
+using CostManagement.Domain.Projects;
+using CostManagement.Domain.Shared;
+
+namespace CostManagement.Application;
+
+/// <summary>
+/// 課の半期予算の策定・改定・承認に関するユースケース。
+/// 予算は (課, 年度, 半期) ごとにバージョン管理され、半期の途中でも改定できる。
+/// </summary>
+public sealed class DepartmentBudgetService
+{
+    private readonly IDepartmentBudgetRepository _budgets;
+    private readonly IDepartmentRepository _departments;
+    private readonly IProjectRepository _projects;
+    private readonly ICostElementRepository _elements;
+    private readonly ISystemClock _clock;
+
+    public DepartmentBudgetService(IDepartmentBudgetRepository budgets,
+        IDepartmentRepository departments, IProjectRepository projects,
+        ICostElementRepository elements, ISystemClock clock)
+    {
+        _budgets = budgets;
+        _departments = departments;
+        _projects = projects;
+        _elements = elements;
+        _clock = clock;
+    }
+
+    /// <summary>
+    /// 予算ドラフトを起票する。初回は当初予算(バージョン1)、
+    /// 以降は既存バージョン(未指定時は最新承認版)を引き継いだ改定版となる。
+    /// </summary>
+    public async Task<BudgetDetailDto> CreateDraftAsync(Guid departmentId,
+        CreateBudgetRequest request, CancellationToken ct = default)
+    {
+        var did = new DepartmentId(departmentId);
+        _ = await _departments.FindByIdAsync(did, ct)
+            ?? throw new NotFoundException($"課が見つかりません: {departmentId}");
+
+        var fiscalHalf = FiscalHalf.Parse(request.FiscalHalf);
+        var existing = await _budgets.ListAsync(did, fiscalHalf, ct);
+        if (existing.Any(b => b.Status == BudgetStatus.Draft))
+            throw new DomainException("策定中のドラフトが既に存在します。承認または破棄してから新しい改定版を作成してください。");
+
+        DepartmentBudget draft;
+        if (existing.Count == 0)
+        {
+            draft = DepartmentBudget.CreateInitial(did, fiscalHalf, request.Label, _clock.UtcNow);
+        }
+        else
+        {
+            var baseBudget = request.BaseBudgetId is { } baseId
+                ? existing.FirstOrDefault(b => b.Id.Value == baseId)
+                  ?? throw new NotFoundException($"基となる予算が見つかりません: {baseId}")
+                : existing.Where(b => b.Status != BudgetStatus.Draft)
+                      .OrderByDescending(b => b.Version).First();
+            var nextVersion = await _budgets.GetMaxVersionAsync(did, fiscalHalf, ct) + 1;
+            draft = DepartmentBudget.ReviseFrom(baseBudget, nextVersion, request.Label, _clock.UtcNow);
+        }
+
+        await _budgets.AddAsync(draft, ct);
+        return ToDetailDto(draft);
+    }
+
+    public async Task<IReadOnlyList<BudgetSummaryDto>> ListAsync(Guid departmentId,
+        string fiscalHalf, CancellationToken ct = default)
+    {
+        var budgets = await _budgets.ListAsync(new DepartmentId(departmentId),
+            FiscalHalf.Parse(fiscalHalf), ct);
+        return budgets.OrderByDescending(b => b.Version).Select(ToSummaryDto).ToList();
+    }
+
+    public async Task<BudgetDetailDto> GetAsync(Guid budgetId, CancellationToken ct = default) =>
+        ToDetailDto(await RequireAsync(budgetId, ct));
+
+    public async Task<BudgetDetailDto> UpsertLineAsync(Guid budgetId,
+        UpsertBudgetLineRequest request, CancellationToken ct = default)
+    {
+        var budget = await RequireAsync(budgetId, ct);
+        var category = ParseCategory(request.Category);
+
+        if (category.IsProjectBased())
+        {
+            var projectId = await RequireProjectInDepartmentAsync(request.ProjectId,
+                budget.DepartmentId, ct);
+            budget.UpsertProjectLine(category, projectId, new Money(request.Amount));
+        }
+        else
+        {
+            var elementCode = await RequireElementAsync(request.ElementCode, ct);
+            budget.UpsertPeriodCostLine(elementCode, new Money(request.Amount));
+        }
+
+        await _budgets.UpdateAsync(budget, ct);
+        return ToDetailDto(budget);
+    }
+
+    public async Task<BudgetDetailDto> RemoveLineAsync(Guid budgetId, string category,
+        Guid? projectId, string? elementCode, CancellationToken ct = default)
+    {
+        var budget = await RequireAsync(budgetId, ct);
+        var parsed = ParseCategory(category);
+
+        if (parsed.IsProjectBased())
+        {
+            if (projectId is not { } pid)
+                throw new DomainException("売上高・加工費・外注費の明細には案件を指定してください。");
+            budget.RemoveProjectLine(parsed, new ProjectId(pid));
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(elementCode))
+                throw new DomainException("期間費用の明細には費目を指定してください。");
+            budget.RemovePeriodCostLine(new CostElementCode(elementCode));
+        }
+
+        await _budgets.UpdateAsync(budget, ct);
+        return ToDetailDto(budget);
+    }
+
+    /// <summary>予算を承認する。同一 (課, 半期) の承認済みバージョンは失効(Superseded)となる。</summary>
+    public async Task<BudgetDetailDto> ApproveAsync(Guid budgetId, CancellationToken ct = default)
+    {
+        var budget = await RequireAsync(budgetId, ct);
+        budget.Approve(_clock.UtcNow);
+
+        var siblings = await _budgets.ListAsync(budget.DepartmentId, budget.FiscalHalf, ct);
+        foreach (var sibling in siblings.Where(b =>
+                     b.Id != budget.Id && b.Status == BudgetStatus.Approved))
+        {
+            sibling.Supersede();
+            await _budgets.UpdateAsync(sibling, ct);
+        }
+
+        await _budgets.UpdateAsync(budget, ct);
+        return ToDetailDto(budget);
+    }
+
+    internal static BudgetCategory ParseCategory(string category)
+    {
+        if (!Enum.TryParse<BudgetCategory>(category, ignoreCase: false, out var parsed))
+            throw new DomainException($"予算区分が不正です: {category}");
+        return parsed;
+    }
+
+    private async Task<ProjectId> RequireProjectInDepartmentAsync(Guid? projectId,
+        DepartmentId departmentId, CancellationToken ct)
+    {
+        if (projectId is not { } pid)
+            throw new DomainException("売上高・加工費・外注費の明細には案件を指定してください。");
+        var project = await _projects.FindByIdAsync(new ProjectId(pid), ct)
+            ?? throw new NotFoundException($"案件が見つかりません: {pid}");
+        if (project.DepartmentId != departmentId)
+            throw new DomainException("指定された案件はこの課に属していません。");
+        return project.Id;
+    }
+
+    private async Task<CostElementCode> RequireElementAsync(string? elementCode, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(elementCode))
+            throw new DomainException("期間費用の明細には費目を指定してください。");
+        var code = new CostElementCode(elementCode);
+        _ = await _elements.FindByCodeAsync(code, ct)
+            ?? throw new NotFoundException($"費目が見つかりません: {elementCode}");
+        return code;
+    }
+
+    private async Task<DepartmentBudget> RequireAsync(Guid budgetId, CancellationToken ct) =>
+        await _budgets.FindByIdAsync(new DepartmentBudgetId(budgetId), ct)
+        ?? throw new NotFoundException($"予算が見つかりません: {budgetId}");
+
+    internal static BudgetSummaryDto ToSummaryDto(DepartmentBudget b) =>
+        new(b.Id.Value, b.DepartmentId.Value, b.FiscalHalf.ToString(), b.Version, b.Label,
+            b.Status.ToString(), b.CreatedAt, b.ApprovedAt,
+            b.CategoryTotal(BudgetCategory.Revenue).Value,
+            b.CategoryTotal(BudgetCategory.Processing).Value,
+            b.CategoryTotal(BudgetCategory.Outsourcing).Value,
+            b.CategoryTotal(BudgetCategory.PeriodCost).Value,
+            b.PlannedProfit.Value);
+
+    internal static BudgetDetailDto ToDetailDto(DepartmentBudget b) =>
+        new(b.Id.Value, b.DepartmentId.Value, b.FiscalHalf.ToString(), b.Version, b.Label,
+            b.Status.ToString(), b.CreatedAt, b.ApprovedAt,
+            b.CategoryTotal(BudgetCategory.Revenue).Value,
+            b.CategoryTotal(BudgetCategory.Processing).Value,
+            b.CategoryTotal(BudgetCategory.Outsourcing).Value,
+            b.CategoryTotal(BudgetCategory.PeriodCost).Value,
+            b.PlannedProfit.Value,
+            b.Lines
+                .OrderBy(l => l.Category)
+                .ThenBy(l => l.ElementCode?.Value)
+                .ThenBy(l => l.ProjectId?.Value)
+                .Select(l => new BudgetLineDto(l.Id, l.Category.ToString(),
+                    l.ProjectId?.Value, l.ElementCode?.Value, l.Amount.Value))
+                .ToList());
+}

@@ -1,9 +1,9 @@
 using CostManagement.Domain.Actuals;
 using CostManagement.Domain.Analysis;
+using CostManagement.Domain.Budgeting;
 using CostManagement.Domain.CostElements;
-using CostManagement.Domain.Planning;
+using CostManagement.Domain.Departments;
 using CostManagement.Domain.Projects;
-using CostManagement.Domain.Revenue;
 using CostManagement.Domain.Shared;
 
 namespace CostManagement.Domain.Tests;
@@ -11,119 +11,110 @@ namespace CostManagement.Domain.Tests;
 public class ProfitAnalysisTests
 {
     private static readonly DateTime Now = new(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc);
-    private static readonly ProjectId Pid = ProjectId.New();
-    private static readonly CostElementCode Labor = new("LAB-SE");
-    private static readonly AccountingPeriod Apr = new(2026, 4);
+    private static readonly DepartmentId Dept = DepartmentId.New();
+    private static readonly FiscalHalf Half = new(2026, HalfTerm.H1);
+    private static readonly ProjectId ProjectA = ProjectId.New();
+    private static readonly ProjectId ProjectB = ProjectId.New();
+    private static readonly CostElementCode Personnel = new("PERSONNEL");
 
-    private readonly ProfitAnalysisService _service = new();
-    private readonly RevenueVarianceAnalysisService _revenueAnalysis = new();
-    private readonly VarianceAnalysisService _costAnalysis = new();
+    private static readonly BudgetVarianceAnalysisService VarianceService = new();
+    private static readonly ProfitAnalysisService Service = new();
 
-    private ProfitReport Analyze(
-        (string Item, decimal Amount)[] revenuePlan,
-        (string Item, decimal Amount)[] revenueActuals,
-        (string? Item, decimal Amount)[] costPlan,
-        (string? Item, decimal Amount)[] costActuals)
+    private static ProfitReport Analyze(DepartmentBudget budget, params ActualEntry[] actuals) =>
+        Service.Analyze(VarianceService.Analyze(budget, actuals));
+
+    private static DepartmentBudget StandardBudget()
     {
-        var rp = RevenuePlan.CreateInitial(Pid, "売上予算", Now);
-        foreach (var (item, amount) in revenuePlan)
-            rp.UpsertLine(item, Apr, new Money(amount));
-        rp.Approve(Now);
+        // 案件A: 売上300万 加工費100万 外注費50万 → 損益150万
+        // 案件B: 売上200万 加工費80万 → 損益120万
+        // 期間費用: 人件費70万
+        var budget = DepartmentBudget.CreateInitial(Dept, Half, "当初予算", Now);
+        budget.UpsertProjectLine(BudgetCategory.Revenue, ProjectA, new Money(3_000_000m));
+        budget.UpsertProjectLine(BudgetCategory.Revenue, ProjectB, new Money(2_000_000m));
+        budget.UpsertProjectLine(BudgetCategory.Processing, ProjectA, new Money(1_000_000m));
+        budget.UpsertProjectLine(BudgetCategory.Processing, ProjectB, new Money(800_000m));
+        budget.UpsertProjectLine(BudgetCategory.Outsourcing, ProjectA, new Money(500_000m));
+        budget.UpsertPeriodCostLine(Personnel, new Money(700_000m));
+        budget.Approve(Now);
+        return budget;
+    }
 
-        var cp = CostPlan.CreateInitial(Pid, "原価予算", Now);
-        foreach (var (item, amount) in costPlan)
-            cp.UpsertLine(Labor, item, Apr, new Money(amount));
-        cp.Approve(Now);
+    private static ActualEntry Actual(BudgetCategory category, ProjectId? project,
+        CostElementCode? element, decimal amount) =>
+        ActualEntry.Record(Dept, Half, category, project, element, new Money(amount), null, Now);
 
-        var ra = revenueActuals
-            .Select(a => ActualRevenue.Record(Pid, a.Item, Apr, new Money(a.Amount), null, Now))
-            .ToList();
-        var ca = costActuals
-            .Select(a => ActualCost.Record(Pid, Labor, a.Item, Apr, new Money(a.Amount), null, Now))
-            .ToList();
+    [Fact]
+    public void 全体損益は売上高から総コストを引いた額になる()
+    {
+        var report = Analyze(StandardBudget(),
+            Actual(BudgetCategory.Revenue, ProjectA, null, 3_200_000m),
+            Actual(BudgetCategory.Processing, ProjectA, null, 1_100_000m),
+            Actual(BudgetCategory.PeriodCost, null, Personnel, 650_000m));
 
-        return _service.Analyze(_revenueAnalysis.Analyze(rp, ra), _costAnalysis.Analyze(cp, ca));
+        Assert.Equal(5_000_000m, report.PlannedRevenue);
+        Assert.Equal(3_000_000m, report.PlannedTotalCost);
+        Assert.Equal(2_000_000m, report.PlannedProfit);
+
+        Assert.Equal(3_200_000m, report.ActualRevenue);
+        Assert.Equal(1_750_000m, report.ActualTotalCost);
+        Assert.Equal(1_450_000m, report.ActualProfit);
+        Assert.Equal(-550_000m, report.ProfitVariance);
     }
 
     [Fact]
-    public void 品目別に売上と対応原価が突き合わされる()
+    public void 案件別損益に期間費用は含めない()
     {
-        var report = Analyze(
-            revenuePlan: [("案件A", 2_000_000m), ("案件B", 1_000_000m)],
-            revenueActuals: [("案件A", 2_100_000m), ("案件B", 900_000m)],
-            costPlan: [("案件A", 1_400_000m), ("案件B", 700_000m)],
-            costActuals: [("案件A", 1_500_000m), ("案件B", 650_000m)]);
+        var report = Analyze(StandardBudget());
 
-        Assert.Equal(2, report.ItemLines.Count);
+        var lineA = report.ProjectLines.Single(l => l.ProjectId == ProjectA.Value);
+        Assert.Equal(3_000_000m, lineA.PlannedRevenue);
+        Assert.Equal(1_000_000m, lineA.PlannedProcessing);
+        Assert.Equal(500_000m, lineA.PlannedOutsourcing);
+        Assert.Equal(1_500_000m, lineA.PlannedProfit);
 
-        var itemA = report.ItemLines.Single(l => l.ItemName == "案件A");
-        Assert.Equal(600_000m, itemA.PlannedProfit);  // 200万 − 140万
-        Assert.Equal(600_000m, itemA.ActualProfit);   // 210万 − 150万
-        Assert.Equal(0m, itemA.ProfitVariance);
+        var lineB = report.ProjectLines.Single(l => l.ProjectId == ProjectB.Value);
+        Assert.Equal(1_200_000m, lineB.PlannedProfit);
 
-        var itemB = report.ItemLines.Single(l => l.ItemName == "案件B");
-        Assert.Equal(300_000m, itemB.PlannedProfit);  // 100万 − 70万
-        Assert.Equal(250_000m, itemB.ActualProfit);   // 90万 − 65万
-        Assert.Equal(-50_000m, itemB.ProfitVariance);
+        // 案件別損益の合計 − 期間費用 = 全体の損益
+        Assert.Equal(report.PlannedProfit,
+            report.ProjectLines.Sum(l => l.PlannedProfit) - report.PlannedPeriodCost);
     }
 
     [Fact]
-    public void 売上対応品目のない原価は共通費として報告される()
+    public void 期間費用は課共通として全体にのみ計上される()
     {
-        var report = Analyze(
-            revenuePlan: [("案件A", 2_000_000m)],
-            revenueActuals: [("案件A", 2_000_000m)],
-            costPlan: [("案件A", 1_400_000m), (null, 300_000m)],
-            costActuals: [("案件A", 1_400_000m), (null, 350_000m)]);
+        var report = Analyze(StandardBudget(),
+            Actual(BudgetCategory.PeriodCost, null, Personnel, 750_000m));
 
-        var common = report.ItemLines.Single(l => l.ItemName is null);
-        Assert.Equal(0m, common.PlannedRevenue);
-        Assert.Equal(300_000m, common.PlannedCost);
-        Assert.Equal(-300_000m, common.PlannedProfit);
-        Assert.Equal(-350_000m, common.ActualProfit);
-
-        // 共通費は末尾に置かれる
-        Assert.Null(report.ItemLines[^1].ItemName);
+        Assert.Equal(700_000m, report.PlannedPeriodCost);
+        Assert.Equal(750_000m, report.ActualPeriodCost);
+        // 案件行に期間費用は現れない
+        Assert.All(report.ProjectLines, l =>
+            Assert.Equal(l.PlannedRevenue - l.PlannedProcessing - l.PlannedOutsourcing, l.PlannedProfit));
     }
 
     [Fact]
-    public void 品目別損益の合計は全体の損益と一致する()
+    public void 粗利率は損益を売上高で割った値になる()
     {
-        var report = Analyze(
-            revenuePlan: [("案件A", 2_000_000m), ("案件B", 1_000_000m)],
-            revenueActuals: [("案件A", 2_100_000m)],
-            costPlan: [("案件A", 1_400_000m), (null, 300_000m)],
-            costActuals: [("案件A", 1_450_000m), (null, 320_000m)]);
+        var report = Analyze(StandardBudget(),
+            Actual(BudgetCategory.Revenue, ProjectA, null, 2_000_000m),
+            Actual(BudgetCategory.Processing, ProjectA, null, 500_000m));
 
-        Assert.Equal(report.PlannedProfit, report.ItemLines.Sum(l => l.PlannedProfit));
-        Assert.Equal(report.ActualProfit, report.ItemLines.Sum(l => l.ActualProfit));
-        Assert.Equal(report.PlannedProfit, 3_000_000m - 1_700_000m);
-        Assert.Equal(report.ActualProfit, 2_100_000m - 1_770_000m);
+        Assert.Equal(0.4m, report.PlannedMarginRate);           // 200万 ÷ 500万
+        Assert.Equal(0.75m, report.ActualMarginRate);            // (200万−50万) ÷ 200万
     }
 
     [Fact]
-    public void 粗利率が算出される()
+    public void 売上高が0のとき粗利率はnullになる()
     {
-        var report = Analyze(
-            revenuePlan: [("案件A", 2_000_000m)],
-            revenueActuals: [("案件A", 2_500_000m)],
-            costPlan: [("案件A", 1_500_000m)],
-            costActuals: [("案件A", 1_500_000m)]);
+        var budget = DepartmentBudget.CreateInitial(Dept, Half, "当初予算", Now);
+        budget.UpsertPeriodCostLine(Personnel, new Money(700_000m));
+        budget.Approve(Now);
 
-        Assert.Equal(0.25m, report.PlannedMarginRate);
-        Assert.Equal(0.4m, report.ActualMarginRate);
-    }
+        var report = Analyze(budget);
 
-    [Fact]
-    public void 売上ゼロの場合の粗利率はnullになる()
-    {
-        var report = Analyze(
-            revenuePlan: [("案件A", 2_000_000m)],
-            revenueActuals: [],
-            costPlan: [("案件A", 1_500_000m)],
-            costActuals: []);
-
-        Assert.NotNull(report.PlannedMarginRate);
+        Assert.Null(report.PlannedMarginRate);
         Assert.Null(report.ActualMarginRate);
+        Assert.Equal(-700_000m, report.PlannedProfit);
     }
 }
