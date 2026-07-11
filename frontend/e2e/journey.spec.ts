@@ -41,6 +41,11 @@ test('計画策定: 課を登録し予算編集で案件別に金額を入力し
   await 案件を追加(projectACode, '案件A')
   await 案件を追加(projectBCode, '案件B')
 
+  // 案件Bを終了しても、予算を承認するまでは金額を編集できる
+  const 案件B行 = page.locator('tr', { hasText: '案件B' })
+  await 案件B行.getByRole('button', { name: '終了' }).click()
+  await expect(案件B行.locator('.badge', { hasText: '終了' })).toBeVisible()
+
   // ---- 案件×区分のグリッドで金額を入力(セルを離れると自動保存) ----
   const セル入力 = async (案件: string, 区分: string, 金額: string) => {
     const cell = page.getByLabel(`${案件} ${区分}`)
@@ -49,6 +54,7 @@ test('計画策定: 課を登録し予算編集で案件別に金額を入力し
   }
   await セル入力('案件A', '売上高', '2000000')
   await セル入力('案件A', '加工費', '1400000')
+  // 終了済みの案件Bでも金額を入力・保存できる
   await セル入力('案件B', '売上高', '1000000')
   await セル入力('案件B', '外注費', '700000')
 

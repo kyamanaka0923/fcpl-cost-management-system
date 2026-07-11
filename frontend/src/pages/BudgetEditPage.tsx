@@ -230,7 +230,7 @@ export default function BudgetEditPage() {
         <h2>案件別の売上高・加工費・外注費</h2>
         <p className="muted small">
           案件ごとに半期一括の金額を入力します(空欄・0 は明細なし)。
-          {editable && '金額を入力して次の欄へ移ると自動保存されます。'}
+          {editable && '金額を入力して次の欄へ移ると自動保存されます。終了にした案件も予算を承認するまでは編集できます。'}
           課の区分合計は案件明細の合計として上部サマリに反映されます。
         </p>
         <table>
@@ -253,7 +253,7 @@ export default function BudgetEditPage() {
               </tr>
             ) : (
               projects.map((p) => (
-                <tr key={p.id} className={p.status === 'Completed' ? 'muted' : ''}>
+                <tr key={p.id}>
                   <td>
                     {p.name}
                     <span className="muted small">({p.code})</span>
