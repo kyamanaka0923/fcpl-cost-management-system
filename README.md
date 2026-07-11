@@ -5,6 +5,8 @@
 **課(部門)単位の半期予算の策定・実績計上・差異分析**を行うシステムです。
 明細は数量×単価ではなく**金額**で直接管理します。
 
+- 組織は **部 > 課** の2階層です。課は必ず1つの部に属し、**部では配下課の予実を合計**して把握できます
+  (部自体は予算を策定しない集計ビュー)
 - 予算は**課 × 半期(年度の上期/下期)**ごとに策定し、**バージョン管理**され、半期の途中でも何度でも改定できます
 - 予算は **売上高・加工費・外注費・期間費用の4区分**を1つの予算としてまとめて承認します
 - **売上高・加工費・外注費は案件別の詳細計画**として立案します。課の区分合計 = 案件明細の合計
@@ -37,12 +39,13 @@ backend/
 │   ├── CostManagement.Domain/          # 中心: エンティティ・値オブジェクト・集約・
 │   │   │                               #       ドメインサービス・リポジトリポート
 │   │   ├── Shared/                     #   Money, FiscalHalf(値オブジェクト)
-│   │   ├── Departments/                #   Department(課)集約
+│   │   ├── Divisions/                  #   Division(部)集約
+│   │   ├── Departments/                #   Department(課。部に属する)集約
 │   │   ├── Projects/                   #   Project(案件。課に属するマスタ)集約
 │   │   ├── CostElements/               #   CostElement(期間費用の費目マスタ)集約
 │   │   ├── Budgeting/                  #   DepartmentBudget 集約(4区分・バージョン管理・承認)
 │   │   ├── Actuals/                    #   ActualEntry 集約(実績)
-│   │   └── Analysis/                   #   差異分析・バージョン比較・損益のドメインサービス群
+│   │   └── Analysis/                   #   差異分析・バージョン比較・損益・部集計のドメインサービス群
 │   ├── CostManagement.Application/     # ユースケース(入力ポート)・DTO
 │   ├── CostManagement.Infrastructure/  # 出力アダプタ: Dapper + SQLite リポジトリ実装
 │   └── CostManagement.WebApi/          # 入力アダプタ: HTTP API(Minimal API)
@@ -56,11 +59,11 @@ frontend/                               # React SPA(/api を dev proxy 経由で
 
 | 要素 | 実装 |
 |---|---|
-| 集約ルート | `Department`(課), `Project`(案件), `DepartmentBudget`(課予算), `ActualEntry`(実績), `CostElement`(費目マスタ) |
+| 集約ルート | `Division`(部), `Department`(課), `Project`(案件), `DepartmentBudget`(課予算), `ActualEntry`(実績), `CostElement`(費目マスタ) |
 | エンティティ | `BudgetLine`(区分 × 案件 or 費目 × 金額。案件系区分と期間費用でキーが排他) |
-| 値オブジェクト | `Money`, `FiscalHalf`(yyyy-H1 / yyyy-H2), `DepartmentId` 等の型付き ID, `CostElementCode` |
-| ドメインサービス | `BudgetVarianceAnalysisService`(予実差異分析), `BudgetComparisonService`(バージョン間比較), `ProfitAnalysisService`(課全体・案件別の損益) |
-| リポジトリ(ポート) | `IDepartmentRepository`, `IProjectRepository`, `ICostElementRepository`, `IDepartmentBudgetRepository`, `IActualEntryRepository` |
+| 値オブジェクト | `Money`, `FiscalHalf`(yyyy-H1 / yyyy-H2), `DivisionId` / `DepartmentId` 等の型付き ID, `CostElementCode` |
+| ドメインサービス | `BudgetVarianceAnalysisService`(予実差異分析), `BudgetComparisonService`(バージョン間比較), `ProfitAnalysisService`(課全体・案件別の損益), `DivisionBudgetSummaryService`(部の予実集計) |
+| リポジトリ(ポート) | `IDivisionRepository`, `IDepartmentRepository`, `IProjectRepository`, `ICostElementRepository`, `IDepartmentBudgetRepository`, `IActualEntryRepository` |
 | ドメイン例外 | `DomainException`(不変条件違反 → HTTP 400 に変換) |
 
 ### 予算の構成と区分
@@ -128,8 +131,10 @@ frontend/                               # React SPA(/api を dev proxy 経由で
 ### スキーマの作り直し
 
 旧世代(プロジェクト単位予算)のテーブルが残っているデータベースは、起動時に旧テーブルを
-破棄して新スキーマで作り直します(**データ移行は行いません**)。この処理は冪等で、
-新スキーマの既存データには影響しません。
+破棄して新スキーマで作り直します(**データ移行は行いません**)。部を持たない旧世代の
+`departments`(`division_id` 列がない)も、配下テーブル(projects / department_budgets /
+department_budget_lines / actual_entries)ごと破棄して作り直します。
+この処理は冪等で、新スキーマの既存データには影響しません。
 
 ## 実行方法
 
@@ -212,7 +217,10 @@ npm run test:e2e
 
 | メソッド/パス | 説明 |
 |---|---|
-| `GET/POST /api/departments` | 課一覧・登録 |
+| `GET/POST /api/divisions` | 部一覧・登録 |
+| `GET /api/divisions/{id}` | 部の取得 |
+| `GET /api/divisions/{id}/budget-summary?fiscalHalf=` | 部の予実サマリ(配下課の予算/実績/差異・損益の合計 + 課別内訳) |
+| `GET/POST /api/divisions/{id}/departments` | 配下課一覧・課の登録(課は部に属する) |
 | `GET /api/departments/{id}` | 課の取得 |
 | `GET/POST /api/departments/{id}/projects` | 案件一覧・登録(案件は課に属する) |
 | `GET /api/projects/{id}` | 案件の取得 |
@@ -230,8 +238,9 @@ npm run test:e2e
 
 ## 画面
 
-- **課一覧 / 課詳細** — 課の登録、対象半期の選択、承認済み予算の4区分サマリ、
-  予算バージョンの一覧・改定・承認
+- **部一覧 / 部詳細** — 部の登録、対象半期の選択、配下課の予実サマリ(区分別の予算/実績/差異 +
+  損益)と課別内訳(未策定の課は明示)、課の登録、各課へのドリルダウン
+- **課詳細** — 対象半期の選択、承認済み予算の4区分サマリ、予算バージョンの一覧・改定・承認
 - **予算編集** — 案件×区分のグリッドで売上高・加工費・外注費を案件別に直接入力
   (セルを離れると自動保存)。期間費用も費目別の表に同様に直接入力する。
   案件の追加・終了、費目マスタの追加もこの画面で行う。

@@ -21,13 +21,15 @@ flowchart TB
         direction TB
         SK["共有カーネル<br/>(Shared Kernel)<br/>Money / FiscalHalf / DomainException"]
 
-        DP["課<br/>(Departments)<br/>予算策定の管理単位"]
+        DV["部<br/>(Divisions)<br/>課の上位組織・集計単位"]
+        DP["課<br/>(Departments)<br/>予算策定の管理単位・部に属する"]
         PJ["案件<br/>(Projects)<br/>課に属する内訳マスタ"]
         CE["費目マスタ<br/>(CostElements)<br/>期間費用の内訳"]
         BG["課予算<br/>(Budgeting)<br/>課×半期・4区分・バージョン管理・承認"]
         AC["実績<br/>(Actuals)<br/>都度計上"]
-        AN["分析<br/>(Analysis)<br/>差異分析・バージョン比較・損益"]
+        AN["分析<br/>(Analysis)<br/>差異分析・バージョン比較・損益・部集計"]
 
+        DV -->|課が所属| DP
         DP -->|管理単位を提供| BG
         DP -->|管理単位を提供| AC
         DP -->|案件が所属| PJ
@@ -38,8 +40,10 @@ flowchart TB
 
         BG -->|予算を入力| AN
         AC -->|実績を入力| AN
+        AN -->|"配下課を合計"| DV
     end
 
+    SK --- DV
     SK --- DP
     SK --- BG
     SK --- AC
@@ -52,6 +56,8 @@ flowchart TB
 
 **設計上のポイント**
 
+- 組織は**部(Division)> 課(Department)の2階層**。課は必ず1つの部に属します。
+  部は予算を策定せず、配下課の予実を合計する集計ビュー(`DivisionBudgetSummaryService`)です
 - 予算は**課 × 半期の単一集約**(DepartmentBudget)で、売上高・加工費・外注費・期間費用の
   4区分をまとめて1承認します(売上と原価を別集約で独立承認する方式は採っていません)
 - 課の区分合計は**常に明細の合計として導出**します(ヘッダに金額を持たない=直接入力不可を
@@ -146,12 +152,25 @@ classDiagram
 
 ```mermaid
 classDiagram
+    class Division {
+        <<Aggregate Root>>
+        +DivisionId Id
+        +string Code
+        +string Name
+        +Create(code, name, now) Division$
+        +Rename(name)
+    }
+    class DivisionId {
+        <<Value Object>>
+        +Guid Value
+    }
     class Department {
         <<Aggregate Root>>
         +DepartmentId Id
+        +DivisionId DivisionId ※所属する部
         +string Code
         +string Name
-        +Create(code, name, now) Department$
+        +Create(divisionId, code, name, now) Department$
         +Rename(name)
     }
     class DepartmentId {
@@ -188,7 +207,9 @@ classDiagram
         <<Value Object>>
         +string Value
     }
+    Division --> DivisionId
     Department --> DepartmentId
+    Department ..> Division : DivisionId で参照
     Project --> ProjectId
     Project --> ProjectStatus
     Project ..> Department : DepartmentId で参照
@@ -288,11 +309,19 @@ classDiagram
 
 ```mermaid
 classDiagram
+    class IDivisionRepository {
+        <<interface>>
+        +FindByIdAsync(DivisionId) Division?
+        +FindByCodeAsync(string) Division?
+        +ListAsync() IReadOnlyList~Division~
+        +AddAsync(Division)
+        +UpdateAsync(Division)
+    }
     class IDepartmentRepository {
         <<interface>>
         +FindByIdAsync(DepartmentId) Department?
         +FindByCodeAsync(string) Department?
-        +ListAsync() IReadOnlyList~Department~
+        +ListByDivisionAsync(DivisionId) IReadOnlyList~Department~
         +AddAsync(Department)
         +UpdateAsync(Department)
     }
@@ -346,6 +375,10 @@ classDiagram
     class ProfitAnalysisService {
         <<Domain Service>>
         +Analyze(VarianceReport) ProfitReport
+    }
+    class DivisionBudgetSummaryService {
+        <<Domain Service>>
+        +Summarize(課別VarianceReportの一覧) DivisionSummaryReport
     }
 
     class VarianceReport {
@@ -408,3 +441,5 @@ classDiagram
   - 課全体 = 売上高 −(加工費 + 外注費 + 期間費用)。利益率 = 損益 ÷ 売上高(売上高0は null)
   - 案件別 = 売上高 − 加工費 − 外注費(期間費用は課共通のため配賦しない)
   - **案件別損益の合計 − 期間費用 = 課全体の損益**(整合性はテストで担保)
+- 部集計(DivisionBudgetSummaryService): 配下課の VarianceReport を区分別・損益で合計する。
+  承認済み予算のない課は合計から除外し未策定として課別内訳に表示する。「部合計 = 課別内訳の合計」
