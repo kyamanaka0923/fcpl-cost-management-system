@@ -23,54 +23,135 @@ export default function BudgetEditPage() {
   const [elements, setElements] = useState<CostElement[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  const [category, setCategory] = useState<BudgetCategory>('Revenue')
-  const [projectId, setProjectId] = useState('')
-  const [elementCode, setElementCode] = useState('')
-  const [amount, setAmount] = useState('')
-  const [saving, setSaving] = useState(false)
+  // 案件グリッドのセル編集中の値(キー: `${category}-${projectId}`)
+  const [edits, setEdits] = useState<Record<string, string>>({})
 
-  const load = useCallback(() => {
+  // 案件追加フォーム
+  const [newCode, setNewCode] = useState('')
+  const [newName, setNewName] = useState('')
+  const [addingProject, setAddingProject] = useState(false)
+
+  // 期間費用の追加フォーム
+  const [elementCode, setElementCode] = useState('')
+  const [periodAmount, setPeriodAmount] = useState('')
+  const [savingPeriod, setSavingPeriod] = useState(false)
+
+  const loadBudget = useCallback(() => {
     if (!budgetId) return
     api.getBudget(budgetId).then(setBudget).catch((e: Error) => setError(e.message))
   }, [budgetId])
-  useEffect(load, [load])
-  useEffect(() => {
+  const loadProjects = useCallback(() => {
     if (!departmentId) return
     api.listProjects(departmentId).then(setProjects).catch((e: Error) => setError(e.message))
-    api.listCostElements().then(setElements).catch((e: Error) => setError(e.message))
   }, [departmentId])
+
+  useEffect(loadBudget, [loadBudget])
+  useEffect(loadProjects, [loadProjects])
+  useEffect(() => {
+    api.listCostElements().then(setElements).catch((e: Error) => setError(e.message))
+  }, [])
 
   if (!departmentId || !budgetId) return null
   const editable = budget?.status === 'Draft'
-  const isProjectCategory = category !== 'PeriodCost'
-  const projectName = (id: string | null) =>
-    projects.find((p) => p.id === id)?.name ?? id ?? ''
   const elementName = (code: string | null) =>
     elements.find((e) => e.code === code)?.name ?? code ?? ''
 
-  const upsert = async (e: FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
+  // ある案件・区分の現在の予算額(明細がなければ 0)
+  const lineAmount = (projectId: string, category: BudgetCategory): number =>
+    budget?.lines.find((l) => l.category === category && l.projectId === projectId)?.amount ?? 0
+
+  const cellKey = (projectId: string, category: BudgetCategory) => `${category}-${projectId}`
+  const cellValue = (projectId: string, category: BudgetCategory): string => {
+    const key = cellKey(projectId, category)
+    if (key in edits) return edits[key]
+    const amount = lineAmount(projectId, category)
+    return amount === 0 ? '' : String(amount)
+  }
+
+  const onCellChange = (projectId: string, category: BudgetCategory, value: string) =>
+    setEdits((prev) => ({ ...prev, [cellKey(projectId, category)]: value }))
+
+  const clearEdit = (key: string) =>
+    setEdits((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+
+  // セルからフォーカスが外れたら、変更があった区分だけ upsert / 削除する
+  const onCellBlur = async (projectId: string, category: BudgetCategory) => {
+    const key = cellKey(projectId, category)
+    if (!(key in edits)) return
+    const raw = edits[key].trim()
+    const num = raw === '' ? 0 : Number(raw)
+    const current = lineAmount(projectId, category)
+    if (Number.isNaN(num) || num < 0 || num === current) {
+      clearEdit(key)
+      return
+    }
     setError(null)
     try {
-      const updated = await api.upsertBudgetLine(budgetId, {
-        category,
-        projectId: isProjectCategory ? projectId : null,
-        elementCode: isProjectCategory ? null : elementCode,
-        amount: Number(amount),
-      })
+      const updated =
+        num > 0
+          ? await api.upsertBudgetLine(budgetId, { category, projectId, amount: num })
+          : await api.removeBudgetLine(budgetId, category, projectId, null)
       setBudget(updated)
+      clearEdit(key)
     } catch (err) {
       setError((err as Error).message)
-    } finally {
-      setSaving(false)
     }
   }
 
-  const remove = async (c: BudgetCategory, pid: string | null, code: string | null) => {
+  const addProject = async (e: FormEvent) => {
+    e.preventDefault()
+    setAddingProject(true)
     setError(null)
     try {
-      setBudget(await api.removeBudgetLine(budgetId, c, pid, code))
+      await api.createProject(departmentId, { code: newCode, name: newName })
+      setNewCode('')
+      setNewName('')
+      loadProjects()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setAddingProject(false)
+    }
+  }
+
+  const completeProject = async (projectId: string) => {
+    setError(null)
+    try {
+      await api.completeProject(projectId)
+      loadProjects()
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+
+  const upsertPeriodCost = async (e: FormEvent) => {
+    e.preventDefault()
+    setSavingPeriod(true)
+    setError(null)
+    try {
+      const updated = await api.upsertBudgetLine(budgetId, {
+        category: 'PeriodCost',
+        elementCode,
+        amount: Number(periodAmount),
+      })
+      setBudget(updated)
+      setElementCode('')
+      setPeriodAmount('')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setSavingPeriod(false)
+    }
+  }
+
+  const removePeriodCost = async (code: string) => {
+    setError(null)
+    try {
+      setBudget(await api.removeBudgetLine(budgetId, 'PeriodCost', null, code))
     } catch (err) {
       setError((err as Error).message)
     }
@@ -85,14 +166,11 @@ export default function BudgetEditPage() {
     }
   }
 
-  const categoryTotals: { category: BudgetCategory; total: number }[] = budget
-    ? [
-        { category: 'Revenue', total: budget.revenueTotal },
-        { category: 'Processing', total: budget.processingTotal },
-        { category: 'Outsourcing', total: budget.outsourcingTotal },
-        { category: 'PeriodCost', total: budget.periodCostTotal },
-      ]
-    : []
+  const periodCostLines = budget?.lines.filter((l) => l.category === 'PeriodCost') ?? []
+  const projectProfit = (projectId: string): number =>
+    lineAmount(projectId, 'Revenue') -
+    lineAmount(projectId, 'Processing') -
+    lineAmount(projectId, 'Outsourcing')
 
   return (
     <>
@@ -113,12 +191,22 @@ export default function BudgetEditPage() {
           </span>
         </h2>
         <div className="stat-row">
-          {categoryTotals.map(({ category: c, total }) => (
-            <div className="stat-tile" key={c}>
-              <div className="label">{categoryLabel[c]}</div>
-              <div className="value">¥{formatYen(total)}</div>
-            </div>
-          ))}
+          <div className="stat-tile">
+            <div className="label">{categoryLabel.Revenue}</div>
+            <div className="value">¥{formatYen(budget?.revenueTotal ?? 0)}</div>
+          </div>
+          <div className="stat-tile">
+            <div className="label">{categoryLabel.Processing}</div>
+            <div className="value">¥{formatYen(budget?.processingTotal ?? 0)}</div>
+          </div>
+          <div className="stat-tile">
+            <div className="label">{categoryLabel.Outsourcing}</div>
+            <div className="value">¥{formatYen(budget?.outsourcingTotal ?? 0)}</div>
+          </div>
+          <div className="stat-tile">
+            <div className="label">{categoryLabel.PeriodCost}</div>
+            <div className="value">¥{formatYen(budget?.periodCostTotal ?? 0)}</div>
+          </div>
           <div className="stat-tile">
             <div className="label">計画損益</div>
             <div className={`value ${(budget?.plannedProfit ?? 0) >= 0 ? 'favorable' : 'adverse'}`}>
@@ -138,41 +226,164 @@ export default function BudgetEditPage() {
         )}
       </div>
 
-      {editable && (
-        <div className="card">
-          <h2>明細の追加・更新</h2>
-          <p className="muted small">
-            売上高・加工費・外注費は案件ごとに、期間費用は費目ごとに半期一括の金額で計画します。
-            同じ区分・案件(または費目)の明細は上書きされます。
-            課の区分合計は明細の合計として自動的に算出されます。
-          </p>
-          <form onSubmit={upsert} className="form-row">
-            <label>
-              区分
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as BudgetCategory)}
-              >
-                {(Object.keys(categoryLabel) as BudgetCategory[]).map((c) => (
-                  <option key={c} value={c}>
-                    {categoryLabel[c]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {isProjectCategory ? (
-              <label>
-                案件
-                <select value={projectId} onChange={(e) => setProjectId(e.target.value)} required>
-                  <option value="">選択してください</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}({p.code})
-                    </option>
-                  ))}
-                </select>
-              </label>
+      <div className="card">
+        <h2>案件別の売上高・加工費・外注費</h2>
+        <p className="muted small">
+          案件ごとに半期一括の金額を入力します(空欄・0 は明細なし)。
+          {editable && '金額を入力して次の欄へ移ると自動保存されます。'}
+          課の区分合計は案件明細の合計として上部サマリに反映されます。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>案件</th>
+              <th className="num">{categoryLabel.Revenue}</th>
+              <th className="num">{categoryLabel.Processing}</th>
+              <th className="num">{categoryLabel.Outsourcing}</th>
+              <th className="num">損益</th>
+              {editable && <th></th>}
+            </tr>
+          </thead>
+          <tbody>
+            {projects.length === 0 ? (
+              <tr>
+                <td colSpan={editable ? 6 : 5} className="muted small">
+                  案件がありません。{editable ? '下の行から案件を追加してください。' : ''}
+                </td>
+              </tr>
             ) : (
+              projects.map((p) => (
+                <tr key={p.id} className={p.status === 'Completed' ? 'muted' : ''}>
+                  <td>
+                    {p.name}
+                    <span className="muted small">({p.code})</span>
+                    {p.status === 'Completed' && (
+                      <span className="badge superseded" style={{ marginLeft: 6 }}>
+                        終了
+                      </span>
+                    )}
+                  </td>
+                  {projectCategories.map((category) => (
+                    <td className="num" key={category}>
+                      {editable ? (
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          className="num"
+                          style={{ width: '9rem' }}
+                          aria-label={`${p.name} ${categoryLabel[category]}`}
+                          value={cellValue(p.id, category)}
+                          onChange={(e) => onCellChange(p.id, category, e.target.value)}
+                          onBlur={() => onCellBlur(p.id, category)}
+                        />
+                      ) : (
+                        <>¥{formatYen(lineAmount(p.id, category))}</>
+                      )}
+                    </td>
+                  ))}
+                  <td className={`num ${projectProfit(p.id) >= 0 ? 'favorable' : 'adverse'}`}>
+                    ¥{formatYen(projectProfit(p.id))}
+                  </td>
+                  {editable && (
+                    <td>
+                      {p.status === 'Active' && (
+                        <button onClick={() => completeProject(p.id)}>終了</button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              ))
+            )}
+            <tr className="total-row">
+              <td>合計</td>
+              <td className="num">¥{formatYen(budget?.revenueTotal ?? 0)}</td>
+              <td className="num">¥{formatYen(budget?.processingTotal ?? 0)}</td>
+              <td className="num">¥{formatYen(budget?.outsourcingTotal ?? 0)}</td>
+              <td className="num">
+                ¥{formatYen(
+                  (budget?.revenueTotal ?? 0) -
+                    (budget?.processingTotal ?? 0) -
+                    (budget?.outsourcingTotal ?? 0),
+                )}
+              </td>
+              {editable && <td></td>}
+            </tr>
+          </tbody>
+        </table>
+
+        {editable && (
+          <>
+            <h3>案件を追加</h3>
+            <form onSubmit={addProject} className="form-row">
+              <label>
+                案件コード
+                <input
+                  value={newCode}
+                  onChange={(e) => setNewCode(e.target.value)}
+                  required
+                  placeholder="PJ-001"
+                />
+              </label>
+              <label>
+                案件名
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  required
+                  placeholder="受託開発A"
+                />
+              </label>
+              <button type="submit" className="primary" disabled={addingProject}>
+                追加
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>期間費用</h2>
+        <p className="muted small">
+          課共通の費用(人件費・ライセンス費など)を費目ごとに計画します。
+        </p>
+        {periodCostLines.length === 0 ? (
+          <p className="muted small">明細がありません。</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>費目</th>
+                <th className="num">金額</th>
+                {editable && <th></th>}
+              </tr>
+            </thead>
+            <tbody>
+              {periodCostLines.map((l) => (
+                <tr key={l.id}>
+                  <td>{elementName(l.elementCode)}</td>
+                  <td className="num">¥{formatYen(l.amount)}</td>
+                  {editable && (
+                    <td>
+                      <button onClick={() => removePeriodCost(l.elementCode!)}>削除</button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+              <tr className="total-row">
+                <td>合計</td>
+                <td className="num">¥{formatYen(budget?.periodCostTotal ?? 0)}</td>
+                {editable && <td></td>}
+              </tr>
+            </tbody>
+          </table>
+        )}
+
+        {editable && (
+          <>
+            <h3>期間費用の追加・更新</h3>
+            <p className="muted small">同じ費目で再登録すると上書きされます。</p>
+            <form onSubmit={upsertPeriodCost} className="form-row">
               <label>
                 費目
                 <select value={elementCode} onChange={(e) => setElementCode(e.target.value)} required>
@@ -184,81 +395,22 @@ export default function BudgetEditPage() {
                   ))}
                 </select>
               </label>
-            )}
-            <label>
-              金額(円・半期一括)
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                min={0}
-                step="any"
-                required
-              />
-            </label>
-            <button type="submit" className="primary" disabled={saving}>
-              登録
-            </button>
-          </form>
-          {projects.length === 0 && (
-            <p className="muted small">
-              案件がまだ登録されていません。課詳細ページの「案件マスタ」から登録してください。
-            </p>
-          )}
-        </div>
-      )}
-
-      <div className="card">
-        <h2>予算明細</h2>
-        {!budget || budget.lines.length === 0 ? (
-          <p className="muted small">明細がありません。</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>区分</th>
-                <th>案件 / 費目</th>
-                <th className="num">金額</th>
-                {editable && <th></th>}
-              </tr>
-            </thead>
-            <tbody>
-              {projectCategories.concat('PeriodCost').flatMap((c) =>
-                budget.lines
-                  .filter((l) => l.category === c)
-                  .map((l) => (
-                    <tr key={l.id}>
-                      <td>{categoryLabel[l.category]}</td>
-                      <td>
-                        {l.category === 'PeriodCost'
-                          ? elementName(l.elementCode)
-                          : projectName(l.projectId)}
-                      </td>
-                      <td className="num">¥{formatYen(l.amount)}</td>
-                      {editable && (
-                        <td>
-                          <button onClick={() => remove(l.category, l.projectId, l.elementCode)}>
-                            削除
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  )),
-              )}
-              <tr className="total-row">
-                <td colSpan={2}>売上高合計</td>
-                <td className="num">¥{formatYen(budget.revenueTotal)}</td>
-                {editable && <td></td>}
-              </tr>
-              <tr className="total-row">
-                <td colSpan={2}>総コスト(加工費 + 外注費 + 期間費用)</td>
-                <td className="num">
-                  ¥{formatYen(budget.processingTotal + budget.outsourcingTotal + budget.periodCostTotal)}
-                </td>
-                {editable && <td></td>}
-              </tr>
-            </tbody>
-          </table>
+              <label>
+                金額(円・半期一括)
+                <input
+                  type="number"
+                  value={periodAmount}
+                  onChange={(e) => setPeriodAmount(e.target.value)}
+                  min={0}
+                  step="any"
+                  required
+                />
+              </label>
+              <button type="submit" className="primary" disabled={savingPeriod}>
+                登録
+              </button>
+            </form>
+          </>
         )}
       </div>
     </>

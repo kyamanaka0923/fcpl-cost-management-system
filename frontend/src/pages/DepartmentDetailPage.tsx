@@ -9,7 +9,6 @@ import {
   type BudgetStatus,
   type BudgetSummary,
   type Department,
-  type Project,
 } from '../api'
 
 const statusLabel: Record<BudgetStatus, string> = {
@@ -173,104 +172,6 @@ function BudgetVersionsCard({
   )
 }
 
-function ProjectMasterCard({
-  departmentId,
-  projects,
-  onChanged,
-  onError,
-}: {
-  departmentId: string
-  projects: Project[]
-  onChanged: () => void
-  onError: (message: string | null) => void
-}) {
-  const [code, setCode] = useState('')
-  const [name, setName] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    onError(null)
-    try {
-      await api.createProject(departmentId, { code, name })
-      setCode('')
-      setName('')
-      onChanged()
-    } catch (err) {
-      onError((err as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const complete = async (projectId: string) => {
-    onError(null)
-    try {
-      await api.completeProject(projectId)
-      onChanged()
-    } catch (err) {
-      onError((err as Error).message)
-    }
-  }
-
-  return (
-    <div className="card">
-      <h2>案件マスタ</h2>
-      <p className="muted small">
-        売上高・加工費・外注費の明細は案件ごとに計画します。案件はこの課に属します。
-      </p>
-      {projects.length === 0 ? (
-        <p className="muted small">案件がありません。下のフォームから登録してください。</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>案件コード</th>
-              <th>案件名</th>
-              <th>状態</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map((p) => (
-              <tr key={p.id}>
-                <td>{p.code}</td>
-                <td>{p.name}</td>
-                <td>
-                  <span className={`badge ${p.status === 'Active' ? 'approved' : 'superseded'}`}>
-                    {p.status === 'Active' ? '進行中' : '終了'}
-                  </span>
-                </td>
-                <td>
-                  {p.status === 'Active' && (
-                    <button onClick={() => complete(p.id)}>終了にする</button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      <h3>案件の登録</h3>
-      <form onSubmit={submit} className="form-row">
-        <label>
-          案件コード
-          <input value={code} onChange={(e) => setCode(e.target.value)} required placeholder="PJ-001" />
-        </label>
-        <label>
-          案件名
-          <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="受託開発A" />
-        </label>
-        <button type="submit" className="primary" disabled={saving}>
-          登録
-        </button>
-      </form>
-    </div>
-  )
-}
-
 export default function DepartmentDetailPage() {
   const { departmentId } = useParams<{ departmentId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -279,14 +180,12 @@ export default function DepartmentDetailPage() {
 
   const [department, setDepartment] = useState<Department | null>(null)
   const [budgets, setBudgets] = useState<BudgetSummary[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
     if (!departmentId) return
     api.getDepartment(departmentId).then(setDepartment).catch((e: Error) => setError(e.message))
     api.listBudgets(departmentId, half).then(setBudgets).catch((e: Error) => setError(e.message))
-    api.listProjects(departmentId).then(setProjects).catch((e: Error) => setError(e.message))
   }, [departmentId, half])
   useEffect(load, [load])
 
@@ -350,13 +249,6 @@ export default function DepartmentDetailPage() {
         departmentId={departmentId}
         half={half}
         budgets={budgets}
-        onChanged={load}
-        onError={setError}
-      />
-
-      <ProjectMasterCard
-        departmentId={departmentId}
-        projects={projects}
         onChanged={load}
         onError={setError}
       />
