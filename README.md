@@ -2,16 +2,18 @@
 
 [![CI](https://github.com/kyamanaka0923/fcpl-cost-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/kyamanaka0923/fcpl-cost-management-system/actions/workflows/ci.yml)
 
-**原価・売上高の予算策定・実績計上・差異分析**を行うシステムです。
-ソフトウェア開発の SE 費用管理を主なユースケースとして、明細は数量×単価ではなく**金額**で直接管理します。
+**課(部門)単位の半期予算の策定・実績計上・差異分析**を行うシステムです。
+明細は数量×単価ではなく**金額**で直接管理します。
 
-- 予算(予定)はプロジェクトごとに**バージョン管理**され、四半期などの節目で何度でも改定できます
-- **売上予算**は原価予算とは独立にバージョン管理・改定できます(品目 × 年月 × 金額)
-- **売上対応原価の詳細定義**: 原価明細(予算・実績)に「売上対応品目」を紐付けでき、
-  品目(案件)単位の粗利を予実で突き合わせられます。品目を指定しない原価は共通費として扱われます
-- 予実の**差異分析**: 差異 = 実績金額 − 予算金額(原価は超過が不利、売上は超過が有利)
-- **損益(粗利)分析**: 全体・品目別・月別の粗利予実と粗利率
-- 予算バージョン間の**変動比較**(例: 当初予算 vs 第2四半期改定)ができます
+- 予算は**課 × 半期(年度の上期/下期)**ごとに策定し、**バージョン管理**され、半期の途中でも何度でも改定できます
+- 予算は **売上高・加工費・外注費・期間費用の4区分**を1つの予算としてまとめて承認します
+- **売上高・加工費・外注費は案件別の詳細計画**として立案します。課の区分合計 = 案件明細の合計
+  (課レベルの直接入力はできません)
+- **期間費用**は費目別(人件費・ライセンス費など。費目マスタで拡張可能)に計画します
+- 明細は**半期一括の金額**です(年月の粒度はありません)
+- 予実の**差異分析**: 差異 = 実績金額 − 予算金額(コストは超過が不利、売上は超過が有利)
+- **損益分析**: 課全体(売上高 − 総コスト)と案件別(売上高 − 加工費 − 外注費。期間費用は課共通)
+- 予算バージョン間の**変動比較**(例: 当初予算 vs 上期見直し)ができます
 
 操作手順は **[操作マニュアル](docs/MANUAL.md)**(計画策定 → 実績入力 → 計画変更)、
 設計の詳細は **[設計ドキュメント](docs/DESIGN.md)**(コンテキストマップ / C4 モデル / クラス図)を参照してください。
@@ -34,13 +36,13 @@ backend/
 ├── src/
 │   ├── CostManagement.Domain/          # 中心: エンティティ・値オブジェクト・集約・
 │   │   │                               #       ドメインサービス・リポジトリポート
-│   │   ├── Shared/                     #   Money, AccountingPeriod(値オブジェクト)
-│   │   ├── Projects/                   #   Project 集約
-│   │   ├── CostElements/               #   CostElement(費目マスタ)集約
-│   │   ├── Planning/                   #   CostPlan 集約(バージョン管理・承認ワークフロー)
-│   │   ├── Actuals/                    #   ActualCost 集約
-│   │   ├── Revenue/                    #   RevenuePlan / ActualRevenue 集約(売上)
-│   │   └── Analysis/                   #   差異分析・バージョン比較のドメインサービス群
+│   │   ├── Shared/                     #   Money, FiscalHalf(値オブジェクト)
+│   │   ├── Departments/                #   Department(課)集約
+│   │   ├── Projects/                   #   Project(案件。課に属するマスタ)集約
+│   │   ├── CostElements/               #   CostElement(期間費用の費目マスタ)集約
+│   │   ├── Budgeting/                  #   DepartmentBudget 集約(4区分・バージョン管理・承認)
+│   │   ├── Actuals/                    #   ActualEntry 集約(実績)
+│   │   └── Analysis/                   #   差異分析・バージョン比較・損益のドメインサービス群
 │   ├── CostManagement.Application/     # ユースケース(入力ポート)・DTO
 │   ├── CostManagement.Infrastructure/  # 出力アダプタ: Dapper + SQLite リポジトリ実装
 │   └── CostManagement.WebApi/          # 入力アダプタ: HTTP API(Minimal API)
@@ -54,18 +56,32 @@ frontend/                               # React SPA(/api を dev proxy 経由で
 
 | 要素 | 実装 |
 |---|---|
-| 集約ルート | `Project`, `CostPlan`, `ActualCost`, `CostElement`, `RevenuePlan`, `ActualRevenue` |
-| エンティティ | `PlanLine`(費目 × 売上対応品目 × 年月 × 金額), `RevenuePlanLine`(品目 × 年月 × 金額) |
-| 値オブジェクト | `Money`, `AccountingPeriod`(yyyy-MM), `ProjectId` 等の型付き ID, `CostElementCode` |
-| ドメインサービス | `VarianceAnalysisService` / `RevenueVarianceAnalysisService`(予実差異分析), `PlanComparisonService` / `RevenuePlanComparisonService`(バージョン間比較), `ProfitAnalysisService`(品目別・月別の損益突き合わせ) |
-| リポジトリ(ポート) | `IProjectRepository`, `ICostPlanRepository`, `IActualCostRepository`, `ICostElementRepository`, `IRevenuePlanRepository`, `IActualRevenueRepository` |
+| 集約ルート | `Department`(課), `Project`(案件), `DepartmentBudget`(課予算), `ActualEntry`(実績), `CostElement`(費目マスタ) |
+| エンティティ | `BudgetLine`(区分 × 案件 or 費目 × 金額。案件系区分と期間費用でキーが排他) |
+| 値オブジェクト | `Money`, `FiscalHalf`(yyyy-H1 / yyyy-H2), `DepartmentId` 等の型付き ID, `CostElementCode` |
+| ドメインサービス | `BudgetVarianceAnalysisService`(予実差異分析), `BudgetComparisonService`(バージョン間比較), `ProfitAnalysisService`(課全体・案件別の損益) |
+| リポジトリ(ポート) | `IDepartmentRepository`, `IProjectRepository`, `ICostElementRepository`, `IDepartmentBudgetRepository`, `IActualEntryRepository` |
 | ドメイン例外 | `DomainException`(不変条件違反 → HTTP 400 に変換) |
+
+### 予算の構成と区分
+
+課の半期予算は次の4区分で構成され、1つの予算としてまとめて承認します。
+
+| 区分 | 明細のキー | 意味 |
+|---|---|---|
+| 売上高(Revenue) | 案件 | 案件ごとの売上計画 |
+| 加工費(Processing) | 案件 | 案件ごとの加工費計画 |
+| 外注費(Outsourcing) | 案件 | 案件ごとの外注費計画 |
+| 期間費用(PeriodCost) | 費目 | 課共通の費用(人件費・ライセンス費など) |
+
+課の区分合計は常に明細の合計として導出されます(ヘッダに金額を持たないため、
+案件明細と課合計が食い違うことは構造的に起こりません)。
 
 ### 予算のライフサイクル
 
 ```
 当初予算 v1 (Draft) ── 承認 ──> v1 (Approved)
-                                    │ 四半期改定(明細を引き継いでドラフト起票)
+                                    │ 見直し(明細を引き継いでドラフト起票)
                                     v
                          v2 (Draft) ── 承認 ──> v2 (Approved)
                                                  v1 は Superseded(履歴として保持)
@@ -75,57 +91,45 @@ frontend/                               # React SPA(/api を dev proxy 経由で
 
 - 承認済み・失効済みの予算は編集不可(改定版の作成が必要)
 - 明細のない予算は承認不可
-- 策定中のドラフトは同時に 1 つまで
-- 同一プロジェクト内でバージョン番号は単調増加
+- 策定中のドラフトは同一(課, 半期)に 1 つまで
+- 同一(課, 半期)内でバージョン番号は単調増加
 - 新バージョンの承認により、旧承認版は自動的に失効(Superseded)
+- 売上高・加工費・外注費の明細は案件必須(その課に属する案件のみ)、期間費用の明細は費目必須
 
 ### 差異分析(変動分析)
 
 明細は金額で管理されるため、差異は「実績金額 − 予算金額」で符号付きに算出します。
 
-- **原価**: (費目, 売上対応品目, 年月) の粒度で突き合わせ。正 = 予算超過 = 不利差異
-- **売上**: (品目, 年月) の粒度で突き合わせ。正 = 売上超過 = 有利差異(原価と逆)
+- **コスト(加工費・外注費・期間費用)**: (区分, 案件 or 費目) の粒度で突き合わせ。正 = 予算超過 = 不利差異
+- **売上高**: (案件) の粒度で突き合わせ。正 = 売上超過 = 有利差異(コストと逆)
 
 同一キーに複数の実績がある場合は合算されます。予算にない実績は「予定外」として報告されます。
 
-### 損益(粗利)分析と売上対応原価
+### 損益分析
 
-原価明細の「売上対応品目」と売上の品目を突き合わせ、`ProfitAnalysisService` が
-**品目(案件)単位の粗利予実**を算出します。売上対応品目のない原価は「共通費」行に
-集計され、品目別損益の合計は常に全体の損益と一致します。あわせて粗利率・月別内訳も
-算出します(対象は最新の承認済み売上予算・原価予算)。
+`ProfitAnalysisService` が課全体と案件別の損益予実を算出します。
+
+- **課全体の損益** = 売上高 −(加工費 + 外注費 + 期間費用)。利益率(損益 ÷ 売上高)も算出
+- **案件別の損益** = 売上高 − 加工費 − 外注費。期間費用は課共通のため案件には配賦しません
+- 案件別損益の合計 − 期間費用 = 課全体の損益(整合性はテストで担保)
 
 ### 管理できる費目(費目マスタ)
 
-原価は費目単位で予算・実績を管理します。費目は4つの原価要素分類のいずれかに属します。
+費目マスタは**期間費用**の明細に使います。初回起動時に以下の標準費目がシードされます。
 
-| 分類 | 意味 |
+| コード | 費目名 |
 |---|---|
-| `Labor` | 労務費(人件費) |
-| `Expense` | 経費 |
-| `Material` | 材料費 |
-| `Overhead` | 間接費 |
+| `PERSONNEL` | 人件費 |
+| `LICENSE` | ライセンス費 |
 
-初回起動時に、SE費用管理を想定した以下の標準費目がシードされます。
+費目は `POST /api/cost-elements` で任意に追加できます(コード・名称を指定。コードは重複不可)。
+シードは `INSERT OR IGNORE` のため、追加・既存データに影響しません。
 
-| コード | 費目名 | 分類 |
-|---|---|---|
-| `LAB-SE` | SE人件費 | Labor |
-| `LAB-PM` | PM人件費 | Labor |
-| `SUB-DEV` | 外注開発費 | Expense |
-| `LIC-SW` | ライセンス費 | Expense |
-| `HW-EQP` | 機器・材料費 | Material |
-| `OVH-COM` | 共通間接費 | Overhead |
-| `EXP-TRV` | 旅費交通費 | Expense |
-| `EXP-OTH` | その他経費 | Expense |
+### スキーマの作り直し
 
-費目は `POST /api/cost-elements` で任意に追加できます(コード・名称・分類を指定。
-コードは重複不可)。シードは `INSERT OR IGNORE` のため、追加・既存データに影響しません。
-
-### スキーマ移行
-
-旧スキーマ(数量×単価で明細管理していた世代)のデータベースは、起動時に自動移行されます
-(金額 = 数量 × 単価で引き継ぎ、売上対応品目は未設定=共通費扱い)。
+旧世代(プロジェクト単位予算)のテーブルが残っているデータベースは、起動時に旧テーブルを
+破棄して新スキーマで作り直します(**データ移行は行いません**)。この処理は冪等で、
+新スキーマの既存データには影響しません。
 
 ## 実行方法
 
@@ -150,6 +154,7 @@ VS Code でのリモート開発は、拡張機能「Dev Containers」を入れ�
 コンテナ内で `dotnet restore` / `npm install` が自動実行され、ポート 5100/5173 が
 フォワードされます。ビルド・テストは `.vscode/tasks.json` のタスク
 (`backend: test`、`full: backend + frontend` など)から実行できます。
+デバッグ実行は `.vscode/launch.json` の構成(`full: backend デバッグ + frontend` など)を使います。
 
 ### バックエンド(ローカルに SDK がある場合)
 
@@ -181,7 +186,7 @@ dotnet test
 - **アプリケーション層テスト**(`tests/CostManagement.Application.Tests`) — ユースケース単位の検証。
   本物のリポジトリ実装+一時 SQLite を使い、予算の策定→改定→承認、実績計上、分析の業務ルールを確認
 - **インフラ層テスト**(`tests/CostManagement.Infrastructure.Tests`) — リポジトリの永続化往復
-  (保存した集約が同じ状態で復元されること)と、旧スキーマ(数量×単価)からの自動移行の検証
+  (保存した集約が同じ状態で復元されること)と、旧スキーマの破棄・作り直しの冪等性の検証
 - **API E2E テスト**(`tests/CostManagement.E2E.Tests`) — WebApplicationFactory で WebApi を
   まるごと起動し、計画策定→実績入力→分析→計画変更の一連の業務フローを HTTP 経由で検証
 - **アーキテクチャテスト**(`tests/CostManagement.Architecture.Tests`) — NetArchTest による
@@ -203,34 +208,33 @@ npm run test:e2e
 
 ## API 概要
 
+半期は `fiscalHalf=2026-H1`(上期)/ `fiscalHalf=2026-H2`(下期)の形式で指定します。
+
 | メソッド/パス | 説明 |
 |---|---|
-| `GET/POST /api/projects` | プロジェクト一覧・作成 |
-| `POST /api/projects/{id}/complete` | プロジェクト完了 |
-| `GET/POST /api/cost-elements` | 費目マスタ一覧・追加 |
-| `GET/POST /api/projects/{id}/plans` | 予算バージョン一覧・ドラフト起票(初回は当初予算、以降は改定版) |
-| `GET /api/plans/{planId}` | 予算詳細(明細含む) |
-| `PUT/DELETE /api/plans/{planId}/lines` | 予算明細の登録(upsert)・削除 |
-| `POST /api/plans/{planId}/approve` | 予算承認(旧承認版は自動失効) |
-| `GET/POST /api/projects/{id}/actuals` | 実績一覧・計上 |
+| `GET/POST /api/departments` | 課一覧・登録 |
+| `GET /api/departments/{id}` | 課の取得 |
+| `GET/POST /api/departments/{id}/projects` | 案件一覧・登録(案件は課に属する) |
+| `GET /api/projects/{id}` | 案件の取得 |
+| `POST /api/projects/{id}/complete` | 案件終了 |
+| `GET/POST /api/cost-elements` | 費目マスタ一覧・追加(期間費用用) |
+| `GET/POST /api/departments/{id}/budgets?fiscalHalf=` | 予算バージョン一覧・ドラフト起票(初回は当初予算、以降は改定版) |
+| `GET /api/budgets/{budgetId}` | 予算詳細(明細・4区分合計含む) |
+| `PUT/DELETE /api/budgets/{budgetId}/lines` | 予算明細の登録(upsert)・削除(案件別 or 費目別) |
+| `POST /api/budgets/{budgetId}/approve` | 予算承認(同一課・半期の旧承認版は自動失効) |
+| `GET/POST /api/departments/{id}/actuals?fiscalHalf=` | 実績一覧・計上 |
 | `DELETE /api/actuals/{actualId}` | 実績取消 |
-| `GET/POST /api/projects/{id}/revenue-plans` | 売上予算バージョン一覧・ドラフト起票 |
-| `GET /api/revenue-plans/{planId}` | 売上予算詳細(明細含む) |
-| `PUT/DELETE /api/revenue-plans/{planId}/lines` | 売上予算明細の登録(upsert)・削除 |
-| `POST /api/revenue-plans/{planId}/approve` | 売上予算承認(旧承認版は自動失効) |
-| `GET/POST /api/projects/{id}/actual-revenues` | 売上実績一覧・計上 |
-| `DELETE /api/actual-revenues/{actualId}` | 売上実績取消 |
-| `GET /api/projects/{id}/variance?planId=&from=&to=` | 原価の予実差異分析(バージョン・期間指定可) |
-| `GET /api/projects/{id}/revenue-variance?planId=&from=&to=` | 売上の予実差異分析 |
-| `GET /api/projects/{id}/plan-comparison?baseVersion=&targetVersion=` | 原価予算バージョン間比較 |
-| `GET /api/projects/{id}/revenue-plan-comparison?baseVersion=&targetVersion=` | 売上予算バージョン間比較 |
-| `GET /api/projects/{id}/profit?from=&to=` | 損益(粗利)予実サマリ(全体・品目別・月別) |
-| `GET /api/projects/{id}/revenue-items` | 売上対応品目の候補一覧(入力補完用) |
+| `GET /api/departments/{id}/variance?fiscalHalf=&budgetId=` | 予実差異分析(区分別+案件/費目内訳。バージョン指定可) |
+| `GET /api/departments/{id}/budget-comparison?fiscalHalf=&baseVersion=&targetVersion=` | 予算バージョン間比較(区分別) |
+| `GET /api/departments/{id}/profit?fiscalHalf=&budgetId=` | 損益予実サマリ(課全体・案件別・期間費用) |
 
 ## 画面
 
-- **プロジェクト一覧 / 詳細** — プロジェクト登録、原価・売上それぞれの予算バージョンの一覧・改定・承認
-- **予算編集** — 原価予算(費目 × 売上対応品目 × 年月 × 金額)/ 売上予算(品目 × 年月 × 金額)のドラフト明細編集。売上対応品目は売上側の品目から入力補完
-- **実績入力** — 原価実績(売上対応品目つき)・売上実績の計上(同一キーへの複数計上に対応)
-- **予実差異分析・損益** — タブ構成: 原価差異 / 売上差異 / 損益(粗利)。月別チャート、費目・品目別差異チャート、品目別損益テーブル(共通費行を含む)、月別内訳
-- **予算バージョン比較** — 原価予算・売上予算それぞれで任意の 2 バージョン間の増減を明細単位で比較
+- **課一覧 / 課詳細** — 課の登録、対象半期の選択、承認済み予算の4区分サマリ、
+  予算バージョンの一覧・改定・承認、案件マスタの管理(登録・終了)
+- **予算編集** — 区分(売上高/加工費/外注費/期間費用)を選び、案件別または費目別に
+  半期一括の金額でドラフト明細を編集。区分合計・計画損益はサマリタイルに自動反映
+- **実績入力** — 区分に応じて案件または費目を選んで計上(同一キーへの複数計上に対応)
+- **予実差異分析・損益** — タブ構成: 予実差異(区分別サブトータル+案件/費目別明細、
+  区分別チャート)/ 損益(課全体サマリ+案件別損益テーブル+期間費用(課共通)行+利益率)
+- **予算バージョン比較** — 同一課・半期の任意の 2 バージョン間の増減を区分別・明細単位で比較

@@ -1,6 +1,6 @@
 ---
 name: domain-design
-description: ドメインモデルの変更・追加・設計判断を行うときに必ず読む。集約の追加、不変条件の変更、予算バージョン管理、売上と原価の対応付け、分析サービスの追加など、backend/src/CostManagement.Domain に触れる作業全般が対象。
+description: ドメインモデルの変更・追加・設計判断を行うときに必ず読む。集約の追加、不変条件の変更、課予算のバージョン管理、区分(売上高/加工費/外注費/期間費用)と案件・費目の対応付け、分析サービスの追加など、backend/src/CostManagement.Domain に触れる作業全般が対象。
 model: claude-opus-4-8
 ---
 
@@ -11,32 +11,49 @@ model: claude-opus-4-8
 
 ## このシステムのドメインの決定事項(再検討しない)
 
-- **明細は金額のみで管理する。数量×単価は使わない**(SE費用管理が主用途)。
+- **管理単位は 課(Department)× 半期(FiscalHalf: yyyy-H1/H2)**。
+  2026-07-11 の要件変更でプロジェクト単位予算から再構築済み(docs/requests/ 参照)
+- **予算は単一集約 DepartmentBudget**。売上高(Revenue)・加工費(Processing)・
+  外注費(Outsourcing)・期間費用(PeriodCost)の4区分を1つの予算としてまとめて承認する
+  (旧世代の「売上と原価の別集約・品目名の緩い結合」は廃止)
+- **明細は金額のみ・半期一括で管理する。数量×単価、年月の粒度は使わない**。
   そのため価格差異・数量差異の分解は存在せず、差異 = 実績金額 − 予算金額 のみ
-- **売上(RevenuePlan/ActualRevenue)と原価(CostPlan/ActualCost)は別集約**で、
-  互いに ID 参照しない。対応付けは「品目名(文字列)」の緩い結合
-  (原価側の `RevenueItem`、null = 共通費)。これにより売上予算と原価予算を独立に改定できる
+- **明細キーの排他**: 売上高・加工費・外注費 = (区分, 案件ID)で案件必須・費目不可 /
+  期間費用 = (期間費用, 費目コード)で費目必須・案件不可。
+  検証は `BudgetCategories.ValidateKey`(BudgetLine と ActualEntry の両方から使う)
+- **課の区分合計 = 常に明細合計**(`CategoryTotal`)。ヘッダに金額を持たないことで
+  課レベルの直接入力を構造的に不可にしている。この構造を崩さない
+- **案件(Project)は課に属するマスタ**(DepartmentId 参照)。予算策定単位ではなく明細の内訳次元。
+  「明細の案件は同一課所属」の検証は Application 層(DepartmentBudgetService/ActualEntryService)
+- **費目(CostElement)は期間費用専用**。シードは人件費(PERSONNEL)・ライセンス費(LICENSE)、
+  マスタで拡張可能。原価要素分類(CostElementType)は廃止済み
 - **予算のバージョン管理**: v1=当初、改定は明細コピーで新バージョン起票。
-  Draft→Approved→Superseded。承認済みは編集不可。ドラフトは同時1件。
-  明細なしは承認不可。承認時に旧承認版を Supersede するのは Application 層の責務
-- 明細キー: 原価 = (費目, 売上対応品目, 年月) / 売上 = (品目, 年月)。同一キーは上書き(Upsert)
-- 実績は同一キーに複数計上でき、分析時に合算する
+  Draft→Approved→Superseded。承認済みは編集不可。ドラフトは同一(課, 半期)に1件。
+  明細なしは承認不可。承認時に同一(課, 半期)の旧承認版を Supersede するのは Application 層の責務
+- 同一キーは上書き(Upsert)。実績(ActualEntry)は同一キーに複数計上でき、分析時に合算する
+- **損益**: 課全体 = 売上高 −(加工費+外注費+期間費用)/ 案件別 = 売上高 − 加工費 − 外注費
+  (期間費用は課共通、案件に配賦しない)。「案件別損益の合計 − 期間費用 = 全体の損益」が不変条件
+- 差異の符号: コスト系は正=不利、売上高は正=有利(VarianceLine.IsFavorable/IsAdverse が区分で分岐)
 
 ## 戦術パターンの規約(アーキテクチャテストで強制される)
 
 - 集約ルート・エンティティ・ドメインサービスは `sealed`
-- 値オブジェクトは `readonly record struct`(Money, AccountingPeriod, 型付きID, CostElementCode)
+- 値オブジェクトは `readonly record struct`(Money, FiscalHalf, 型付きID, CostElementCode)
 - 集約に公開セッターを置かない。状態変更はドメインメソッド(`Approve()` 等)のみ
-- リポジトリはポート(interface)としてドメイン層に定義。実装はインフラ層のみ
+- リポジトリはポート(interface)としてドメイン層に定義。実装はインフラ層のみ。
+  **ポート数(現在5)・VO列挙・集約列挙は ArchitectureTests.cs に固定値で書かれている**ため、
+  集約を増減したら必ず同時に更新する
 - ドメイン例外は `DomainException`(日本語メッセージ)。WebApi が 400 に変換する。
   未検出は Application 層の `NotFoundException` → 404
-- 永続化からの復元は `Restore(...)` 静的ファクトリ(検証をスキップして状態を再構築)
+- 永続化からの復元は `Restore(...)` 静的ファクトリ(検証をスキップして状態を再構築。
+  ただし BudgetLine の区分×案件/費目の排他検証は Restore 経由でも internal ctor で走る)
 - 分析はステートレスなドメインサービス + イミュータブルな record レポート。
-  「品目別の合計 = 全体」のような整合性はテストで担保する
+  「案件別の合計 = 全体」のような整合性はテストで担保する
 
 ## 変更時の必須手順
 
 1. ドメイン変更 → `CostManagement.Domain.Tests` を先に更新(日本語テスト名)
 2. Restore ファクトリ・リポジトリ・DTO・AnalysisService への波及を必ず追う
-3. スキーマが変わる場合は docs-update スキルと ci-and-env スキルの移行手順に従う
+3. スキーマが変わる場合は docs-update スキルと ci-and-env スキルの手順に従う
 4. `docs/DESIGN.md` のクラス図・不変条件表を同期する
+5. ArchitectureTests.cs の固定値(ポート数・VO列挙・集約列挙)を確認する

@@ -19,31 +19,29 @@
 flowchart TB
     subgraph BC["境界づけられたコンテキスト: 総合原価管理 (Core Domain)"]
         direction TB
-        SK["共有カーネル<br/>(Shared Kernel)<br/>Money / AccountingPeriod / DomainException"]
+        SK["共有カーネル<br/>(Shared Kernel)<br/>Money / FiscalHalf / DomainException"]
 
-        PJ["プロジェクト<br/>(Projects)<br/>管理単位の定義"]
-        CE["費目マスタ<br/>(CostElements)<br/>原価要素の分類"]
-        PL["原価予算<br/>(Planning)<br/>バージョン管理・承認"]
-        RV["売上予算・売上実績<br/>(Revenue)<br/>バージョン管理・承認"]
-        AC["原価実績<br/>(Actuals)<br/>都度計上"]
+        DP["課<br/>(Departments)<br/>予算策定の管理単位"]
+        PJ["案件<br/>(Projects)<br/>課に属する内訳マスタ"]
+        CE["費目マスタ<br/>(CostElements)<br/>期間費用の内訳"]
+        BG["課予算<br/>(Budgeting)<br/>課×半期・4区分・バージョン管理・承認"]
+        AC["実績<br/>(Actuals)<br/>都度計上"]
         AN["分析<br/>(Analysis)<br/>差異分析・バージョン比較・損益"]
 
-        PJ -->|管理単位を提供| PL
-        PJ -->|管理単位を提供| RV
-        PJ -->|管理単位を提供| AC
-        CE -->|費目コードを参照| PL
+        DP -->|管理単位を提供| BG
+        DP -->|管理単位を提供| AC
+        DP -->|案件が所属| PJ
+        PJ -->|"案件IDを参照<br/>(売上高・加工費・外注費の明細)"| BG
+        PJ -->|案件IDを参照| AC
+        CE -->|"費目コードを参照<br/>(期間費用の明細)"| BG
         CE -->|費目コードを参照| AC
-        RV -.->|"品目名で対応付け<br/>(売上対応品目)"| PL
-        RV -.->|"品目名で対応付け"| AC
 
-        PL -->|予算を入力| AN
+        BG -->|予算を入力| AN
         AC -->|実績を入力| AN
-        RV -->|売上予実を入力| AN
     end
 
-    SK --- PJ
-    SK --- PL
-    SK --- RV
+    SK --- DP
+    SK --- BG
     SK --- AC
 
     EXT1["会計システム(将来連携の候補・未実装)"]
@@ -54,10 +52,13 @@ flowchart TB
 
 **設計上のポイント**
 
-- 「売上」と「原価」は集約を分け、**品目名(文字列)による緩い対応付け**で結合しています。
-  集約間を ID で強く参照しないことで、売上予算と原価予算を独立に改定できます
+- 予算は**課 × 半期の単一集約**(DepartmentBudget)で、売上高・加工費・外注費・期間費用の
+  4区分をまとめて1承認します(売上と原価を別集約で独立承認する方式は採っていません)
+- 課の区分合計は**常に明細の合計として導出**します(ヘッダに金額を持たない=直接入力不可を
+  構造的に保証)
+- 案件・費目はマスタとして ID / コードで参照します(旧世代の「品目名の緩い結合」は廃止)
 - 分析(Analysis)は状態を持たず、予算・実績の集約を入力として受け取る
-  **ドメインサービス群**として実現しています(下流のコンフォーミスト的な位置づけ)
+  **ドメインサービス群**として実現しています
 
 ## 2. C4 モデル
 
@@ -66,8 +67,8 @@ flowchart TB
 ```mermaid
 C4Context
     title システムコンテキスト図
-    Person(manager, "原価管理者", "予算の策定・承認、実績の計上、差異・損益の分析を行う")
-    System(cms, "総合原価管理システム", "原価・売上高の予実管理と差異・損益分析")
+    Person(manager, "原価管理者", "課の半期予算の策定・承認、実績の計上、差異・損益の分析を行う")
+    System(cms, "総合原価管理システム", "課別半期予算の予実管理と差異・損益分析")
     System_Ext(acct, "会計システム", "(将来連携の候補・未実装)")
     Rel(manager, cms, "利用する", "ブラウザ/HTTPS")
     Rel(cms, acct, "実績データ連携(将来)", "未実装")
@@ -82,7 +83,7 @@ C4Container
     System_Boundary(cms, "総合原価管理システム") {
         Container(spa, "フロントエンド SPA", "React 19 + TypeScript + Vite", "予算編集・実績入力・差異/損益ダッシュボード")
         Container(api, "WebApi", "ASP.NET Core (.NET 10) Minimal API", "ユースケースの公開。ヘキサゴナルアーキテクチャの入力アダプタ")
-        ContainerDb(db, "データベース", "SQLite", "プロジェクト/費目/予算(版管理)/実績")
+        ContainerDb(db, "データベース", "SQLite", "課/案件/費目/課予算(版管理)/実績")
     }
     Rel(manager, spa, "操作", "HTTPS")
     Rel(spa, api, "REST /api/*", "JSON/HTTP")
@@ -96,9 +97,9 @@ C4Component
     title コンポーネント図(WebApi)— ポート&アダプタ
     Container_Boundary(api, "WebApi (.NET 10)") {
         Component(endpoints, "Minimal API エンドポイント", "CostManagement.WebApi", "入力アダプタ。HTTP⇔DTO変換、例外→HTTPステータス変換")
-        Component(app, "アプリケーションサービス", "CostManagement.Application", "ユースケース(入力ポート): Project/CostPlan/RevenuePlan/ActualCost/ActualRevenue/Analysis")
+        Component(app, "アプリケーションサービス", "CostManagement.Application", "ユースケース(入力ポート): Department/Project/CostElement/DepartmentBudget/ActualEntry/Analysis")
         Component(domain, "ドメイン", "CostManagement.Domain", "集約・値オブジェクト・ドメインサービス・リポジトリポート(中心。他層へ依存しない)")
-        Component(infra, "Dapper リポジトリ", "CostManagement.Infrastructure", "出力アダプタ。リポジトリポートの実装、スキーマ初期化・移行")
+        Component(infra, "Dapper リポジトリ", "CostManagement.Infrastructure", "出力アダプタ。リポジトリポートの実装、スキーマ初期化(旧世代テーブルの破棄・作り直し)")
     }
     ContainerDb(db, "SQLite", "", "")
     Rel(endpoints, app, "呼び出し")
@@ -122,32 +123,49 @@ classDiagram
         +bool IsNegative
         +加算・減算・定数倍の演算子を提供()
     }
-    class AccountingPeriod {
+    class FiscalHalf {
         <<Value Object>>
         +int Year
-        +int Month
-        +int Quarter
-        +Parse(string) AccountingPeriod$
-        +CompareTo(AccountingPeriod) int
+        +HalfTerm Half ※H1 上期・H2 下期
+        +Parse(string) FiscalHalf$
+        +CompareTo(FiscalHalf) int
+    }
+    class HalfTerm {
+        <<enumeration>>
+        H1 上期
+        H2 下期
     }
     class DomainException {
         <<Exception>>
         不変条件違反(HTTP 400 に変換)
     }
+    FiscalHalf --> HalfTerm
 ```
 
-### 3-2. プロジェクト・費目マスタ
+### 3-2. 課・案件・費目マスタ
 
 ```mermaid
 classDiagram
+    class Department {
+        <<Aggregate Root>>
+        +DepartmentId Id
+        +string Code
+        +string Name
+        +Create(code, name, now) Department$
+        +Rename(name)
+    }
+    class DepartmentId {
+        <<Value Object>>
+        +Guid Value
+    }
     class Project {
         <<Aggregate Root>>
         +ProjectId Id
+        +DepartmentId DepartmentId ※所属する課
         +string Code
         +string Name
-        +int FiscalYear
         +ProjectStatus Status
-        +Create(code, name, fiscalYear, now) Project$
+        +Create(departmentId, code, name, now) Project$
         +Rename(name)
         +Complete()
     }
@@ -164,131 +182,105 @@ classDiagram
         <<Aggregate Root>>
         +CostElementCode Code
         +string Name
-        +CostElementType Type
-        +Create(code, name, type) CostElement$
+        +Create(code, name) CostElement$
     }
     class CostElementCode {
         <<Value Object>>
         +string Value
     }
-    class CostElementType {
-        <<enumeration>>
-        Material 材料費
-        Labor 労務費
-        Overhead 間接費
-        Expense 経費
-    }
+    Department --> DepartmentId
     Project --> ProjectId
     Project --> ProjectStatus
+    Project ..> Department : DepartmentId で参照
     CostElement --> CostElementCode
-    CostElement --> CostElementType
 ```
 
-### 3-3. 予算・実績(中核の集約)
+### 3-3. 課予算・実績(中核の集約)
 
 ```mermaid
 classDiagram
-    class PlanStatus {
+    class BudgetStatus {
         <<enumeration>>
         Draft 策定中
         Approved 承認済
         Superseded 失効
     }
+    class BudgetCategory {
+        <<enumeration>>
+        Revenue 売上高 ※案件別
+        Processing 加工費 ※案件別
+        Outsourcing 外注費 ※案件別
+        PeriodCost 期間費用 ※費目別
+    }
 
-    class CostPlan {
+    class DepartmentBudget {
         <<Aggregate Root>>
-        +CostPlanId Id
-        +ProjectId ProjectId
+        +DepartmentBudgetId Id
+        +DepartmentId DepartmentId
+        +FiscalHalf FiscalHalf
         +int Version
         +string Label
-        +PlanStatus Status
+        +BudgetStatus Status
         +DateTime? ApprovedAt
-        +Money TotalAmount
-        +CreateInitial(projectId, label, now) CostPlan$
-        +ReviseFrom(basePlan, nextVersion, label, now) CostPlan$
-        +UpsertLine(elementCode, revenueItem, period, amount)
-        +RemoveLine(elementCode, revenueItem, period)
+        +CategoryTotal(category) Money ※常に明細合計
+        +Money TotalCost ※加工費+外注費+期間費用
+        +Money PlannedProfit ※売上高−総コスト
+        +CreateInitial(departmentId, fiscalHalf, label, now) DepartmentBudget$
+        +ReviseFrom(baseBudget, nextVersion, label, now) DepartmentBudget$
+        +UpsertProjectLine(category, projectId, amount)
+        +UpsertPeriodCostLine(elementCode, amount)
+        +RemoveProjectLine(category, projectId)
+        +RemovePeriodCostLine(elementCode)
         +Approve(now)
         +Supersede()
     }
-    class PlanLine {
+    class BudgetLine {
         <<Entity>>
         +Guid Id
-        +CostElementCode ElementCode
-        +string? RevenueItem ※売上対応品目・null は共通費
-        +AccountingPeriod Period
-        +Money Amount
+        +BudgetCategory Category
+        +ProjectId? ProjectId ※案件系区分で必須
+        +CostElementCode? ElementCode ※期間費用で必須
+        +Money Amount ※半期一括
     }
 
-    class RevenuePlan {
+    class ActualEntry {
         <<Aggregate Root>>
-        +RevenuePlanId Id
-        +ProjectId ProjectId
-        +int Version
-        +string Label
-        +PlanStatus Status
-        +DateTime? ApprovedAt
-        +Money TotalAmount
-        +CreateInitial(projectId, label, now) RevenuePlan$
-        +ReviseFrom(basePlan, nextVersion, label, now) RevenuePlan$
-        +UpsertLine(itemName, period, amount)
-        +RemoveLine(itemName, period)
-        +Approve(now)
-        +Supersede()
-    }
-    class RevenuePlanLine {
-        <<Entity>>
-        +Guid Id
-        +string ItemName 品目(案件名)
-        +AccountingPeriod Period
-        +Money Amount
-    }
-
-    class ActualCost {
-        <<Aggregate Root>>
-        +ActualCostId Id
-        +ProjectId ProjectId
-        +CostElementCode ElementCode
-        +string? RevenueItem ※売上対応品目・null は共通費
-        +AccountingPeriod Period
+        +ActualEntryId Id
+        +DepartmentId DepartmentId
+        +FiscalHalf FiscalHalf
+        +BudgetCategory Category
+        +ProjectId? ProjectId ※案件系区分で必須
+        +CostElementCode? ElementCode ※期間費用で必須
         +Money Amount
         +string? Note
-        +Record(...) ActualCost$
-    }
-    class ActualRevenue {
-        <<Aggregate Root>>
-        +ActualRevenueId Id
-        +ProjectId ProjectId
-        +string ItemName 品目
-        +AccountingPeriod Period
-        +Money Amount
-        +string? Note
-        +Record(...) ActualRevenue$
+        +Record(...) ActualEntry$
     }
 
-    CostPlan "1" *-- "0..*" PlanLine : 明細(費目×品目×年月で一意)
-    RevenuePlan "1" *-- "0..*" RevenuePlanLine : 明細(品目×年月で一意)
-    CostPlan --> PlanStatus
-    RevenuePlan --> PlanStatus
-    CostPlan ..> Project : ProjectId で参照
-    RevenuePlan ..> Project : ProjectId で参照
-    ActualCost ..> Project : ProjectId で参照
-    ActualRevenue ..> Project : ProjectId で参照
-    PlanLine ..> CostElement : CostElementCode で参照
-    ActualCost ..> CostElement : CostElementCode で参照
-    PlanLine ..> RevenuePlanLine : 品目名で対応付け(緩い結合)
+    DepartmentBudget "1" *-- "0..*" BudgetLine : 明細(区分×案件 or 費目で一意)
+    DepartmentBudget --> BudgetStatus
+    BudgetLine --> BudgetCategory
+    ActualEntry --> BudgetCategory
+    DepartmentBudget ..> Department : DepartmentId で参照
+    ActualEntry ..> Department : DepartmentId で参照
+    BudgetLine ..> Project : ProjectId で参照
+    BudgetLine ..> CostElement : CostElementCode で参照
+    ActualEntry ..> Project : ProjectId で参照
+    ActualEntry ..> CostElement : CostElementCode で参照
 ```
 
 **不変条件(集約が強制するルール)**
 
 | 集約 | 不変条件 |
 |---|---|
-| CostPlan / RevenuePlan | 承認済み・失効済みは編集不可(編集は Draft のみ) |
+| DepartmentBudget | 承認済み・失効済みは編集不可(編集は Draft のみ) |
 | 〃 | 明細のない予算は承認不可 |
-| 〃 | 明細キー(費目 × 売上対応品目 × 年月/品目 × 年月)は集約内で一意(同一キーは上書き) |
+| 〃 | 明細キー(区分 × 案件/期間費用 × 費目)は集約内で一意(同一キーは上書き) |
+| 〃 | 売上高・加工費・外注費の明細は案件必須(費目は指定不可)。期間費用の明細は費目必須(案件は指定不可) |
 | 〃 | 改定版のバージョン番号は基となる版より大きい |
 | 〃 | 金額は0以上 |
-| ActualCost / ActualRevenue | 金額は0以上。同一キーへの複数計上を許容(分析時に合算) |
+| 〃 | 区分合計はヘッダに持たず常に明細合計として導出(課レベルの直接入力は構造的に不可) |
+| ActualEntry | 区分と案件/費目の排他は予算明細と同じ。金額は0以上。同一キーへの複数計上を許容(分析時に合算) |
+| (Application 層) | ドラフトは同一(課, 半期)に1つまで。承認時に旧承認版を Supersede。案件は同一課所属のみ明細に使える |
 
 ### 3-4. リポジトリ(ポート)
 
@@ -296,11 +288,19 @@ classDiagram
 
 ```mermaid
 classDiagram
+    class IDepartmentRepository {
+        <<interface>>
+        +FindByIdAsync(DepartmentId) Department?
+        +FindByCodeAsync(string) Department?
+        +ListAsync() IReadOnlyList~Department~
+        +AddAsync(Department)
+        +UpdateAsync(Department)
+    }
     class IProjectRepository {
         <<interface>>
         +FindByIdAsync(ProjectId) Project?
         +FindByCodeAsync(string) Project?
-        +ListAsync() IReadOnlyList~Project~
+        +ListByDepartmentAsync(DepartmentId) IReadOnlyList~Project~
         +AddAsync(Project)
         +UpdateAsync(Project)
     }
@@ -310,37 +310,21 @@ classDiagram
         +ListAsync() IReadOnlyList~CostElement~
         +AddAsync(CostElement)
     }
-    class ICostPlanRepository {
+    class IDepartmentBudgetRepository {
         <<interface>>
-        +FindByIdAsync(CostPlanId) CostPlan?
-        +ListByProjectAsync(ProjectId) IReadOnlyList~CostPlan~
-        +FindLatestApprovedAsync(ProjectId) CostPlan?
-        +GetMaxVersionAsync(ProjectId) int
-        +AddAsync(CostPlan)
-        +UpdateAsync(CostPlan)
+        +FindByIdAsync(DepartmentBudgetId) DepartmentBudget?
+        +ListAsync(DepartmentId, FiscalHalf) IReadOnlyList~DepartmentBudget~
+        +FindLatestApprovedAsync(DepartmentId, FiscalHalf) DepartmentBudget?
+        +GetMaxVersionAsync(DepartmentId, FiscalHalf) int
+        +AddAsync(DepartmentBudget)
+        +UpdateAsync(DepartmentBudget)
     }
-    class IRevenuePlanRepository {
+    class IActualEntryRepository {
         <<interface>>
-        +FindByIdAsync(RevenuePlanId) RevenuePlan?
-        +ListByProjectAsync(ProjectId) IReadOnlyList~RevenuePlan~
-        +FindLatestApprovedAsync(ProjectId) RevenuePlan?
-        +GetMaxVersionAsync(ProjectId) int
-        +AddAsync(RevenuePlan)
-        +UpdateAsync(RevenuePlan)
-    }
-    class IActualCostRepository {
-        <<interface>>
-        +FindByIdAsync(ActualCostId) ActualCost?
-        +ListByProjectAsync(ProjectId) IReadOnlyList~ActualCost~
-        +AddAsync(ActualCost)
-        +DeleteAsync(ActualCostId)
-    }
-    class IActualRevenueRepository {
-        <<interface>>
-        +FindByIdAsync(ActualRevenueId) ActualRevenue?
-        +ListByProjectAsync(ProjectId) IReadOnlyList~ActualRevenue~
-        +AddAsync(ActualRevenue)
-        +DeleteAsync(ActualRevenueId)
+        +FindByIdAsync(ActualEntryId) ActualEntry?
+        +ListAsync(DepartmentId, FiscalHalf) IReadOnlyList~ActualEntry~
+        +AddAsync(ActualEntry)
+        +DeleteAsync(ActualEntryId)
     }
 ```
 
@@ -351,94 +335,76 @@ classDiagram
 
 ```mermaid
 classDiagram
-    class VarianceAnalysisService {
+    class BudgetVarianceAnalysisService {
         <<Domain Service>>
-        +Analyze(CostPlan, actuals, from?, to?) VarianceReport
+        +Analyze(DepartmentBudget, actuals) VarianceReport
     }
-    class RevenueVarianceAnalysisService {
+    class BudgetComparisonService {
         <<Domain Service>>
-        +Analyze(RevenuePlan, actuals, from?, to?) RevenueVarianceReport
+        +Compare(baseBudget, targetBudget) BudgetComparisonReport
     }
     class ProfitAnalysisService {
         <<Domain Service>>
-        +Analyze(RevenueVarianceReport, VarianceReport) ProfitReport
-    }
-    class PlanComparisonService {
-        <<Domain Service>>
-        +Compare(basePlan, targetPlan) PlanComparisonReport
-    }
-    class RevenuePlanComparisonService {
-        <<Domain Service>>
-        +Compare(basePlan, targetPlan) RevenuePlanComparisonReport
+        +Analyze(VarianceReport) ProfitReport
     }
 
     class VarianceReport {
         <<record>>
+        +List~CategoryVariance~ Categories
+        +売上高とコストの予実・差異の合計
+    }
+    class CategoryVariance {
+        <<record>>
+        +BudgetCategory Category
         +List~VarianceLine~ Lines
-        +decimal TotalPlannedAmount
-        +decimal TotalActualAmount
-        +decimal TotalVariance
+        +区分サブトータル(予算・実績・差異)
     }
     class VarianceLine {
         <<record>>
-        +string ElementCode
-        +string? RevenueItem
-        +AccountingPeriod Period
+        +BudgetCategory Category
+        +Guid? ProjectId ※案件系区分
+        +string? ElementCode ※期間費用
         +decimal PlannedAmount
         +decimal ActualAmount
-        +decimal TotalVariance ※実績−予算
+        +decimal Variance ※実績−予算
         +bool IsUnplanned ※予定外
-        +bool IsAdverse ※正は予算超過で不利
+        +bool IsFavorable ※売上は正が有利・コストは負が有利
     }
-    class RevenueVarianceReport {
+    class BudgetComparisonReport {
         <<record>>
-        +List~RevenueVarianceLine~ Lines
-        +decimal TotalVariance ほか合計
-    }
-    class RevenueVarianceLine {
-        <<record>>
-        +string ItemName
-        +AccountingPeriod Period
-        +decimal PlannedAmount
-        +decimal ActualAmount
-        +decimal TotalVariance
-        +bool IsFavorable ※正は売上超過で有利
+        +バージョン間の区分別・明細別の増減
     }
     class ProfitReport {
         <<record>>
-        +売上・原価・粗利の予実と差異
+        +課全体の売上高・総コスト・損益の予実と差異
+        +期間費用の予実 ※課共通
         +decimal? PlannedMarginRate
         +decimal? ActualMarginRate
-        +List~ProfitItemLine~ ItemLines
-        +List~ProfitPeriodLine~ PeriodLines
+        +List~ProjectProfitLine~ ProjectLines
     }
-    class ProfitItemLine {
+    class ProjectProfitLine {
         <<record>>
-        +string? ItemName ※null は共通費
-        +品目別の売上・原価・粗利の予実
-    }
-    class PlanComparisonReport {
-        <<record>>
-        +バージョン間の明細増減と合計
+        +Guid ProjectId
+        +案件別の売上高・加工費・外注費・損益の予実
     }
 
-    VarianceAnalysisService ..> VarianceReport : 生成
-    VarianceReport *-- VarianceLine
-    RevenueVarianceAnalysisService ..> RevenueVarianceReport : 生成
-    RevenueVarianceReport *-- RevenueVarianceLine
+    BudgetVarianceAnalysisService ..> VarianceReport : 生成
+    VarianceReport *-- CategoryVariance
+    CategoryVariance *-- VarianceLine
+    BudgetComparisonService ..> BudgetComparisonReport : 生成
     ProfitAnalysisService ..> ProfitReport : 生成
-    ProfitReport *-- ProfitItemLine
     ProfitAnalysisService ..> VarianceReport : 入力
-    ProfitAnalysisService ..> RevenueVarianceReport : 入力
-    PlanComparisonService ..> PlanComparisonReport : 生成
-    RevenuePlanComparisonService ..> PlanComparisonReport : 同型のレポートを生成
+    ProfitReport *-- ProjectProfitLine
 ```
 
 **分析の計算規則**
 
 - 差異 = 実績金額 − 予算金額(符号付き)
-  - 原価: 正 = 予算超過 = **不利差異**(`IsAdverse`)
-  - 売上: 正 = 売上超過 = **有利差異**(`IsFavorable`)
-- 突き合わせ粒度: 原価 = (費目, 売上対応品目, 年月)、売上 = (品目, 年月)。同一キーの実績は合算
-- 損益: 売上品目と原価の売上対応品目を突き合わせて品目別粗利を算出。
-  対応品目のない原価は「共通費」行に集計され、**品目別の合計は常に全体の損益と一致**する
+  - コスト(加工費・外注費・期間費用): 正 = 予算超過 = **不利差異**(`IsAdverse`)
+  - 売上高: 正 = 売上超過 = **有利差異**(`IsFavorable`)
+- 突き合わせ粒度: (区分, 案件) または (期間費用, 費目)。半期一括のため年月の軸はない。
+  同一キーの実績は合算
+- 損益:
+  - 課全体 = 売上高 −(加工費 + 外注費 + 期間費用)。利益率 = 損益 ÷ 売上高(売上高0は null)
+  - 案件別 = 売上高 − 加工費 − 外注費(期間費用は課共通のため配賦しない)
+  - **案件別損益の合計 − 期間費用 = 課全体の損益**(整合性はテストで担保)

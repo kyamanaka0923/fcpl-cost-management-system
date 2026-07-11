@@ -37,12 +37,17 @@ model: claude-sonnet-5
 
 ## DBスキーマ変更の手順(重要)
 
+方針: 旧世代スキーマからの**データ移行は行わない**(2026-07-11 の課×半期再構築で決定)。
+旧世代のテーブルは起動時に破棄して新スキーマで作り直す(`DropLegacyTables`)。
+
 1. `DatabaseInitializer` の CREATE TABLE を新スキーマに更新
-2. 旧スキーマからの**自動移行**を `MigrateLegacyQuantitySchema` と同じパターンで実装:
-   pragma_table_info で旧カラムを検出 → 旧テーブルを RENAME → 新テーブル作成 → SELECT で変換コピー → DROP
-3. 移行は**冪等**にする(2回実行しても壊れない)
-4. `Infrastructure.Tests` の LegacyMigrationTests に移行テストを追加(旧スキーマを生SQLで再現)
-5. README の「スキーマ移行」節を更新
+2. 同名テーブルの構造が変わる場合は `DropLegacyTables` に判定を追加:
+   pragma_table_info で**旧世代にしかないカラム**を検出したら DROP(旧世代専用テーブルは
+   無条件 `DROP TABLE IF EXISTS`、子 → 親の順)
+3. 破棄処理は**冪等**にする(2回実行しても壊れない。新スキーマの既存データには触れない)
+4. `Infrastructure.Tests` の SchemaResetTests にテストを追加(旧スキーマを生SQLで再現 →
+   Initialize → 旧テーブル消滅・新スキーマ・シード確認、冪等性、新スキーマデータの保持)
+5. README の「スキーマの作り直し」節を更新
 
 ## プッシュ運用
 

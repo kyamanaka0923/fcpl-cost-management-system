@@ -19,15 +19,16 @@ model: claude-sonnet-5
 | プロジェクト | 対象 | 方式 |
 |---|---|---|
 | Domain.Tests | 不変条件・計算規則 | 純粋単体 |
-| Application.Tests | ユースケース | `UseCaseFixture`(一時SQLite+本物リポジトリ+`FixedClock`) |
-| Infrastructure.Tests | 永続化往復・旧スキーマ移行 | `RepositoryFixture`(一時SQLite) |
+| Application.Tests | ユースケース | `UseCaseFixture`(一時SQLite+本物リポジトリ+`FixedClock`。日本語ヘルパ: `課を作成`/`案件を作成`/`承認済み予算を作成`) |
+| Infrastructure.Tests | 永続化往復・スキーマ作り直し | `RepositoryFixture`(一時SQLite)+ `SchemaResetTests` |
 | E2E.Tests | HTTP経由の業務フロー | `WebApplicationFactory<Program>`(`ApiFixture`) |
 | Architecture.Tests | 依存ルール | NetArchTest |
 | frontend/e2e | ブラウザ操作 | @playwright/test(webServerで両サーバ自動起動) |
 
 - 新しいユースケース → Application.Tests に業務フローとして追加
 - 新しいリポジトリ/カラム → Infrastructure.Tests にラウンドトリップを追加
-- スキーマ変更 → LegacyMigrationTests に移行+冪等性テストを追加
+- スキーマ変更 → `SchemaResetTests` に「旧テーブルの破棄・作り直し+冪等性(2回実行)+
+  新スキーマの既存データ保持」のテストを追加(レガシー移行は行わない方針。ci-and-env 参照)
 - 一時DBは `Path.GetTempPath()` に GUID 名で作り Dispose で削除。テスト間で共有しない
 
 ## 既知の落とし穴(このセッションで実際に踏んだもの)
@@ -39,7 +40,8 @@ model: claude-sonnet-5
   `.first()` か行スコープで特定する。バッジは `.locator('.badge', { hasText: ... })`。
   説明文にも同じ語が出る(「失効」等)のでテキスト一致は要注意
 - **null キーの Dictionary**: `GroupBy(x => x.NullableKey).ToDictionary(...)` は null キーで落ちる。
-  null は Where で分離して別集計する(ProfitAnalysisService 参照)
+  null になりうるキーは Where で分離してから集計する(ProfitAnalysisService は案件系区分に
+  絞ってから `ProjectId!.Value` で GroupBy している。タプルキーなら null を含んでも安全)
 - WebApplicationFactory を使うため `Program.cs` 末尾の `public partial class Program {}` を消さない
 
 ## 実行方法
