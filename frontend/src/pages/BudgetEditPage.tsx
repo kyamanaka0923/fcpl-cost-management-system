@@ -23,7 +23,7 @@ export default function BudgetEditPage() {
   const [elements, setElements] = useState<CostElement[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  // 案件グリッドのセル編集中の値(キー: `${category}-${projectId}`)
+  // グリッドのセル編集中の値。案件は `${category}-${projectId}`、期間費用は `PeriodCost-${code}`。
   const [edits, setEdits] = useState<Record<string, string>>({})
 
   // 案件追加フォーム
@@ -31,10 +31,10 @@ export default function BudgetEditPage() {
   const [newName, setNewName] = useState('')
   const [addingProject, setAddingProject] = useState(false)
 
-  // 期間費用の追加フォーム
-  const [elementCode, setElementCode] = useState('')
-  const [periodAmount, setPeriodAmount] = useState('')
-  const [savingPeriod, setSavingPeriod] = useState(false)
+  // 費目追加フォーム
+  const [newElementCode, setNewElementCode] = useState('')
+  const [newElementName, setNewElementName] = useState('')
+  const [addingElement, setAddingElement] = useState(false)
 
   const loadBudget = useCallback(() => {
     if (!budgetId) return
@@ -44,32 +44,18 @@ export default function BudgetEditPage() {
     if (!departmentId) return
     api.listProjects(departmentId).then(setProjects).catch((e: Error) => setError(e.message))
   }, [departmentId])
+  const loadElements = useCallback(() => {
+    api.listCostElements().then(setElements).catch((e: Error) => setError(e.message))
+  }, [])
 
   useEffect(loadBudget, [loadBudget])
   useEffect(loadProjects, [loadProjects])
-  useEffect(() => {
-    api.listCostElements().then(setElements).catch((e: Error) => setError(e.message))
-  }, [])
+  useEffect(loadElements, [loadElements])
 
   if (!departmentId || !budgetId) return null
   const editable = budget?.status === 'Draft'
   const elementName = (code: string | null) =>
     elements.find((e) => e.code === code)?.name ?? code ?? ''
-
-  // ある案件・区分の現在の予算額(明細がなければ 0)
-  const lineAmount = (projectId: string, category: BudgetCategory): number =>
-    budget?.lines.find((l) => l.category === category && l.projectId === projectId)?.amount ?? 0
-
-  const cellKey = (projectId: string, category: BudgetCategory) => `${category}-${projectId}`
-  const cellValue = (projectId: string, category: BudgetCategory): string => {
-    const key = cellKey(projectId, category)
-    if (key in edits) return edits[key]
-    const amount = lineAmount(projectId, category)
-    return amount === 0 ? '' : String(amount)
-  }
-
-  const onCellChange = (projectId: string, category: BudgetCategory, value: string) =>
-    setEdits((prev) => ({ ...prev, [cellKey(projectId, category)]: value }))
 
   const clearEdit = (key: string) =>
     setEdits((prev) => {
@@ -78,29 +64,63 @@ export default function BudgetEditPage() {
       return next
     })
 
-  // セルからフォーカスが外れたら、変更があった区分だけ upsert / 削除する
-  const onCellBlur = async (projectId: string, category: BudgetCategory) => {
-    const key = cellKey(projectId, category)
+  // 編集中セルの値を、変更があったときだけ upsert / 削除する共通処理。
+  const saveCell = async (
+    key: string,
+    current: number,
+    upsert: (amount: number) => Promise<BudgetDetail>,
+    remove: () => Promise<BudgetDetail>,
+  ) => {
     if (!(key in edits)) return
     const raw = edits[key].trim()
     const num = raw === '' ? 0 : Number(raw)
-    const current = lineAmount(projectId, category)
     if (Number.isNaN(num) || num < 0 || num === current) {
       clearEdit(key)
       return
     }
     setError(null)
     try {
-      const updated =
-        num > 0
-          ? await api.upsertBudgetLine(budgetId, { category, projectId, amount: num })
-          : await api.removeBudgetLine(budgetId, category, projectId, null)
-      setBudget(updated)
+      setBudget(await (num > 0 ? upsert(num) : remove()))
       clearEdit(key)
     } catch (err) {
       setError((err as Error).message)
     }
   }
+
+  const cellValue = (key: string, amount: number): string => {
+    if (key in edits) return edits[key]
+    return amount === 0 ? '' : String(amount)
+  }
+  const onCellChange = (key: string, value: string) =>
+    setEdits((prev) => ({ ...prev, [key]: value }))
+
+  // ---- 案件別(売上高・加工費・外注費) ----
+  const projectKey = (projectId: string, category: BudgetCategory) => `${category}-${projectId}`
+  const projectAmount = (projectId: string, category: BudgetCategory): number =>
+    budget?.lines.find((l) => l.category === category && l.projectId === projectId)?.amount ?? 0
+  const onProjectBlur = (projectId: string, category: BudgetCategory) =>
+    saveCell(
+      projectKey(projectId, category),
+      projectAmount(projectId, category),
+      (amount) => api.upsertBudgetLine(budgetId, { category, projectId, amount }),
+      () => api.removeBudgetLine(budgetId, category, projectId, null),
+    )
+  const projectProfit = (projectId: string): number =>
+    projectAmount(projectId, 'Revenue') -
+    projectAmount(projectId, 'Processing') -
+    projectAmount(projectId, 'Outsourcing')
+
+  // ---- 期間費用(費目別) ----
+  const periodKey = (code: string) => `PeriodCost-${code}`
+  const periodAmount = (code: string): number =>
+    budget?.lines.find((l) => l.category === 'PeriodCost' && l.elementCode === code)?.amount ?? 0
+  const onPeriodBlur = (code: string) =>
+    saveCell(
+      periodKey(code),
+      periodAmount(code),
+      (amount) => api.upsertBudgetLine(budgetId, { category: 'PeriodCost', elementCode: code, amount }),
+      () => api.removeBudgetLine(budgetId, 'PeriodCost', null, code),
+    )
 
   const addProject = async (e: FormEvent) => {
     e.preventDefault()
@@ -128,32 +148,19 @@ export default function BudgetEditPage() {
     }
   }
 
-  const upsertPeriodCost = async (e: FormEvent) => {
+  const addElement = async (e: FormEvent) => {
     e.preventDefault()
-    setSavingPeriod(true)
+    setAddingElement(true)
     setError(null)
     try {
-      const updated = await api.upsertBudgetLine(budgetId, {
-        category: 'PeriodCost',
-        elementCode,
-        amount: Number(periodAmount),
-      })
-      setBudget(updated)
-      setElementCode('')
-      setPeriodAmount('')
+      await api.createCostElement({ code: newElementCode, name: newElementName })
+      setNewElementCode('')
+      setNewElementName('')
+      loadElements()
     } catch (err) {
       setError((err as Error).message)
     } finally {
-      setSavingPeriod(false)
-    }
-  }
-
-  const removePeriodCost = async (code: string) => {
-    setError(null)
-    try {
-      setBudget(await api.removeBudgetLine(budgetId, 'PeriodCost', null, code))
-    } catch (err) {
-      setError((err as Error).message)
+      setAddingElement(false)
     }
   }
 
@@ -166,11 +173,11 @@ export default function BudgetEditPage() {
     }
   }
 
+  // 期間費用の行: 編集中は全費目、閲覧時は明細のある費目のみ。
   const periodCostLines = budget?.lines.filter((l) => l.category === 'PeriodCost') ?? []
-  const projectProfit = (projectId: string): number =>
-    lineAmount(projectId, 'Revenue') -
-    lineAmount(projectId, 'Processing') -
-    lineAmount(projectId, 'Outsourcing')
+  const periodRows = editable
+    ? elements.map((el) => ({ code: el.code, name: el.name }))
+    : periodCostLines.map((l) => ({ code: l.elementCode!, name: elementName(l.elementCode) }))
 
   return (
     <>
@@ -273,12 +280,12 @@ export default function BudgetEditPage() {
                           className="num"
                           style={{ width: '9rem' }}
                           aria-label={`${p.name} ${categoryLabel[category]}`}
-                          value={cellValue(p.id, category)}
-                          onChange={(e) => onCellChange(p.id, category, e.target.value)}
-                          onBlur={() => onCellBlur(p.id, category)}
+                          value={cellValue(projectKey(p.id, category), projectAmount(p.id, category))}
+                          onChange={(e) => onCellChange(projectKey(p.id, category), e.target.value)}
+                          onBlur={() => onProjectBlur(p.id, category)}
                         />
                       ) : (
-                        <>¥{formatYen(lineAmount(p.id, category))}</>
+                        <>¥{formatYen(projectAmount(p.id, category))}</>
                       )}
                     </td>
                   ))}
@@ -345,69 +352,84 @@ export default function BudgetEditPage() {
       <div className="card">
         <h2>期間費用</h2>
         <p className="muted small">
-          課共通の費用(人件費・ライセンス費など)を費目ごとに計画します。
+          課共通の費用(人件費・ライセンス費など)を費目ごとに入力します(空欄・0 は明細なし)。
+          {editable && '金額を入力して次の欄へ移ると自動保存されます。'}
         </p>
-        {periodCostLines.length === 0 ? (
-          <p className="muted small">明細がありません。</p>
-        ) : (
-          <table>
-            <thead>
+        <table>
+          <thead>
+            <tr>
+              <th>費目</th>
+              <th className="num">金額</th>
+            </tr>
+          </thead>
+          <tbody>
+            {periodRows.length === 0 ? (
               <tr>
-                <th>費目</th>
-                <th className="num">金額</th>
-                {editable && <th></th>}
+                <td colSpan={2} className="muted small">
+                  {editable ? '費目がありません。下の行から費目を追加してください。' : '明細がありません。'}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {periodCostLines.map((l) => (
-                <tr key={l.id}>
-                  <td>{elementName(l.elementCode)}</td>
-                  <td className="num">¥{formatYen(l.amount)}</td>
-                  {editable && (
-                    <td>
-                      <button onClick={() => removePeriodCost(l.elementCode!)}>削除</button>
-                    </td>
-                  )}
+            ) : (
+              periodRows.map((el) => (
+                <tr key={el.code}>
+                  <td>
+                    {el.name}
+                    <span className="muted small">({el.code})</span>
+                  </td>
+                  <td className="num">
+                    {editable ? (
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        className="num"
+                        style={{ width: '9rem' }}
+                        aria-label={`${el.name} 金額`}
+                        value={cellValue(periodKey(el.code), periodAmount(el.code))}
+                        onChange={(e) => onCellChange(periodKey(el.code), e.target.value)}
+                        onBlur={() => onPeriodBlur(el.code)}
+                      />
+                    ) : (
+                      <>¥{formatYen(periodAmount(el.code))}</>
+                    )}
+                  </td>
                 </tr>
-              ))}
-              <tr className="total-row">
-                <td>合計</td>
-                <td className="num">¥{formatYen(budget?.periodCostTotal ?? 0)}</td>
-                {editable && <td></td>}
-              </tr>
-            </tbody>
-          </table>
-        )}
+              ))
+            )}
+            <tr className="total-row">
+              <td>合計</td>
+              <td className="num">¥{formatYen(budget?.periodCostTotal ?? 0)}</td>
+            </tr>
+          </tbody>
+        </table>
 
         {editable && (
           <>
-            <h3>期間費用の追加・更新</h3>
-            <p className="muted small">同じ費目で再登録すると上書きされます。</p>
-            <form onSubmit={upsertPeriodCost} className="form-row">
+            <h3>費目を追加</h3>
+            <p className="muted small">
+              新しい費目はマスタに追加され、以降どの課の予算でも使えます。
+            </p>
+            <form onSubmit={addElement} className="form-row">
               <label>
-                費目
-                <select value={elementCode} onChange={(e) => setElementCode(e.target.value)} required>
-                  <option value="">選択してください</option>
-                  {elements.map((el) => (
-                    <option key={el.code} value={el.code}>
-                      {el.name}({el.code})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                金額(円・半期一括)
+                費目コード
                 <input
-                  type="number"
-                  value={periodAmount}
-                  onChange={(e) => setPeriodAmount(e.target.value)}
-                  min={0}
-                  step="any"
+                  value={newElementCode}
+                  onChange={(e) => setNewElementCode(e.target.value)}
                   required
+                  placeholder="TRAVEL"
                 />
               </label>
-              <button type="submit" className="primary" disabled={savingPeriod}>
-                登録
+              <label>
+                費目名
+                <input
+                  value={newElementName}
+                  onChange={(e) => setNewElementName(e.target.value)}
+                  required
+                  placeholder="旅費交通費"
+                />
+              </label>
+              <button type="submit" className="primary" disabled={addingElement}>
+                追加
               </button>
             </form>
           </>

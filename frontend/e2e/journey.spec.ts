@@ -33,9 +33,10 @@ test('計画策定: 課を登録し予算編集で案件別に金額を入力し
 
   // ---- 予算編集の中で案件を追加する(案件マスタ画面は廃止) ----
   const 案件を追加 = async (code: string, name: string) => {
-    await page.getByLabel('案件コード').fill(code)
-    await page.getByLabel('案件名').fill(name)
-    await page.getByRole('button', { name: '追加' }).click()
+    const form = page.locator('form', { hasText: '案件コード' })
+    await form.getByLabel('案件コード').fill(code)
+    await form.getByLabel('案件名').fill(name)
+    await form.getByRole('button', { name: '追加' }).click()
     await expect(page.getByRole('cell', { name: new RegExp(name) })).toBeVisible()
   }
   await 案件を追加(projectACode, '案件A')
@@ -58,10 +59,10 @@ test('計画策定: 課を登録し予算編集で案件別に金額を入力し
   await セル入力('案件B', '売上高', '1000000')
   await セル入力('案件B', '外注費', '700000')
 
-  // ---- 期間費用(費目別) ----
-  await page.getByLabel('費目').selectOption({ label: '人件費(PERSONNEL)' })
-  await page.getByLabel('金額(円・半期一括)').fill('300000')
-  await page.getByRole('button', { name: '登録' }).click()
+  // ---- 期間費用(費目別。案件と同じくセルに直接入力) ----
+  const 人件費セル = page.getByLabel('人件費 金額')
+  await 人件費セル.fill('300000')
+  await 人件費セル.blur()
 
   // 課の区分合計 = 案件明細の合計(サマリタイルで確認)
   await expect(page.getByText('¥3,000,000').first()).toBeVisible() // 売上高
