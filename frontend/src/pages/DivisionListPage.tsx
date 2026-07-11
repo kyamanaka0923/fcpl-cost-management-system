@@ -1,16 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { api, type Department } from '../api'
+import { api, type Division } from '../api'
 
-export default function DepartmentListPage() {
-  const [departments, setDepartments] = useState<Department[]>([])
+export default function DivisionListPage() {
+  const [divisions, setDivisions] = useState<Division[]>([])
   const [error, setError] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
 
   const load = () => {
-    api.listDepartments().then(setDepartments).catch((e: Error) => setError(e.message))
+    api.listDivisions().then(setDivisions).catch((e: Error) => setError(e.message))
   }
   useEffect(load, [])
 
@@ -19,7 +19,7 @@ export default function DepartmentListPage() {
     setSaving(true)
     setError(null)
     try {
-      await api.createDepartment({ code, name })
+      await api.createDivision({ code, name })
       setCode('')
       setName('')
       load()
@@ -35,15 +35,15 @@ export default function DepartmentListPage() {
       {error && <div className="error-banner">{error}</div>}
 
       <div className="card">
-        <h2>課の新規登録</h2>
+        <h2>部の新規登録</h2>
         <form onSubmit={onSubmit} className="form-row">
           <label>
-            課コード
-            <input value={code} onChange={(e) => setCode(e.target.value)} required placeholder="DEV-1" />
+            部コード
+            <input value={code} onChange={(e) => setCode(e.target.value)} required placeholder="SALES" />
           </label>
           <label>
-            課名
-            <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="開発1課" />
+            部名
+            <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="営業本部" />
           </label>
           <button type="submit" className="primary" disabled={saving}>
             登録
@@ -52,27 +52,23 @@ export default function DepartmentListPage() {
       </div>
 
       <div className="card">
-        <h2>課一覧</h2>
-        {departments.length === 0 ? (
-          <p className="muted small">課がありません。上のフォームから登録してください。</p>
+        <h2>部一覧</h2>
+        {divisions.length === 0 ? (
+          <p className="muted small">部がありません。上のフォームから登録してください。</p>
         ) : (
           <table>
             <thead>
               <tr>
-                <th>課コード</th>
-                <th>課名</th>
-                <th></th>
+                <th>部コード</th>
+                <th>部名</th>
               </tr>
             </thead>
             <tbody>
-              {departments.map((d) => (
+              {divisions.map((d) => (
                 <tr key={d.id}>
                   <td>{d.code}</td>
                   <td>
-                    <Link to={`/departments/${d.id}`}>{d.name}</Link>
-                  </td>
-                  <td className="small">
-                    <Link to={`/departments/${d.id}/variance`}>差異分析</Link>
+                    <Link to={`/divisions/${d.id}`}>{d.name}</Link>
                   </td>
                 </tr>
               ))}

@@ -3,11 +3,54 @@
 export type BudgetCategory = 'Revenue' | 'Processing' | 'Outsourcing' | 'PeriodCost'
 export type BudgetStatus = 'Draft' | 'Approved' | 'Superseded'
 
-export interface Department {
+export interface Division {
   id: string
   code: string
   name: string
   createdAt: string
+}
+
+export interface Department {
+  id: string
+  divisionId: string
+  code: string
+  name: string
+  createdAt: string
+}
+
+export interface CategorySummary {
+  category: BudgetCategory
+  plannedAmount: number
+  actualAmount: number
+  variance: number
+}
+
+export interface DepartmentSummaryLine {
+  departmentId: string
+  departmentCode: string
+  departmentName: string
+  hasApprovedBudget: boolean
+  plannedRevenue: number
+  actualRevenue: number
+  plannedCost: number
+  actualCost: number
+  plannedProfit: number
+  actualProfit: number
+  profitVariance: number
+}
+
+export interface DivisionBudgetSummary {
+  categories: CategorySummary[]
+  plannedRevenue: number
+  actualRevenue: number
+  revenueVariance: number
+  plannedCost: number
+  actualCost: number
+  costVariance: number
+  plannedProfit: number
+  actualProfit: number
+  profitVariance: number
+  departmentLines: DepartmentSummaryLine[]
 }
 
 export interface Project {
@@ -178,11 +221,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  // ---- 課 ----
-  listDepartments: () => request<Department[]>('/departments'),
+  // ---- 部 ----
+  listDivisions: () => request<Division[]>('/divisions'),
+  getDivision: (id: string) => request<Division>(`/divisions/${id}`),
+  createDivision: (body: { code: string; name: string }) =>
+    request<Division>('/divisions', { method: 'POST', body: JSON.stringify(body) }),
+  getDivisionBudgetSummary: (divisionId: string, fiscalHalf: string) =>
+    request<DivisionBudgetSummary>(
+      `/divisions/${divisionId}/budget-summary?fiscalHalf=${encodeURIComponent(fiscalHalf)}`,
+    ),
+
+  // ---- 課(部に属する) ----
+  listDepartments: (divisionId: string) =>
+    request<Department[]>(`/divisions/${divisionId}/departments`),
   getDepartment: (id: string) => request<Department>(`/departments/${id}`),
-  createDepartment: (body: { code: string; name: string }) =>
-    request<Department>('/departments', { method: 'POST', body: JSON.stringify(body) }),
+  createDepartment: (divisionId: string, body: { code: string; name: string }) =>
+    request<Department>(`/divisions/${divisionId}/departments`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 
   // ---- 案件(課に属するマスタ) ----
   listProjects: (departmentId: string) =>

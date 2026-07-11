@@ -2,6 +2,8 @@ import { expect, test, type Page } from '@playwright/test'
 
 // 実行のたびに一意なコードを使う(同じDBで再実行しても衝突しない)
 const suffix = Date.now() % 1_000_000
+const divCode = `DIV-${suffix}`
+const divName = `営業本部E2E-${suffix}`
 const deptCode = `DEV-${suffix}`
 const deptName = `開発課E2E-${suffix}`
 const projectACode = `PJA-${suffix}`
@@ -9,15 +11,28 @@ const projectBCode = `PJB-${suffix}`
 
 test.describe.configure({ mode: 'serial' })
 
-async function 課詳細を開く(page: Page) {
+async function 部詳細を開く(page: Page) {
   await page.goto('/')
+  await page.getByRole('link', { name: divName }).click()
+  await expect(page.getByRole('heading', { name: new RegExp(divCode) })).toBeVisible()
+}
+
+async function 課詳細を開く(page: Page) {
+  await 部詳細を開く(page)
   await page.getByRole('link', { name: deptName }).click()
   await expect(page.getByRole('heading', { name: new RegExp(deptCode) })).toBeVisible()
 }
 
-test('計画策定: 課を登録し予算編集で案件別に金額を入力して承認できる', async ({ page }) => {
-  // ---- 課の登録 ----
+test('計画策定: 部と課を登録し予算編集で案件別に金額を入力して承認できる', async ({ page }) => {
+  // ---- 部の登録 ----
   await page.goto('/')
+  await page.getByLabel('部コード').fill(divCode)
+  await page.getByLabel('部名').fill(divName)
+  await page.getByRole('button', { name: '登録' }).click()
+  await expect(page.getByRole('link', { name: divName })).toBeVisible()
+
+  // ---- 部詳細で課を登録 ----
+  await 部詳細を開く(page)
   await page.getByLabel('課コード').fill(deptCode)
   await page.getByLabel('課名').fill(deptName)
   await page.getByRole('button', { name: '登録' }).click()
@@ -71,6 +86,14 @@ test('計画策定: 課を登録し予算編集で案件別に金額を入力し
   // ---- 承認 ----
   await page.getByRole('button', { name: 'この予算を承認する' }).click()
   await expect(page.getByText('承認済')).toBeVisible()
+
+  // ---- 部詳細に配下課の予実が集計される ----
+  await 部詳細を開く(page)
+  await expect(page.getByRole('heading', { name: '区分別の予実(部合計)' })).toBeVisible()
+  const 課別内訳 = page.locator('.card', { hasText: '課別の内訳' })
+  await expect(課別内訳.getByRole('link', { name: deptName })).toBeVisible()
+  // 部合計の売上高予算 = 課の売上高 300万
+  await expect(課別内訳.getByRole('cell', { name: '¥3,000,000' }).first()).toBeVisible()
 })
 
 test('実績入力: 区分ごとに案件別・費目別の実績を計上できる', async ({ page }) => {
@@ -96,6 +119,8 @@ test('実績入力: 区分ごとに案件別・費目別の実績を計上でき
 
   // 明細行と合計行の両方に同額が出るため first で確認
   await expect(page.getByRole('cell', { name: '¥2,100,000' }).first()).toBeVisible()
+  await expect(page.getByRole('cell', { name: '¥900,000' }).first()).toBeVisible()   // 案件B 売上
+  await expect(page.getByRole('cell', { name: '¥650,000' }).first()).toBeVisible()   // 案件B 外注
   await expect(page.getByRole('cell', { name: '¥320,000' }).first()).toBeVisible()
 })
 

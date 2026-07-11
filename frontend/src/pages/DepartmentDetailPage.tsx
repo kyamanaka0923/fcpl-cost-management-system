@@ -9,6 +9,7 @@ import {
   type BudgetStatus,
   type BudgetSummary,
   type Department,
+  type Division,
 } from '../api'
 
 const statusLabel: Record<BudgetStatus, string> = {
@@ -179,12 +180,19 @@ export default function DepartmentDetailPage() {
   const setHalf = (value: string) => setSearchParams({ half: value })
 
   const [department, setDepartment] = useState<Department | null>(null)
+  const [division, setDivision] = useState<Division | null>(null)
   const [budgets, setBudgets] = useState<BudgetSummary[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
     if (!departmentId) return
-    api.getDepartment(departmentId).then(setDepartment).catch((e: Error) => setError(e.message))
+    api
+      .getDepartment(departmentId)
+      .then((d) => {
+        setDepartment(d)
+        api.getDivision(d.divisionId).then(setDivision).catch(() => undefined)
+      })
+      .catch((e: Error) => setError(e.message))
     api.listBudgets(departmentId, half).then(setBudgets).catch((e: Error) => setError(e.message))
   }, [departmentId, half])
   useEffect(load, [load])
@@ -196,7 +204,9 @@ export default function DepartmentDetailPage() {
   return (
     <>
       <div className="breadcrumbs">
-        <Link to="/">課一覧</Link> / {department?.name ?? '…'}
+        <Link to="/">部一覧</Link> /{' '}
+        <Link to={`/divisions/${department?.divisionId}?half=${half}`}>{division?.name ?? '…'}</Link>{' '}
+        / {department?.name ?? '…'}
       </div>
       {error && <div className="error-banner">{error}</div>}
 
