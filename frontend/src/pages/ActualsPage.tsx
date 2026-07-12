@@ -11,6 +11,7 @@ import {
   type CostElement,
   type Project,
 } from '../api'
+import MoneyInput from '../components/MoneyInput'
 
 export default function ActualsPage() {
   const { departmentId } = useParams<{ departmentId: string }>()
@@ -133,14 +134,7 @@ export default function ActualsPage() {
           )}
           <label>
             金額(円)
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              min={0}
-              step="any"
-              required
-            />
+            <MoneyInput value={amount} onChange={setAmount} required />
           </label>
           <label>
             備考

@@ -12,6 +12,7 @@ import {
   type CostElement,
   type Project,
 } from '../api'
+import MoneyInput from '../components/MoneyInput'
 
 export default function BudgetEditPage() {
   const { departmentId, budgetId } = useParams<{ departmentId: string; budgetId: string }>()
@@ -273,15 +274,12 @@ export default function BudgetEditPage() {
                   {projectCategories.map((category) => (
                     <td className="num" key={category}>
                       {editable ? (
-                        <input
-                          type="number"
-                          min={0}
-                          step="any"
+                        <MoneyInput
                           className="num"
                           style={{ width: '9rem' }}
                           aria-label={`${p.name} ${categoryLabel[category]}`}
                           value={cellValue(projectKey(p.id, category), projectAmount(p.id, category))}
-                          onChange={(e) => onCellChange(projectKey(p.id, category), e.target.value)}
+                          onChange={(v) => onCellChange(projectKey(p.id, category), v)}
                           onBlur={() => onProjectBlur(p.id, category)}
                         />
                       ) : (
@@ -378,15 +376,12 @@ export default function BudgetEditPage() {
                   </td>
                   <td className="num">
                     {editable ? (
-                      <input
-                        type="number"
-                        min={0}
-                        step="any"
+                      <MoneyInput
                         className="num"
                         style={{ width: '9rem' }}
                         aria-label={`${el.name} 金額`}
                         value={cellValue(periodKey(el.code), periodAmount(el.code))}
-                        onChange={(e) => onCellChange(periodKey(el.code), e.target.value)}
+                        onChange={(v) => onCellChange(periodKey(el.code), v)}
                         onBlur={() => onPeriodBlur(el.code)}
                       />
                     ) : (
