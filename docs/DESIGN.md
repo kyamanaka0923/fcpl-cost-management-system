@@ -164,6 +164,15 @@ classDiagram
         <<Value Object>>
         +Guid Value
     }
+    class DivisionBudgetApproval {
+        <<Aggregate Root>>
+        +DivisionBudgetApprovalId Id
+        +DivisionId DivisionId
+        +FiscalHalf FiscalHalf
+        +DateTime ApprovedAt
+        +Approve(divisionId, fiscalHalf, now) DivisionBudgetApproval$
+        ※レコードの有無 = 承認状態
+    }
     class Department {
         <<Aggregate Root>>
         +DepartmentId Id
@@ -208,6 +217,7 @@ classDiagram
         +string Value
     }
     Division --> DivisionId
+    DivisionBudgetApproval ..> Division : DivisionId で参照
     Department --> DepartmentId
     Department ..> Division : DivisionId で参照
     Project --> ProjectId
@@ -316,6 +326,12 @@ classDiagram
         +ListAsync() IReadOnlyList~Division~
         +AddAsync(Division)
         +UpdateAsync(Division)
+    }
+    class IDivisionBudgetApprovalRepository {
+        <<interface>>
+        +FindAsync(DivisionId, FiscalHalf) DivisionBudgetApproval?
+        +AddAsync(DivisionBudgetApproval)
+        +DeleteAsync(DivisionId, FiscalHalf)
     }
     class IDepartmentRepository {
         <<interface>>
@@ -443,3 +459,6 @@ classDiagram
   - **案件別損益の合計 − 期間費用 = 課全体の損益**(整合性はテストで担保)
 - 部集計(DivisionBudgetSummaryService): 配下課の VarianceReport を区分別・損益で合計する。
   承認済み予算のない課は合計から除外し未策定として課別内訳に表示する。「部合計 = 課別内訳の合計」
+- 部承認(DivisionBudgetApproval): (部, 半期) ごとの承認レコード。配下の全課が承認済み予算を
+  持つときのみ承認可能(条件判定は Application 層)。取り消し可。課の承認フローとは独立で、
+  部承認後に課が改定しても部承認は残る

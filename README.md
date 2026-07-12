@@ -7,6 +7,8 @@
 
 - 組織は **部 > 課** の2階層です。課は必ず1つの部に属し、**部では配下課の予実を合計**して把握できます
   (部自体は予算を策定しない集計ビュー)
+- 課の承認に加えて**部単位の予算承認**ができます。部承認は配下課がすべて承認済みになると可能で、
+  課の承認とは独立(部承認後に課が改定しても部承認は残る)。取り消しもできます
 - 予算は**課 × 半期(年度の上期/下期)**ごとに策定し、**バージョン管理**され、半期の途中でも何度でも改定できます
 - 予算は **売上高・加工費・外注費・期間費用の4区分**を1つの予算としてまとめて承認します
 - **売上高・加工費・外注費は案件別の詳細計画**として立案します。課の区分合計 = 案件明細の合計
@@ -59,11 +61,11 @@ frontend/                               # React SPA(/api を dev proxy 経由で
 
 | 要素 | 実装 |
 |---|---|
-| 集約ルート | `Division`(部), `Department`(課), `Project`(案件), `DepartmentBudget`(課予算), `ActualEntry`(実績), `CostElement`(費目マスタ) |
+| 集約ルート | `Division`(部), `DivisionBudgetApproval`(部承認), `Department`(課), `Project`(案件), `DepartmentBudget`(課予算), `ActualEntry`(実績), `CostElement`(費目マスタ) |
 | エンティティ | `BudgetLine`(区分 × 案件 or 費目 × 金額。案件系区分と期間費用でキーが排他) |
 | 値オブジェクト | `Money`, `FiscalHalf`(yyyy-H1 / yyyy-H2), `DivisionId` / `DepartmentId` 等の型付き ID, `CostElementCode` |
 | ドメインサービス | `BudgetVarianceAnalysisService`(予実差異分析), `BudgetComparisonService`(バージョン間比較), `ProfitAnalysisService`(課全体・案件別の損益), `DivisionBudgetSummaryService`(部の予実集計) |
-| リポジトリ(ポート) | `IDivisionRepository`, `IDepartmentRepository`, `IProjectRepository`, `ICostElementRepository`, `IDepartmentBudgetRepository`, `IActualEntryRepository` |
+| リポジトリ(ポート) | `IDivisionRepository`, `IDivisionBudgetApprovalRepository`, `IDepartmentRepository`, `IProjectRepository`, `ICostElementRepository`, `IDepartmentBudgetRepository`, `IActualEntryRepository` |
 | ドメイン例外 | `DomainException`(不変条件違反 → HTTP 400 に変換) |
 
 ### 予算の構成と区分
@@ -219,7 +221,8 @@ npm run test:e2e
 |---|---|
 | `GET/POST /api/divisions` | 部一覧・登録 |
 | `GET /api/divisions/{id}` | 部の取得 |
-| `GET /api/divisions/{id}/budget-summary?fiscalHalf=` | 部の予実サマリ(配下課の予算/実績/差異・損益の合計 + 課別内訳) |
+| `GET /api/divisions/{id}/budget-summary?fiscalHalf=` | 部の予実サマリ(配下課の予算/実績/差異・損益の合計 + 課別内訳 + 部承認状態) |
+| `POST/DELETE /api/divisions/{id}/budget-approval?fiscalHalf=` | 部予算の承認・取り消し(配下課が全承認済みで承認可能) |
 | `GET/POST /api/divisions/{id}/departments` | 配下課一覧・課の登録(課は部に属する) |
 | `GET /api/departments/{id}` | 課の取得 |
 | `GET/POST /api/departments/{id}/projects` | 案件一覧・登録(案件は課に属する) |
@@ -239,7 +242,8 @@ npm run test:e2e
 ## 画面
 
 - **部一覧 / 部詳細** — 部の登録、対象半期の選択、配下課の予実サマリ(区分別の予算/実績/差異 +
-  損益)と課別内訳(未策定の課は明示)、課の登録、各課へのドリルダウン
+  損益)と課別内訳(未策定の課は明示)、課の登録、各課へのドリルダウン、
+  **部予算の承認・取り消し**(配下課が全承認済みのとき承認可能)
 - **課詳細** — 対象半期の選択、承認済み予算の4区分サマリ、予算バージョンの一覧・改定・承認
 - **予算編集** — 案件×区分のグリッドで売上高・加工費・外注費を案件別に直接入力
   (セルを離れると自動保存)。期間費用も費目別の表に同様に直接入力する。

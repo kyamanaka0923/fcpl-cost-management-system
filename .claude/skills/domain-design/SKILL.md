@@ -15,6 +15,9 @@ model: claude-opus-4-8
   (Department が DivisionId を持つ)。部は予算を策定せず、配下課の予実を合計する集計ビュー。
   部集計は `DivisionBudgetSummaryService`(課別 VarianceReport を合計)。「部合計 = 課別内訳の合計」が不変条件。
   承認済み予算のない課は部合計に含めず未策定として内訳表示(Application 層)
+- **部承認(DivisionBudgetApproval)** は (部, 半期) ごとの集約(レコードの有無 = 承認状態)。
+  配下の全課が承認済み予算を持つときのみ承認可能で、取り消せる(条件判定は Application 層)。
+  課の承認フローとは**完全に独立**(DepartmentBudgetService は無変更)。部承認後に課が改定しても部承認は残る
 - **管理単位は 課(Department)× 半期(FiscalHalf: yyyy-H1/H2)**。
   2026-07-11 の要件変更でプロジェクト単位予算から再構築済み(docs/requests/ 参照)
 - **予算は単一集約 DepartmentBudget**。売上高(Revenue)・加工費(Processing)・
@@ -45,7 +48,7 @@ model: claude-opus-4-8
 - 値オブジェクトは `readonly record struct`(Money, FiscalHalf, 型付きID, CostElementCode)
 - 集約に公開セッターを置かない。状態変更はドメインメソッド(`Approve()` 等)のみ
 - リポジトリはポート(interface)としてドメイン層に定義。実装はインフラ層のみ。
-  **ポート数(現在6)・VO列挙・集約列挙は ArchitectureTests.cs に固定値で書かれている**ため、
+  **ポート数(現在7)・VO列挙・集約列挙は ArchitectureTests.cs に固定値で書かれている**ため、
   集約を増減したら必ず同時に更新する
 - ドメイン例外は `DomainException`(日本語メッセージ)。WebApi が 400 に変換する。
   未検出は Application 層の `NotFoundException` → 404
