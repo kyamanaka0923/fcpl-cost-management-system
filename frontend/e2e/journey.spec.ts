@@ -94,6 +94,14 @@ test('計画策定: 部と課を登録し予算編集で案件別に金額を入
   await expect(課別内訳.getByRole('link', { name: deptName })).toBeVisible()
   // 部合計の売上高予算 = 課の売上高 300万
   await expect(課別内訳.getByRole('cell', { name: '¥3,000,000' }).first()).toBeVisible()
+
+  // 配下課がすべて承認済みなので部予算を承認できる
+  const 承認カード = page.locator('.card', { hasText: '部予算の承認' })
+  await 承認カード.getByRole('button', { name: '部予算を承認する' }).click()
+  await expect(承認カード.getByText('承認済')).toBeVisible()
+  // 取り消せる
+  await 承認カード.getByRole('button', { name: '部承認を取り消す' }).click()
+  await expect(承認カード.getByText('未承認')).toBeVisible()
 })
 
 test('実績入力: 区分ごとに案件別・費目別の実績を計上できる', async ({ page }) => {

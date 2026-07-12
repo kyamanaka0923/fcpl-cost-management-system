@@ -51,6 +51,9 @@ export interface DivisionBudgetSummary {
   actualProfit: number
   profitVariance: number
   departmentLines: DepartmentSummaryLine[]
+  isApproved: boolean
+  approvedAt: string | null
+  canApprove: boolean
 }
 
 export interface Project {
@@ -229,6 +232,16 @@ export const api = {
   getDivisionBudgetSummary: (divisionId: string, fiscalHalf: string) =>
     request<DivisionBudgetSummary>(
       `/divisions/${divisionId}/budget-summary?fiscalHalf=${encodeURIComponent(fiscalHalf)}`,
+    ),
+  approveDivisionBudget: (divisionId: string, fiscalHalf: string) =>
+    request<void>(
+      `/divisions/${divisionId}/budget-approval?fiscalHalf=${encodeURIComponent(fiscalHalf)}`,
+      { method: 'POST' },
+    ),
+  revokeDivisionBudget: (divisionId: string, fiscalHalf: string) =>
+    request<void>(
+      `/divisions/${divisionId}/budget-approval?fiscalHalf=${encodeURIComponent(fiscalHalf)}`,
+      { method: 'DELETE' },
     ),
 
   // ---- 課(部に属する) ----

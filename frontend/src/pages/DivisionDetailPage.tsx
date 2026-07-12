@@ -55,6 +55,26 @@ export default function DivisionDetailPage() {
     }
   }
 
+  const approve = async () => {
+    setError(null)
+    try {
+      await api.approveDivisionBudget(divisionId, half)
+      load()
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+
+  const revoke = async () => {
+    setError(null)
+    try {
+      await api.revokeDivisionBudget(divisionId, half)
+      load()
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+
   // 区分別の差異の色: 売上高は正が有利(緑)、コスト系は正が不利(赤)。
   const categoryVarianceClass = (category: BudgetCategory, variance: number) => {
     if (variance === 0) return ''
@@ -92,6 +112,43 @@ export default function DivisionDetailPage() {
 
       {summary && (
         <>
+          <div className="card">
+            <h2>
+              部予算の承認
+              <span
+                className={`badge ${summary.isApproved ? 'approved' : 'draft'}`}
+                style={{ marginLeft: 12 }}
+              >
+                {summary.isApproved ? '承認済' : '未承認'}
+              </span>
+            </h2>
+            {summary.isApproved ? (
+              <>
+                <p className="muted small">
+                  {summary.approvedAt
+                    ? `${new Date(summary.approvedAt).toLocaleString('ja-JP')} に承認`
+                    : ''}
+                  。課の承認・改定は部承認とは独立しています(改定しても部承認は残ります)。
+                </p>
+                <button onClick={revoke}>部承認を取り消す</button>
+              </>
+            ) : (
+              <>
+                <p className="muted small">
+                  配下課の予算がすべて承認されると、部として承認できます。
+                </p>
+                <button className="primary" onClick={approve} disabled={!summary.canApprove}>
+                  部予算を承認する
+                </button>
+                {!summary.canApprove && (
+                  <span className="muted small" style={{ marginLeft: 8 }}>
+                    未承認の課があります。
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+
           <div className="stat-row">
             <div className="stat-tile">
               <div className="label">売上高(予算 / 実績)</div>
