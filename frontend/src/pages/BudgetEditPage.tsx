@@ -33,9 +33,6 @@ export default function BudgetEditPage() {
   const [addingProject, setAddingProject] = useState(false)
 
   // 費目追加フォーム
-  const [newElementCode, setNewElementCode] = useState('')
-  const [newElementName, setNewElementName] = useState('')
-  const [addingElement, setAddingElement] = useState(false)
 
   const loadBudget = useCallback(() => {
     if (!budgetId) return
@@ -146,22 +143,6 @@ export default function BudgetEditPage() {
       loadProjects()
     } catch (err) {
       setError((err as Error).message)
-    }
-  }
-
-  const addElement = async (e: FormEvent) => {
-    e.preventDefault()
-    setAddingElement(true)
-    setError(null)
-    try {
-      await api.createCostElement({ code: newElementCode, name: newElementName })
-      setNewElementCode('')
-      setNewElementName('')
-      loadElements()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setAddingElement(false)
     }
   }
 
@@ -352,6 +333,7 @@ export default function BudgetEditPage() {
         <p className="muted small">
           課共通の費用(人件費・ライセンス費など)を費目ごとに入力します(空欄・0 は明細なし)。
           {editable && '金額を入力して次の欄へ移ると自動保存されます。'}
+          費目はシステム共通のマスタで、「費目マスタ」画面で追加します。
         </p>
         <table>
           <thead>
@@ -364,7 +346,9 @@ export default function BudgetEditPage() {
             {periodRows.length === 0 ? (
               <tr>
                 <td colSpan={2} className="muted small">
-                  {editable ? '費目がありません。下の行から費目を追加してください。' : '明細がありません。'}
+                  {editable
+                    ? '費目がありません。「費目マスタ」画面で費目を追加してください。'
+                    : '明細がありません。'}
                 </td>
               </tr>
             ) : (
@@ -399,35 +383,10 @@ export default function BudgetEditPage() {
         </table>
 
         {editable && (
-          <>
-            <h3>費目を追加</h3>
-            <p className="muted small">
-              新しい費目はマスタに追加され、以降どの課の予算でも使えます。
-            </p>
-            <form onSubmit={addElement} className="form-row">
-              <label>
-                費目コード
-                <input
-                  value={newElementCode}
-                  onChange={(e) => setNewElementCode(e.target.value)}
-                  required
-                  placeholder="TRAVEL"
-                />
-              </label>
-              <label>
-                費目名
-                <input
-                  value={newElementName}
-                  onChange={(e) => setNewElementName(e.target.value)}
-                  required
-                  placeholder="旅費交通費"
-                />
-              </label>
-              <button type="submit" className="primary" disabled={addingElement}>
-                追加
-              </button>
-            </form>
-          </>
+          <p className="muted small">
+            費目はシステム共通のマスタです。新しい費目は
+            <Link to="/cost-elements">費目マスタ</Link>画面で追加してください。
+          </p>
         )}
       </div>
     </>

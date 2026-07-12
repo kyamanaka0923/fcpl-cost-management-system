@@ -26,8 +26,9 @@ public sealed class ProjectService
         var did = new DepartmentId(departmentId);
         _ = await _departments.FindByIdAsync(did, ct)
             ?? throw new NotFoundException($"課が見つかりません: {departmentId}");
-        if (await _projects.FindByCodeAsync(request.Code?.Trim() ?? "", ct) is not null)
-            throw new DomainException($"案件コードが重複しています: {request.Code}");
+        // 案件コードは課ごとに一意。別の課では同じコードを使える。
+        if (await _projects.FindByCodeAsync(did, request.Code?.Trim() ?? "", ct) is not null)
+            throw new DomainException($"この課には既に案件コード '{request.Code}' が存在します。");
 
         var project = Project.Create(did, request.Code!, request.Name, _clock.UtcNow);
         await _projects.AddAsync(project, ct);

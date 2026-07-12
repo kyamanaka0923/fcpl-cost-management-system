@@ -31,11 +31,13 @@ public sealed class ProjectRepository : IProjectRepository
         return row is null ? null : ToEntity(row);
     }
 
-    public async Task<Project?> FindByCodeAsync(string code, CancellationToken ct = default)
+    public async Task<Project?> FindByCodeAsync(DepartmentId departmentId, string code,
+        CancellationToken ct = default)
     {
         using var conn = _factory.Create();
         var row = await conn.QuerySingleOrDefaultAsync<Row>(
-            $"{SelectSql} WHERE code = @Code", new { Code = code });
+            $"{SelectSql} WHERE department_id = @Did AND code = @Code",
+            new { Did = departmentId.Value, Code = code });
         return row is null ? null : ToEntity(row);
     }
 

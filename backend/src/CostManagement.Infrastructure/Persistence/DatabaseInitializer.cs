@@ -22,6 +22,7 @@ public sealed class DatabaseInitializer
         using var connection = _factory.Create();
 
         DropLegacyTables(connection);
+        MigrateProjectCodeUniqueness(connection);
 
         connection.Execute("""
             CREATE TABLE IF NOT EXISTS divisions (
@@ -39,13 +40,15 @@ public sealed class DatabaseInitializer
                 created_at  TEXT NOT NULL
             );
 
+            -- 案件コードは課ごとに一意(別の課では同じコードを使える)。
             CREATE TABLE IF NOT EXISTS projects (
                 id            TEXT PRIMARY KEY,
                 department_id TEXT NOT NULL REFERENCES departments(id),
-                code          TEXT NOT NULL UNIQUE,
+                code          TEXT NOT NULL,
                 name          TEXT NOT NULL,
                 status        TEXT NOT NULL,
-                created_at    TEXT NOT NULL
+                created_at    TEXT NOT NULL,
+                UNIQUE (department_id, code)
             );
 
             CREATE TABLE IF NOT EXISTS cost_elements (
@@ -167,6 +170,48 @@ public sealed class DatabaseInitializer
                 """, transaction: tx);
         }
 
+        tx.Commit();
+    }
+
+    /// <summary>
+    /// 案件コードの一意制約を「グローバル一意」から「課ごとに一意」へ変更するマイグレーション。
+    /// 旧制約(code 単独 UNIQUE)の projects テーブルを、データを保持したまま作り直す。
+    /// 制約の緩和のみのため既存データが衝突することはない。冪等(移行済みなら何もしない)。
+    /// </summary>
+    private static void MigrateProjectCodeUniqueness(SqliteConnection connection)
+    {
+        // 現世代(department_id を持つ)の projects で、まだ課ごと一意になっていないものだけが対象。
+        var sql = connection.ExecuteScalar<string?>(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projects'");
+        if (sql is null)
+            return; // projects 未作成(新規DB)
+        var hasDepartmentId = connection.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM pragma_table_info('projects') WHERE name = 'department_id'") > 0;
+        if (!hasDepartmentId)
+            return; // 旧世代(fiscal_year 版)は DropLegacyTables が破棄する
+        if (sql.Contains("UNIQUE (department_id, code)"))
+            return; // 既に課ごと一意に移行済み
+
+        using var tx = connection.BeginTransaction();
+        connection.Execute("""
+            ALTER TABLE projects RENAME TO projects_pre_dept_unique;
+
+            CREATE TABLE projects (
+                id            TEXT PRIMARY KEY,
+                department_id TEXT NOT NULL REFERENCES departments(id),
+                code          TEXT NOT NULL,
+                name          TEXT NOT NULL,
+                status        TEXT NOT NULL,
+                created_at    TEXT NOT NULL,
+                UNIQUE (department_id, code)
+            );
+
+            INSERT INTO projects (id, department_id, code, name, status, created_at)
+            SELECT id, department_id, code, name, status, created_at
+            FROM projects_pre_dept_unique;
+
+            DROP TABLE projects_pre_dept_unique;
+            """, transaction: tx);
         tx.Commit();
     }
 }

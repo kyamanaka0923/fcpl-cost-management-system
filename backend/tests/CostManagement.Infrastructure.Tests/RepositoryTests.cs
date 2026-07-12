@@ -130,6 +130,26 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
     }
 
     [Fact]
+    public async Task 案件コードの検索は課ごとにスコープされ別の課で同じコードを持てる()
+    {
+        var div = await _fx.部を保存();
+        var deptRepo = new DepartmentRepository(_fx.Factory);
+        var 課1 = Department.Create(div.Id, "DEV-1", "開発1課", _fx.Now);
+        var 課2 = Department.Create(div.Id, "DEV-2", "開発2課", _fx.Now);
+        await deptRepo.AddAsync(課1);
+        await deptRepo.AddAsync(課2);
+
+        var repo = new ProjectRepository(_fx.Factory);
+        // 別の課で同じコードを登録できる(UNIQUE(department_id, code))
+        await repo.AddAsync(Project.Create(課1.Id, "PJ-001", "課1の案件", _fx.Now));
+        await repo.AddAsync(Project.Create(課2.Id, "PJ-001", "課2の案件", _fx.Now));
+
+        // 検索は課ごとにスコープされる
+        Assert.Equal("課1の案件", (await repo.FindByCodeAsync(課1.Id, "PJ-001"))!.Name);
+        Assert.Equal("課2の案件", (await repo.FindByCodeAsync(課2.Id, "PJ-001"))!.Name);
+    }
+
+    [Fact]
     public async Task 課予算は案件別明細と期間費用明細を含めて復元される()
     {
         var dept = await _fx.課を保存();

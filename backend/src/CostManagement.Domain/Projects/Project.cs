@@ -64,7 +64,9 @@ public sealed class Project
 public interface IProjectRepository
 {
     Task<Project?> FindByIdAsync(ProjectId id, CancellationToken ct = default);
-    Task<Project?> FindByCodeAsync(string code, CancellationToken ct = default);
+
+    /// <summary>案件コードは課ごとに一意。別の課では同じコードを使える。</summary>
+    Task<Project?> FindByCodeAsync(DepartmentId departmentId, string code, CancellationToken ct = default);
     Task<IReadOnlyList<Project>> ListByDepartmentAsync(DepartmentId departmentId, CancellationToken ct = default);
     Task AddAsync(Project project, CancellationToken ct = default);
     Task UpdateAsync(Project project, CancellationToken ct = default);

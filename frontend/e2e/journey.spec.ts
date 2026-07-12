@@ -6,8 +6,11 @@ const divCode = `DIV-${suffix}`
 const divName = `営業本部E2E-${suffix}`
 const deptCode = `DEV-${suffix}`
 const deptName = `開発課E2E-${suffix}`
+const dept2Code = `DEV2-${suffix}`
+const dept2Name = `開発2課E2E-${suffix}`
 const projectACode = `PJA-${suffix}`
 const projectBCode = `PJB-${suffix}`
+const elementCode = `TRAVEL-${suffix}`
 
 test.describe.configure({ mode: 'serial' })
 
@@ -190,4 +193,52 @@ test('計画変更: 改定版の承認で旧バージョンが失効しバージ
   await page.getByRole('button', { name: '予算バージョン比較' }).click()
   const 加工費増減 = page.locator('.stat-tile', { hasText: '加工費 増減' })
   await expect(加工費増減.getByText('¥+100,000')).toBeVisible()
+})
+
+test('費目マスタ: システム画面で費目を追加すると予算編集の期間費用に現れる', async ({ page }) => {
+  // ---- 費目マスタ画面(システム共通)で費目を追加 ----
+  await page.goto('/')
+  await page.getByRole('link', { name: '費目マスタ' }).click()
+  await expect(page.getByRole('heading', { name: '費目マスタ(期間費用)' })).toBeVisible()
+  await page.getByLabel('費目コード').fill(elementCode)
+  await page.getByLabel('費目名').fill('旅費交通費E2E')
+  await page.getByRole('button', { name: '追加' }).click()
+  await expect(page.getByRole('cell', { name: elementCode })).toBeVisible()
+
+  // ---- 追加した費目が課の予算編集の期間費用行に現れる(課の予算編集からは追加できない) ----
+  await 課詳細を開く(page)
+  const 予算カード = page.locator('.card', { hasText: '予算バージョン' })
+  await 予算カード.getByLabel('予算名').fill('費目確認予算')
+  await 予算カード.getByRole('button', { name: 'ドラフト作成' }).click()
+  await expect(page.getByRole('heading', { name: /費目確認予算/ })).toBeVisible()
+
+  const 期間費用 = page.locator('.card', { hasText: '期間費用' })
+  await expect(期間費用.getByText('旅費交通費E2E')).toBeVisible()
+  // 予算編集ページには費目追加フォームがない(マスタ画面へ誘導)
+  await expect(page.getByRole('heading', { name: '費目を追加' })).toHaveCount(0)
+})
+
+test('案件コード: 別の課では同じ案件コードを登録できる', async ({ page }) => {
+  // ---- 同じ部にもう1つ課を登録 ----
+  await 部詳細を開く(page)
+  await page.getByLabel('課コード').fill(dept2Code)
+  await page.getByLabel('課名').fill(dept2Name)
+  await page.getByRole('button', { name: '登録' }).click()
+  await expect(page.getByRole('link', { name: dept2Name })).toBeVisible()
+
+  // ---- 2課目の予算編集で、1課目と同じ案件コードを登録できる ----
+  await page.getByRole('link', { name: dept2Name }).click()
+  const 予算カード = page.locator('.card', { hasText: '予算バージョン' })
+  await 予算カード.getByLabel('予算名').fill('当初予算')
+  await 予算カード.getByRole('button', { name: 'ドラフト作成' }).click()
+  await expect(page.getByRole('heading', { name: /当初予算/ })).toBeVisible()
+
+  const form = page.locator('form', { hasText: '案件コード' })
+  await form.getByLabel('案件コード').fill(projectACode) // 1課目と同じコード
+  await form.getByLabel('案件名').fill('2課目の案件')
+  await form.getByRole('button', { name: '追加' }).click()
+
+  // エラーにならず、案件が追加される
+  await expect(page.getByRole('cell', { name: '2課目の案件' })).toBeVisible()
+  await expect(page.locator('.error-banner')).toHaveCount(0)
 })

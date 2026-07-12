@@ -147,7 +147,7 @@ public class 課予算の策定と改定 : IDisposable
     }
 
     [Fact]
-    public async Task 課コードと案件コードは重複できない()
+    public async Task 課コードは重複できず同一課では案件コードも重複できない()
     {
         var div = await _fx.部を作成();
         var dept = await _fx.課を作成(div.Id, "DEV-1", "開発1課");
@@ -155,5 +155,21 @@ public class 課予算の策定と改定 : IDisposable
 
         await Assert.ThrowsAsync<DomainException>(() => _fx.課を作成(div.Id, "DEV-1", "別の課"));
         await Assert.ThrowsAsync<DomainException>(() => _fx.案件を作成(dept.Id, "PJ-001", "別の案件"));
+    }
+
+    [Fact]
+    public async Task 案件コードは課ごとに一意で別の課では同じコードを使える()
+    {
+        var div = await _fx.部を作成();
+        var 課1 = await _fx.課を作成(div.Id, "DEV-1", "開発1課");
+        var 課2 = await _fx.課を作成(div.Id, "DEV-2", "開発2課");
+
+        await _fx.案件を作成(課1.Id, "PJ-001", "課1の案件");
+        // 別の課なら同じ案件コードを登録できる
+        var 課2案件 = await _fx.案件を作成(課2.Id, "PJ-001", "課2の案件");
+        Assert.Equal("PJ-001", 課2案件.Code);
+
+        // 同じ課で同じコードは不可
+        await Assert.ThrowsAsync<DomainException>(() => _fx.案件を作成(課1.Id, "PJ-001", "課1の別案件"));
     }
 }

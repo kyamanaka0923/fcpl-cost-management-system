@@ -205,3 +205,100 @@ public class スキーマの作り直し : IDisposable
         Assert.True(カラムが存在する("departments", "division_id"));
     }
 }
+
+/// <summary>
+/// 案件コードの一意制約を「グローバル一意」→「課ごとに一意」へ変更するマイグレーションの検証。
+/// 制約緩和のため既存の案件データは保持したまま作り直される(Issue #1)。
+/// </summary>
+public class 案件コードの課ごと一意化マイグレーション : IDisposable
+{
+    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _factory;
+
+    public 案件コードの課ごと一意化マイグレーション()
+    {
+        _dbPath = Path.Combine(Path.GetTempPath(), $"cm-projuniq-{Guid.NewGuid():N}.db");
+        _factory = new SqliteConnectionFactory($"Data Source={_dbPath}");
+    }
+
+    public void Dispose()
+    {
+        if (File.Exists(_dbPath))
+            File.Delete(_dbPath);
+    }
+
+    /// <summary>旧制約(code 単独 UNIQUE)の現世代 projects を持つDBを作る。</summary>
+    private void 旧一意制約のDBを作成()
+    {
+        using var conn = _factory.Create();
+        conn.Execute("""
+            CREATE TABLE divisions (
+                id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE TABLE departments (
+                id TEXT PRIMARY KEY, division_id TEXT NOT NULL, code TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE TABLE projects (
+                id            TEXT PRIMARY KEY,
+                department_id TEXT NOT NULL REFERENCES departments(id),
+                code          TEXT NOT NULL UNIQUE,
+                name          TEXT NOT NULL,
+                status        TEXT NOT NULL,
+                created_at    TEXT NOT NULL
+            );
+            INSERT INTO divisions VALUES ('v1', 'SALES', '営業本部', '2026-04-01');
+            INSERT INTO departments VALUES
+                ('d1', 'v1', 'DEV-1', '開発1課', '2026-04-01'),
+                ('d2', 'v1', 'DEV-2', '開発2課', '2026-04-01');
+            INSERT INTO projects VALUES ('p1', 'd1', 'PJ-001', '課1の案件', 'Active', '2026-04-01');
+            """);
+    }
+
+    [Fact]
+    public void 旧一意制約のDBは案件データを保持したまま課ごと一意に作り直される()
+    {
+        旧一意制約のDBを作成();
+
+        new DatabaseInitializer(_factory).Initialize();
+
+        using var conn = _factory.Create();
+        // 既存の案件は保持される
+        var name = conn.ExecuteScalar<string>("SELECT name FROM projects WHERE id = 'p1'");
+        Assert.Equal("課1の案件", name);
+
+        // 別の課で同じコードを登録できる(以前はグローバル UNIQUE で不可だった)
+        conn.Execute(
+            "INSERT INTO projects VALUES ('p2', 'd2', 'PJ-001', '課2の案件', 'Active', '2026-04-01')");
+        Assert.Equal(2, conn.ExecuteScalar<long>("SELECT COUNT(*) FROM projects WHERE code = 'PJ-001'"));
+    }
+
+    [Fact]
+    public void 同一課の案件コード重複は移行後も許されない()
+    {
+        旧一意制約のDBを作成();
+        new DatabaseInitializer(_factory).Initialize();
+
+        using var conn = _factory.Create();
+        var ex = Assert.ThrowsAny<Microsoft.Data.Sqlite.SqliteException>(() =>
+            conn.Execute(
+                "INSERT INTO projects VALUES ('p3', 'd1', 'PJ-001', '課1の別案件', 'Active', '2026-04-01')"));
+        Assert.Contains("UNIQUE", ex.Message);
+    }
+
+    [Fact]
+    public void 移行は冪等で2回実行しても壊れない()
+    {
+        旧一意制約のDBを作成();
+
+        var initializer = new DatabaseInitializer(_factory);
+        initializer.Initialize();
+        initializer.Initialize(); // 2回目は移行済みのため何もしない
+
+        using var conn = _factory.Create();
+        Assert.Equal(1, conn.ExecuteScalar<long>("SELECT COUNT(*) FROM projects"));
+        // 一時テーブルが残っていない
+        Assert.Equal(0, conn.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'projects_pre_dept_unique'"));
+    }
+}

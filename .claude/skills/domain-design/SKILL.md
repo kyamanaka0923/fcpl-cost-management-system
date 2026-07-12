@@ -31,9 +31,13 @@ model: claude-opus-4-8
 - **課の区分合計 = 常に明細合計**(`CategoryTotal`)。ヘッダに金額を持たないことで
   課レベルの直接入力を構造的に不可にしている。この構造を崩さない
 - **案件(Project)は課に属するマスタ**(DepartmentId 参照)。予算策定単位ではなく明細の内訳次元。
-  「明細の案件は同一課所属」の検証は Application 層(DepartmentBudgetService/ActualEntryService)
-- **費目(CostElement)は期間費用専用**。シードは人件費(PERSONNEL)・ライセンス費(LICENSE)、
-  マスタで拡張可能。原価要素分類(CostElementType)は廃止済み
+  「明細の案件は同一課所属」の検証は Application 層(DepartmentBudgetService/ActualEntryService)。
+  **案件コードは課ごとに一意**(別の課では同じコード可)。`IProjectRepository.FindByCodeAsync`
+  は `(DepartmentId, code)` でスコープし、DB は `UNIQUE (department_id, code)`(Issue #1)
+- **費目(CostElement)は期間費用専用のシステム全体で共通なマスタ**(課ごとの設定ではない)。
+  管理はフロントの専用画面 `/cost-elements`(課の予算編集からは選択のみ)。
+  シードは人件費(PERSONNEL)・ライセンス費(LICENSE)、マスタで拡張可能。
+  原価要素分類(CostElementType)は廃止済み
 - **予算のバージョン管理**: v1=当初、改定は明細コピーで新バージョン起票。
   Draft→Approved→Superseded。承認済みは編集不可。ドラフトは同一(課, 半期)に1件。
   明細なしは承認不可。承認時に同一(課, 半期)の旧承認版を Supersede するのは Application 層の責務

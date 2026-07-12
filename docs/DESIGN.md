@@ -62,7 +62,9 @@ flowchart TB
   4区分をまとめて1承認します(売上と原価を別集約で独立承認する方式は採っていません)
 - 課の区分合計は**常に明細の合計として導出**します(ヘッダに金額を持たない=直接入力不可を
   構造的に保証)
-- 案件・費目はマスタとして ID / コードで参照します(旧世代の「品目名の緩い結合」は廃止)
+- 案件・費目はマスタとして ID / コードで参照します(旧世代の「品目名の緩い結合」は廃止)。
+  **案件(Project)は課に属し、案件コードは課ごとに一意**(別の課では同じコードを使える)。
+  **費目(CostElement)はシステム全体で共通のマスタ**(課ごとの設定ではない)
 - 分析(Analysis)は状態を持たず、予算・実績の集約を入力として受け取る
   **ドメインサービス群**として実現しています
 
@@ -190,7 +192,7 @@ classDiagram
         <<Aggregate Root>>
         +ProjectId Id
         +DepartmentId DepartmentId ※所属する課
-        +string Code
+        +string Code ※課ごとに一意
         +string Name
         +ProjectStatus Status
         +Create(departmentId, code, name, now) Project$
@@ -208,7 +210,7 @@ classDiagram
     }
     class CostElement {
         <<Aggregate Root>>
-        +CostElementCode Code
+        +CostElementCode Code ※システム全体で共通
         +string Name
         +Create(code, name) CostElement$
     }
