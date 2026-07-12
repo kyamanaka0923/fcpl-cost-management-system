@@ -43,6 +43,10 @@ model: claude-sonnet-5
   null になりうるキーは Where で分離してから集計する(ProfitAnalysisService は案件系区分に
   絞ってから `ProjectId!.Value` で GroupBy している。タプルキーなら null を含んでも安全)
 - WebApplicationFactory を使うため `Program.cs` 末尾の `public partial class Program {}` を消さない
+- **Playwright の連続フォーム送信レース**: 送信ボタンを連打する前に完了を待つこと。
+  ローカルの速いマシンでは通っても遅い CI で落ちる。実績計上のように送信後に入力欄が
+  クリアされる画面なら `await expect(欄).toHaveValue('')` で完了を待ってから次へ進む
+  (`reuseExistingServer` で残ったサーバを掴むと結果がぶれるので、E2E前に 5173/5100 を掃除する)
 
 ## 実行方法
 

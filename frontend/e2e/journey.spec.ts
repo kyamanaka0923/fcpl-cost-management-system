@@ -126,8 +126,11 @@ test('実績入力: 区分ごとに案件別・費目別の実績を計上でき
     } else {
       await page.getByLabel('案件').selectOption({ label: 相手 })
     }
-    await page.getByLabel(/金額/).fill(金額)
+    const 金額欄 = page.getByLabel(/金額/)
+    await 金額欄.fill(金額)
     await page.getByRole('button', { name: '計上' }).click()
+    // 計上に成功すると金額欄がクリアされる。次の計上と競合しないよう完了を待つ。
+    await expect(金額欄).toHaveValue('')
   }
 
   await 実績を計上('売上高', `案件A(${projectACode})`, '2100000')
