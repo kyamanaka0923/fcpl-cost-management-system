@@ -47,6 +47,44 @@ public class 部の予実サマリ : IDisposable
     }
 
     [Fact]
+    public async Task 課別内訳には区分別の予算内訳が含まれる()
+    {
+        var div = await _fx.部を作成();
+        var 課1 = await _fx.課を作成(div.Id, "DEV-1", "開発1課");
+        var pj1 = await _fx.案件を作成(課1.Id, "PJ-1", "案件1");
+        await _fx.承認済み予算を作成(課1.Id, "2026-H1",
+            ("Revenue", pj1.Id, null, 3_000_000m),
+            ("Processing", pj1.Id, null, 1_000_000m),
+            ("Outsourcing", pj1.Id, null, 500_000m),
+            ("PeriodCost", null, "PERSONNEL", 300_000m));
+
+        var summary = await _fx.Analysis.GetDivisionBudgetSummaryAsync(div.Id, "2026-H1");
+
+        var line = summary.DepartmentLines.Single(l => l.DepartmentCode == "DEV-1");
+        Assert.Equal(4, line.Categories.Count); // 4区分すべて
+        Assert.Equal(1_000_000m,
+            line.Categories.Single(c => c.Category == "Processing").PlannedAmount);
+        Assert.Equal(500_000m,
+            line.Categories.Single(c => c.Category == "Outsourcing").PlannedAmount);
+        Assert.Equal(300_000m,
+            line.Categories.Single(c => c.Category == "PeriodCost").PlannedAmount);
+        // 区分別内訳の合計 = その課のコスト予算
+        var costCategories = line.Categories.Where(c => c.Category != "Revenue");
+        Assert.Equal(line.PlannedCost, costCategories.Sum(c => c.PlannedAmount));
+    }
+
+    [Fact]
+    public async Task 未策定の課の区分別内訳は空になる()
+    {
+        var div = await _fx.部を作成();
+        _ = await _fx.課を作成(div.Id, "DEV-1", "開発1課"); // 予算未策定
+
+        var summary = await _fx.Analysis.GetDivisionBudgetSummaryAsync(div.Id, "2026-H1");
+
+        Assert.Empty(summary.DepartmentLines.Single().Categories);
+    }
+
+    [Fact]
     public async Task 承認済み予算のない課は未策定として内訳に出て合計に含まれない()
     {
         var div = await _fx.部を作成();

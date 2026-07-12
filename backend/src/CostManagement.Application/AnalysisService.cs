@@ -164,12 +164,16 @@ public sealed class AnalysisService
                 {
                     var plannedProfit = r.PlannedRevenue - r.PlannedCost;
                     var actualProfit = r.ActualRevenue - r.ActualCost;
+                    var categories = r.Categories
+                        .Select(c => new CategorySummaryDto(c.Category.ToString(),
+                            c.PlannedAmount, c.ActualAmount, c.Variance))
+                        .ToList();
                     return new DepartmentSummaryLineDto(d.Id.Value, d.Code, d.Name, true,
                         r.PlannedRevenue, r.ActualRevenue, r.PlannedCost, r.ActualCost,
-                        plannedProfit, actualProfit, actualProfit - plannedProfit);
+                        plannedProfit, actualProfit, actualProfit - plannedProfit, categories);
                 }
                 return new DepartmentSummaryLineDto(d.Id.Value, d.Code, d.Name, false,
-                    0m, 0m, 0m, 0m, 0m, 0m, 0m);
+                    0m, 0m, 0m, 0m, 0m, 0m, 0m, []);
             })
             .ToList();
 

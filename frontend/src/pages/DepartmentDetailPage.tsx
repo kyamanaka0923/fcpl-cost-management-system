@@ -4,8 +4,10 @@ import {
   api,
   currentFiscalHalf,
   fiscalHalfOptions,
+  formatPercent,
   formatYen,
   halfLabel,
+  marginRate,
   type BudgetStatus,
   type BudgetSummary,
   type Department,
@@ -250,6 +252,9 @@ export default function DepartmentDetailPage() {
             <div className="label">計画損益</div>
             <div className={`value ${approved.plannedProfit >= 0 ? 'favorable' : 'adverse'}`}>
               ¥{formatYen(approved.plannedProfit)}
+            </div>
+            <div className="label">
+              粗利率 {formatPercent(marginRate(approved.plannedProfit, approved.revenueTotal))}
             </div>
           </div>
         </div>

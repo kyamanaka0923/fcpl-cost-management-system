@@ -37,6 +37,7 @@ export interface DepartmentSummaryLine {
   plannedProfit: number
   actualProfit: number
   profitVariance: number
+  categories: CategorySummary[]
 }
 
 export interface DivisionBudgetSummary {
@@ -365,6 +366,14 @@ export const formatYen = (value: number): string =>
 
 export const formatSignedYen = (value: number): string =>
   (value > 0 ? '+' : '') + formatYen(value)
+
+/** 粗利率などの割合表示。null / 分母0 は「—」。 */
+export const formatPercent = (rate: number | null): string =>
+  rate === null ? '—' : `${(rate * 100).toFixed(1)}%`
+
+/** 粗利率 = 損益 ÷ 売上高。売上高が0なら null。 */
+export const marginRate = (profit: number, revenue: number): number | null =>
+  revenue === 0 ? null : profit / revenue
 
 /** 予算区分の表示名。 */
 export const categoryLabel: Record<BudgetCategory, string> = {

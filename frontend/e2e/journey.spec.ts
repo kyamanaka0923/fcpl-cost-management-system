@@ -87,13 +87,21 @@ test('計画策定: 部と課を登録し予算編集で案件別に金額を入
   await page.getByRole('button', { name: 'この予算を承認する' }).click()
   await expect(page.getByText('承認済')).toBeVisible()
 
-  // ---- 部詳細に配下課の予実が集計される ----
+  // ---- 部詳細の予算(計画)タブに配下課の予算が集計される(既定タブ) ----
   await 部詳細を開く(page)
+  // 部の計画損益の粗利率(60万 / 300万 = 20.0%)
+  await expect(page.getByText('粗利率 20.0%').first()).toBeVisible()
+  const 予算比較 = page.locator('.card', { hasText: '課ごとの予算比較' })
+  await expect(予算比較.getByRole('link', { name: deptName })).toBeVisible()
+  // 課ごとの予算比較グリッド: 売上高 300万・計画損益 60万(課行と部合計行に出るため first)
+  await expect(予算比較.getByRole('cell', { name: '¥3,000,000' }).first()).toBeVisible()
+  await expect(予算比較.getByRole('cell', { name: '¥600,000' }).first()).toBeVisible()
+
+  // 予実サマリタブに切り替えると予実の内訳が見られる
+  await page.getByRole('button', { name: '予実サマリ' }).click()
   await expect(page.getByRole('heading', { name: '区分別の予実(部合計)' })).toBeVisible()
   const 課別内訳 = page.locator('.card', { hasText: '課別の内訳' })
   await expect(課別内訳.getByRole('link', { name: deptName })).toBeVisible()
-  // 部合計の売上高予算 = 課の売上高 300万
-  await expect(課別内訳.getByRole('cell', { name: '¥3,000,000' }).first()).toBeVisible()
 
   // 配下課がすべて承認済みなので部予算を承認できる
   const 承認カード = page.locator('.card', { hasText: '部予算の承認' })

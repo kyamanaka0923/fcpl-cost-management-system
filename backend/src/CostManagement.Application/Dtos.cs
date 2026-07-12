@@ -179,7 +179,8 @@ public sealed record DepartmentSummaryLineDto(
     decimal ActualCost,
     decimal PlannedProfit,
     decimal ActualProfit,
-    decimal ProfitVariance);
+    decimal ProfitVariance,
+    IReadOnlyList<CategorySummaryDto> Categories);
 
 public sealed record DivisionBudgetSummaryDto(
     IReadOnlyList<CategorySummaryDto> Categories,
