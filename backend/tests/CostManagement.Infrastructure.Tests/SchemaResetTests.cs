@@ -110,6 +110,7 @@ public class スキーマの作り直し : IDisposable
 
         // 新スキーマのテーブルが揃う
         Assert.Equal(1, テーブル数("divisions"));
+        Assert.Equal(1, テーブル数("division_budget_approvals"));
         Assert.Equal(1, テーブル数("departments"));
         Assert.Equal(1, テーブル数("department_budgets"));
         Assert.Equal(1, テーブル数("department_budget_lines"));
@@ -143,6 +144,7 @@ public class スキーマの作り直し : IDisposable
         new DatabaseInitializer(_factory).Initialize();
 
         Assert.Equal(1, テーブル数("divisions"));
+        Assert.Equal(1, テーブル数("division_budget_approvals"));
         Assert.Equal(1, テーブル数("departments"));
         Assert.Equal(1, テーブル数("department_budgets"));
         Assert.True(カラムが存在する("departments", "division_id"));

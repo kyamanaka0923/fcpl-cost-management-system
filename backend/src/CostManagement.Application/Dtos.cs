@@ -192,7 +192,10 @@ public sealed record DivisionBudgetSummaryDto(
     decimal PlannedProfit,
     decimal ActualProfit,
     decimal ProfitVariance,
-    IReadOnlyList<DepartmentSummaryLineDto> DepartmentLines);
+    IReadOnlyList<DepartmentSummaryLineDto> DepartmentLines,
+    bool IsApproved,
+    DateTime? ApprovedAt,
+    bool CanApprove);
 
 // ---- リクエスト ----
 

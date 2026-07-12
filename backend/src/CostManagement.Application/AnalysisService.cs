@@ -19,6 +19,7 @@ public sealed class AnalysisService
     private readonly ICostElementRepository _elements;
     private readonly IDepartmentRepository _departments;
     private readonly IDivisionRepository _divisions;
+    private readonly IDivisionBudgetApprovalRepository _divisionApprovals;
     private readonly BudgetVarianceAnalysisService _varianceAnalysis;
     private readonly BudgetComparisonService _budgetComparison;
     private readonly ProfitAnalysisService _profitAnalysis;
@@ -27,6 +28,7 @@ public sealed class AnalysisService
     public AnalysisService(IDepartmentBudgetRepository budgets, IActualEntryRepository actuals,
         IProjectRepository projects, ICostElementRepository elements,
         IDepartmentRepository departments, IDivisionRepository divisions,
+        IDivisionBudgetApprovalRepository divisionApprovals,
         BudgetVarianceAnalysisService varianceAnalysis, BudgetComparisonService budgetComparison,
         ProfitAnalysisService profitAnalysis, DivisionBudgetSummaryService divisionSummary)
     {
@@ -36,6 +38,7 @@ public sealed class AnalysisService
         _elements = elements;
         _departments = departments;
         _divisions = divisions;
+        _divisionApprovals = divisionApprovals;
         _varianceAnalysis = varianceAnalysis;
         _budgetComparison = budgetComparison;
         _profitAnalysis = profitAnalysis;
@@ -170,6 +173,10 @@ public sealed class AnalysisService
             })
             .ToList();
 
+        // 部承認の状態。配下課が1件以上かつ全課が承認済み予算を持つとき部承認が可能。
+        var approval = await _divisionApprovals.FindAsync(divId, half, ct);
+        var canApprove = departments.Count > 0 && lines.All(l => l.HasApprovedBudget);
+
         return new DivisionBudgetSummaryDto(
             summary.Categories
                 .Select(c => new CategorySummaryDto(c.Category.ToString(),
@@ -178,7 +185,8 @@ public sealed class AnalysisService
             summary.PlannedRevenue, summary.ActualRevenue, summary.RevenueVariance,
             summary.PlannedCost, summary.ActualCost, summary.CostVariance,
             summary.PlannedProfit, summary.ActualProfit, summary.ProfitVariance,
-            lines);
+            lines,
+            approval is not null, approval?.ApprovedAt, canApprove);
     }
 
     private async Task<DepartmentBudget> ResolveBudgetAsync(DepartmentId departmentId,

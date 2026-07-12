@@ -50,6 +50,18 @@ api.MapPost("/divisions",
 api.MapGet("/divisions/{id:guid}/budget-summary",
     (Guid id, string fiscalHalf, AnalysisService svc, CancellationToken ct) =>
         svc.GetDivisionBudgetSummaryAsync(id, fiscalHalf, ct));
+api.MapPost("/divisions/{id:guid}/budget-approval",
+    async (Guid id, string fiscalHalf, DivisionBudgetApprovalService svc, CancellationToken ct) =>
+    {
+        await svc.ApproveAsync(id, fiscalHalf, ct);
+        return Results.NoContent();
+    });
+api.MapDelete("/divisions/{id:guid}/budget-approval",
+    async (Guid id, string fiscalHalf, DivisionBudgetApprovalService svc, CancellationToken ct) =>
+    {
+        await svc.RevokeAsync(id, fiscalHalf, ct);
+        return Results.NoContent();
+    });
 
 // ---- 課(部に属する) ----
 api.MapGet("/divisions/{id:guid}/departments",

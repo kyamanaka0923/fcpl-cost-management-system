@@ -191,6 +191,32 @@ public class 業務フロー全体のE2E : IDisposable
         var deptLine = divisionSummary.GetProperty("departmentLines").EnumerateArray().Single();
         Assert.True(deptLine.GetProperty("hasApprovedBudget").GetBoolean());
         Assert.Equal(deptId, deptLine.GetProperty("departmentId").GetString());
+        // 配下課がすべて承認済みなので部承認が可能・未承認
+        Assert.True(divisionSummary.GetProperty("canApprove").GetBoolean());
+        Assert.False(divisionSummary.GetProperty("isApproved").GetBoolean());
+
+        // ---- 6. 部予算の承認・取り消し ----
+        // 部を承認する → isApproved
+        var approveRes = await _client.PostAsJsonAsync(
+            $"/api/divisions/{divisionId}/budget-approval?fiscalHalf=2026-H1", new { }, Json);
+        Assert.Equal(HttpStatusCode.NoContent, approveRes.StatusCode);
+        var afterApprove = await GetAsync($"/api/divisions/{divisionId}/budget-summary?fiscalHalf=2026-H1");
+        Assert.True(afterApprove.GetProperty("isApproved").GetBoolean());
+
+        // 課を改定・再承認しても部承認は残る(独立)
+        var revised3 = await PostAsync($"/api/departments/{deptId}/budgets",
+            new { fiscalHalf = "2026-H1", label = "再見直し" });
+        await PostAsync($"/api/budgets/{revised3.GetProperty("id").GetString()}/approve",
+            new { }, HttpStatusCode.OK);
+        var afterRevise = await GetAsync($"/api/divisions/{divisionId}/budget-summary?fiscalHalf=2026-H1");
+        Assert.True(afterRevise.GetProperty("isApproved").GetBoolean());
+
+        // 部承認を取り消す → 未承認に戻る
+        var revokeRes = await _client.DeleteAsync(
+            $"/api/divisions/{divisionId}/budget-approval?fiscalHalf=2026-H1");
+        Assert.Equal(HttpStatusCode.NoContent, revokeRes.StatusCode);
+        var afterRevoke = await GetAsync($"/api/divisions/{divisionId}/budget-summary?fiscalHalf=2026-H1");
+        Assert.False(afterRevoke.GetProperty("isApproved").GetBoolean());
     }
 
     [Fact]
@@ -285,5 +311,24 @@ public class エラー応答のE2E : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
         var body = await res.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Contains("半期の形式が不正です", body.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task 未承認の課がある部は承認できず400を返す()
+    {
+        var division = await _client.PostAsJsonAsync("/api/divisions",
+            new { code = "SALES", name = "営業本部" });
+        var divisionId = (await division.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetString();
+        // 課だけ作り予算は未承認のまま
+        await _client.PostAsJsonAsync($"/api/divisions/{divisionId}/departments",
+            new { code = "DEV-1", name = "開発1課" });
+
+        var res = await _client.PostAsJsonAsync(
+            $"/api/divisions/{divisionId}/budget-approval?fiscalHalf=2026-H1", new { });
+
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+        var body = await res.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Contains("未承認の予算がある課", body.GetProperty("error").GetString());
     }
 }

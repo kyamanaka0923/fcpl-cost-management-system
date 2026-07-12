@@ -249,6 +249,25 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
     }
 
     [Fact]
+    public async Task 部承認は保存と取り消しができる()
+    {
+        var division = await _fx.部を保存();
+        var repo = new DivisionBudgetApprovalRepository(_fx.Factory);
+
+        var approval = DivisionBudgetApproval.Approve(division.Id, _fx.Half, _fx.Now);
+        await repo.AddAsync(approval);
+
+        var restored = await repo.FindAsync(division.Id, _fx.Half);
+        Assert.NotNull(restored);
+        Assert.Equal(division.Id, restored.DivisionId);
+        Assert.Equal(_fx.Half, restored.FiscalHalf);
+        Assert.Equal(_fx.Now, restored.ApprovedAt);
+
+        await repo.DeleteAsync(division.Id, _fx.Half);
+        Assert.Null(await repo.FindAsync(division.Id, _fx.Half));
+    }
+
+    [Fact]
     public async Task 費目マスタにはシード済みの標準費目が存在する()
     {
         var repo = new CostElementRepository(_fx.Factory);

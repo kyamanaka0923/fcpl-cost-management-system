@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddSingleton(new SqliteConnectionFactory(connectionString));
         services.AddSingleton<DatabaseInitializer>();
         services.AddSingleton<IDivisionRepository, DivisionRepository>();
+        services.AddSingleton<IDivisionBudgetApprovalRepository, DivisionBudgetApprovalRepository>();
         services.AddSingleton<IDepartmentRepository, DepartmentRepository>();
         services.AddSingleton<IProjectRepository, ProjectRepository>();
         services.AddSingleton<ICostElementRepository, CostElementRepository>();
@@ -43,6 +44,7 @@ public static class DependencyInjection
 
         // ユースケース(アプリケーションサービス)
         services.AddSingleton<DivisionService>();
+        services.AddSingleton<DivisionBudgetApprovalService>();
         services.AddSingleton<DepartmentService>();
         services.AddSingleton<ProjectService>();
         services.AddSingleton<CostElementService>();

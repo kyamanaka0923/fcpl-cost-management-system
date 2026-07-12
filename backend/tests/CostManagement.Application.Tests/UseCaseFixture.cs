@@ -23,6 +23,7 @@ public sealed class UseCaseFixture : IDisposable
     public FixedClock Clock { get; } = new();
 
     public DivisionService Divisions { get; }
+    public DivisionBudgetApprovalService DivisionApprovals { get; }
     public DepartmentService Departments { get; }
     public ProjectService Projects { get; }
     public CostElementService CostElements { get; }
@@ -37,6 +38,7 @@ public sealed class UseCaseFixture : IDisposable
         new DatabaseInitializer(factory).Initialize();
 
         var divisions = new DivisionRepository(factory);
+        var divisionApprovals = new DivisionBudgetApprovalRepository(factory);
         var departments = new DepartmentRepository(factory);
         var projects = new ProjectRepository(factory);
         var elements = new CostElementRepository(factory);
@@ -44,12 +46,15 @@ public sealed class UseCaseFixture : IDisposable
         var actuals = new ActualEntryRepository(factory);
 
         Divisions = new DivisionService(divisions, Clock);
+        DivisionApprovals = new DivisionBudgetApprovalService(divisionApprovals, divisions,
+            departments, budgets, Clock);
         Departments = new DepartmentService(departments, divisions, Clock);
         Projects = new ProjectService(projects, departments, Clock);
         CostElements = new CostElementService(elements);
         Budgets = new DepartmentBudgetService(budgets, departments, projects, elements, Clock);
         Actuals = new ActualEntryService(actuals, departments, projects, elements, Clock);
         Analysis = new AnalysisService(budgets, actuals, projects, elements, departments, divisions,
+            divisionApprovals,
             new BudgetVarianceAnalysisService(), new BudgetComparisonService(),
             new ProfitAnalysisService(), new DivisionBudgetSummaryService());
     }

@@ -90,6 +90,14 @@ public sealed class DatabaseInitializer
                 recorded_at   TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS division_budget_approvals (
+                id            TEXT PRIMARY KEY,
+                division_id   TEXT NOT NULL REFERENCES divisions(id),
+                fiscal_half   TEXT NOT NULL,
+                approved_at   TEXT NOT NULL,
+                UNIQUE (division_id, fiscal_half)
+            );
+
             CREATE INDEX IF NOT EXISTS ix_departments_division ON departments(division_id);
             CREATE INDEX IF NOT EXISTS ix_projects_department ON projects(department_id);
             CREATE INDEX IF NOT EXISTS ix_budgets_dept_half
