@@ -6,10 +6,25 @@
     <ProjectReference Include="..\CostManagement.Domain\CostManagement.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="2.1.0" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!--
+    AWS Lambda カスタムランタイム(provided.al2023)向けの発行設定。
+    LambdaPublish=true のとき(infra/ の Makefile 経由の発行時)だけ有効。
+    実行ファイル名を bootstrap にすることで provided.al2023 のブートストラップになる。
+    通常のローカル実行・テスト(WebApplicationFactory)には影響しない。
+  -->
+  <PropertyGroup Condition="'$(LambdaPublish)' == 'true'">
+    <AssemblyName>bootstrap</AssemblyName>
+    <SelfContained>true</SelfContained>
   </PropertyGroup>
 
 </Project>

@@ -1,3 +1,4 @@
+using Amazon.Lambda.AspNetCoreServer.Hosting;
 using CostManagement.Application;
 using CostManagement.Application.Common;
 using CostManagement.Domain.Shared;
@@ -12,6 +13,11 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
 builder.Services.AddCostManagement(connectionString);
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
     policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
+
+// AWS Lambda(API Gateway HTTP API / Function URL のペイロード v2)で実行するときだけ
+// Lambda ランタイムに接続する。Lambda 環境でなければ何もしないため、
+// ローカル実行・テスト(WebApplicationFactory)には影響しない。
+builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 
 var app = builder.Build();
 

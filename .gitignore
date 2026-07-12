@@ -22,3 +22,7 @@ dist/
 # Playwright
 test-results/
 playwright-report/
+
+# AWS SAM
+.aws-sam/
+infra/packaged.yaml

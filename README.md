@@ -228,6 +228,18 @@ npm run test:e2e
 詳細な HTML レポートは実行のアーティファクト `coverage-report` からダウンロードできます。
 ローカルでは `dotnet test --collect:"XPlat Code Coverage"` で計測できます。
 
+## AWS へのデプロイ(サーバーレス構成)
+
+EC2・コンテナを使わず費用を抑えたサーバーレス構成の IaC(AWS SAM)を `infra/` に用意しています。
+
+- **バックエンド**: .NET 10 を **Lambda**(`provided.al2023` カスタムランタイム, arm64)で実行(コンテナ不使用)
+- **DB**: SQLite ファイルを **EFS** に永続化(予約同時実行=1 で書き込み直列化)
+- **フロント**: React 静的ビルドを **S3 + CloudFront**。CloudFront が `/api/*` を Lambda に振り分け同一ドメイン化
+
+```bash
+cd infra && ./deploy.sh     # 詳細・コスト目安・注意点は infra/README.md
+```
+
 ## API 概要
 
 半期は `fiscalHalf=2026-H1`(上期)/ `fiscalHalf=2026-H2`(下期)の形式で指定します。

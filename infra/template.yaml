@@ -1,0 +1,277 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  総合原価管理システムのサーバーレス構成(EC2・コンテナ不使用)。
+  バックエンド = .NET 10 を AWS Lambda(provided.al2023 カスタムランタイム, arm64)で実行。
+  DB = SQLite ファイルを Amazon EFS に永続化(Lambda にマウント、予約同時実行=1 で書き込み直列化)。
+  フロント = React 静的ビルドを S3 + CloudFront で配信。CloudFront が /api/* を Lambda に振り分け同一ドメイン化。
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: fcpl-cost
+    Description: 各リソース名のプレフィックス。
+  VpcCidr:
+    Type: String
+    Default: 10.20.0.0/16
+  SubnetACidr:
+    Type: String
+    Default: 10.20.1.0/24
+  SubnetBCidr:
+    Type: String
+    Default: 10.20.2.0/24
+
+Resources:
+  # ---------------------------------------------------------------------------
+  # ネットワーク(NAT/IGW なし = 追加課金なし)。
+  # Lambda は EFS を同一 VPC 内の ENI 経由で使うだけで、外部通信は不要。
+  # ---------------------------------------------------------------------------
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-vpc'
+
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref SubnetACidr
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-subnet-a'
+
+  SubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref SubnetBCidr
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-subnet-b'
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${ProjectName} Lambda SG'
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: allow all egress (EFS 等)
+
+  EfsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${ProjectName} EFS SG'
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+          Description: NFS from Lambda
+
+  # ---------------------------------------------------------------------------
+  # EFS(SQLite ファイルの永続化先)。アクセスポイントで posix uid/gid を固定。
+  # ---------------------------------------------------------------------------
+  FileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-efs'
+
+  MountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Ref SubnetA
+      SecurityGroups:
+        - !Ref EfsSecurityGroup
+
+  MountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Ref SubnetB
+      SecurityGroups:
+        - !Ref EfsSecurityGroup
+
+  AccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref FileSystem
+      PosixUser:
+        Uid: '1000'
+        Gid: '1000'
+      RootDirectory:
+        Path: /costdb
+        CreationInfo:
+          OwnerUid: '1000'
+          OwnerGid: '1000'
+          Permissions: '0755'
+
+  # ---------------------------------------------------------------------------
+  # バックエンド Lambda(.NET 10 / provided.al2023 / arm64)。
+  # EFS を /mnt/efs にマウントし、SQLite をそこに置く。
+  # 予約同時実行=1 で SQLite の書き込み競合を防ぐ(単一利用者の内部ツール向け)。
+  # ---------------------------------------------------------------------------
+  CostApiFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - MountTargetA
+      - MountTargetB
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub '${ProjectName}-api'
+      CodeUri: ../backend/src/CostManagement.WebApi
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      MemorySize: 512
+      Timeout: 30
+      ReservedConcurrentExecutions: 1
+      Environment:
+        Variables:
+          ConnectionStrings__Default: 'Data Source=/mnt/efs/costmanagement.db'
+          ASPNETCORE_ENVIRONMENT: Production
+      VpcConfig:
+        SubnetIds:
+          - !Ref SubnetA
+          - !Ref SubnetB
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+      FileSystemConfigs:
+        - Arn: !GetAtt AccessPoint.Arn
+          LocalMountPath: /mnt/efs
+      FunctionUrlConfig:
+        AuthType: NONE
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - elasticfilesystem:ClientMount
+                - elasticfilesystem:ClientWrite
+                - elasticfilesystem:ClientRootAccess
+              Resource: !GetAtt FileSystem.Arn
+
+  # ---------------------------------------------------------------------------
+  # フロント配信(S3 は非公開。CloudFront の OAC からのみ読める)。
+  # ---------------------------------------------------------------------------
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-frontend-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFrontOAC
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub '${FrontendBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+
+  FrontendOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${ProjectName}-frontend-oac'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # ---------------------------------------------------------------------------
+  # CloudFront: / は S3(静的)、/api/* は Lambda Function URL に振り分け同一ドメイン化。
+  # ---------------------------------------------------------------------------
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub '${ProjectName} frontend + api'
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_200
+        Origins:
+          - Id: s3-frontend
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !Ref FrontendOAC
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+          - Id: lambda-api
+            DomainName: !Select [2, !Split ['/', !GetAtt CostApiFunctionUrl.FunctionUrl]]
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+        DefaultCacheBehavior:
+          TargetOriginId: s3-frontend
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          # Managed-CachingOptimized
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: lambda-api
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            Compress: true
+            # Managed-CachingDisabled
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            # Managed-AllViewerExceptHostHeader(Function URL は Host 検証のため Host は転送しない)
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+        CustomErrorResponses:
+          # React Router(SPA)のクライアントルーティング用に index.html へフォールバック。
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+Outputs:
+  CloudFrontUrl:
+    Description: アプリのURL(ここにアクセス)
+    Value: !Sub 'https://${Distribution.DomainName}'
+  FunctionUrl:
+    Description: Lambda Function URL(CloudFront 経由が本来の入口。直アクセスは要注意)
+    Value: !GetAtt CostApiFunctionUrl.FunctionUrl
+  FrontendBucketName:
+    Description: フロント配置先 S3 バケット
+    Value: !Ref FrontendBucket
+  DistributionId:
+    Description: CloudFront ディストリビューションID(キャッシュ無効化に使用)
+    Value: !Ref Distribution
