@@ -5,15 +5,18 @@ using Dapper;
 
 namespace CostManagement.Infrastructure.Repositories;
 
+/// <summary>部予算承認の永続化ポート <see cref="IDivisionBudgetApprovalRepository"/> の Dapper/SQLite 実装。</summary>
 public sealed class DivisionBudgetApprovalRepository : IDivisionBudgetApprovalRepository
 {
     private readonly SqliteConnectionFactory _factory;
 
+    /// <summary>接続ファクトリを受け取る。</summary>
     public DivisionBudgetApprovalRepository(SqliteConnectionFactory factory)
     {
         _factory = factory;
     }
 
+    /// <summary>division_budget_approvals テーブルの1行に対応する DTO。</summary>
     private sealed record Row(Guid Id, Guid DivisionId, string FiscalHalf, DateTime ApprovedAt);
 
     private const string SelectSql = """
@@ -21,6 +24,7 @@ public sealed class DivisionBudgetApprovalRepository : IDivisionBudgetApprovalRe
         FROM division_budget_approvals
         """;
 
+    /// <inheritdoc />
     public async Task<DivisionBudgetApproval?> FindAsync(DivisionId divisionId, FiscalHalf fiscalHalf,
         CancellationToken ct = default)
     {
@@ -31,6 +35,7 @@ public sealed class DivisionBudgetApprovalRepository : IDivisionBudgetApprovalRe
         return row is null ? null : DivisionBudgetApproval.Restore(row.Id, row.DivisionId, row.FiscalHalf, row.ApprovedAt);
     }
 
+    /// <inheritdoc />
     public async Task AddAsync(DivisionBudgetApproval approval, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -46,6 +51,7 @@ public sealed class DivisionBudgetApprovalRepository : IDivisionBudgetApprovalRe
         });
     }
 
+    /// <inheritdoc />
     public async Task DeleteAsync(DivisionId divisionId, FiscalHalf fiscalHalf,
         CancellationToken ct = default)
     {

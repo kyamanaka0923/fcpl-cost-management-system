@@ -42,6 +42,7 @@ public sealed record ProfitReport(
 /// </summary>
 public sealed class ProfitAnalysisService
 {
+    /// <summary>予実差異分析の結果から、案件別損益と課全体の損益(粗利率含む)を算出する。</summary>
     public ProfitReport Analyze(VarianceReport variance)
     {
         var projectLines = variance.Categories

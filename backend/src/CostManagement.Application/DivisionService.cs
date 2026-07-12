@@ -10,12 +10,14 @@ public sealed class DivisionService
     private readonly IDivisionRepository _divisions;
     private readonly ISystemClock _clock;
 
+    /// <summary>依存する部リポジトリと時計を受け取る。</summary>
     public DivisionService(IDivisionRepository divisions, ISystemClock clock)
     {
         _divisions = divisions;
         _clock = clock;
     }
 
+    /// <summary>部を新規登録する。部コードの重複は <see cref="DomainException"/>。</summary>
     public async Task<DivisionDto> CreateAsync(CreateDivisionRequest request,
         CancellationToken ct = default)
     {
@@ -27,12 +29,14 @@ public sealed class DivisionService
         return ToDto(division);
     }
 
+    /// <summary>全ての部をコード順で取得する。</summary>
     public async Task<IReadOnlyList<DivisionDto>> ListAsync(CancellationToken ct = default)
     {
         var divisions = await _divisions.ListAsync(ct);
         return divisions.OrderBy(d => d.Code).Select(ToDto).ToList();
     }
 
+    /// <summary>IDで部を取得する。存在しなければ <see cref="NotFoundException"/>。</summary>
     public async Task<DivisionDto> GetAsync(Guid id, CancellationToken ct = default)
     {
         var division = await _divisions.FindByIdAsync(new DivisionId(id), ct)
@@ -40,6 +44,7 @@ public sealed class DivisionService
         return ToDto(division);
     }
 
+    /// <summary>ドメインの部を応答 DTO へ変換する。</summary>
     internal static DivisionDto ToDto(Division d) =>
         new(d.Id.Value, d.Code, d.Name, d.CreatedAt);
 }

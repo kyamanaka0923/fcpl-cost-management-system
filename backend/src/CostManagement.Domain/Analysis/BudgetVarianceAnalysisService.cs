@@ -55,6 +55,7 @@ public sealed class BudgetVarianceAnalysisService
     private static readonly BudgetCategory[] AllCategories =
         [BudgetCategory.Revenue, BudgetCategory.Processing, BudgetCategory.Outsourcing, BudgetCategory.PeriodCost];
 
+    /// <summary>予算と実績から (区分, 案件 or 費目) 粒度の差異を算出し、区分別・全体の集計を返す。</summary>
     public VarianceReport Analyze(DepartmentBudget budget, IReadOnlyCollection<ActualEntry> actuals)
     {
         var plannedByKey = budget.Lines
@@ -130,6 +131,7 @@ public sealed class BudgetComparisonService
     private static readonly BudgetCategory[] AllCategories =
         [BudgetCategory.Revenue, BudgetCategory.Processing, BudgetCategory.Outsourcing, BudgetCategory.PeriodCost];
 
+    /// <summary>2つの予算バージョンを (区分, 案件 or 費目) 粒度で突き合わせ、増減を算出する。同一課・半期のみ。</summary>
     public BudgetComparisonReport Compare(DepartmentBudget baseBudget, DepartmentBudget targetBudget)
     {
         if (baseBudget.DepartmentId != targetBudget.DepartmentId

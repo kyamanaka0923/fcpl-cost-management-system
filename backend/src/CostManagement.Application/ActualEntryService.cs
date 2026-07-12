@@ -17,6 +17,7 @@ public sealed class ActualEntryService
     private readonly ICostElementRepository _elements;
     private readonly ISystemClock _clock;
 
+    /// <summary>依存する実績・課・案件・費目の各リポジトリと時計を受け取る。</summary>
     public ActualEntryService(IActualEntryRepository actuals, IDepartmentRepository departments,
         IProjectRepository projects, ICostElementRepository elements, ISystemClock clock)
     {
@@ -27,6 +28,10 @@ public sealed class ActualEntryService
         _clock = clock;
     }
 
+    /// <summary>
+    /// 実績を計上する。区分に応じて案件(同一課所属)または費目の指定を検証し、
+    /// 未検出は <see cref="NotFoundException"/>、不整合は <see cref="DomainException"/>。
+    /// </summary>
     public async Task<ActualEntryDto> RecordAsync(Guid departmentId, RecordActualRequest request,
         CancellationToken ct = default)
     {
@@ -65,6 +70,7 @@ public sealed class ActualEntryService
         return ToDto(entry);
     }
 
+    /// <summary>(課, 半期)の実績を計上日時の新しい順で取得する。</summary>
     public async Task<IReadOnlyList<ActualEntryDto>> ListAsync(Guid departmentId,
         string fiscalHalf, CancellationToken ct = default)
     {
@@ -76,6 +82,7 @@ public sealed class ActualEntryService
             .ToList();
     }
 
+    /// <summary>実績を1件削除する。存在しなければ <see cref="NotFoundException"/>。</summary>
     public async Task DeleteAsync(Guid actualId, CancellationToken ct = default)
     {
         var id = new ActualEntryId(actualId);
@@ -84,6 +91,7 @@ public sealed class ActualEntryService
         await _actuals.DeleteAsync(id, ct);
     }
 
+    /// <summary>ドメインの実績を応答 DTO へ変換する。</summary>
     internal static ActualEntryDto ToDto(ActualEntry e) =>
         new(e.Id.Value, e.DepartmentId.Value, e.FiscalHalf.ToString(), e.Category.ToString(),
             e.ProjectId?.Value, e.ElementCode?.Value, e.Amount.Value, e.Note, e.RecordedAt);

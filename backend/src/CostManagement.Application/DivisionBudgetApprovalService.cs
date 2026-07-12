@@ -19,6 +19,7 @@ public sealed class DivisionBudgetApprovalService
     private readonly IDepartmentBudgetRepository _budgets;
     private readonly ISystemClock _clock;
 
+    /// <summary>依存する部承認・部・課・課予算の各リポジトリと時計を受け取る。</summary>
     public DivisionBudgetApprovalService(IDivisionBudgetApprovalRepository approvals,
         IDivisionRepository divisions, IDepartmentRepository departments,
         IDepartmentBudgetRepository budgets, ISystemClock clock)

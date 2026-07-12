@@ -6,9 +6,13 @@ using CostManagement.Domain.Shared;
 
 namespace CostManagement.Domain.Actuals;
 
+/// <summary>実績を識別する型付きID(値オブジェクト)。</summary>
 public readonly record struct ActualEntryId(Guid Value)
 {
+    /// <summary>新しい一意なIDを採番する。</summary>
     public static ActualEntryId New() => new(Guid.NewGuid());
+
+    /// <summary>GUID 文字列を返す。</summary>
     public override string ToString() => Value.ToString();
 }
 
@@ -19,9 +23,16 @@ public readonly record struct ActualEntryId(Guid Value)
 /// </summary>
 public sealed class ActualEntry
 {
+    /// <summary>実績ID。</summary>
     public ActualEntryId Id { get; }
+
+    /// <summary>計上先の課ID。</summary>
     public DepartmentId DepartmentId { get; }
+
+    /// <summary>計上対象の半期。</summary>
     public FiscalHalf FiscalHalf { get; }
+
+    /// <summary>予算区分(売上高/加工費/外注費/期間費用)。</summary>
     public BudgetCategory Category { get; }
 
     /// <summary>案件。売上高・加工費・外注費の実績で必須。期間費用では null。</summary>
@@ -30,8 +41,13 @@ public sealed class ActualEntry
     /// <summary>費目。期間費用の実績で必須。案件別区分では null。</summary>
     public CostElementCode? ElementCode { get; }
 
+    /// <summary>計上金額(0以上)。</summary>
     public Money Amount { get; }
+
+    /// <summary>備考(任意)。</summary>
     public string? Note { get; }
+
+    /// <summary>計上日時(UTC)。</summary>
     public DateTime RecordedAt { get; }
 
     private ActualEntry(ActualEntryId id, DepartmentId departmentId, FiscalHalf fiscalHalf,
@@ -49,6 +65,10 @@ public sealed class ActualEntry
         RecordedAt = recordedAt;
     }
 
+    /// <summary>
+    /// 実績を計上する。区分と案件/費目の排他(<see cref="BudgetCategories.ValidateKey"/>)を検証し、
+    /// 金額は0以上を要求する。
+    /// </summary>
     public static ActualEntry Record(DepartmentId departmentId, FiscalHalf fiscalHalf,
         BudgetCategory category, ProjectId? projectId, CostElementCode? elementCode,
         Money amount, string? note, DateTime now)
@@ -72,11 +92,19 @@ public sealed class ActualEntry
             new Money(amount), note, recordedAt);
 }
 
+/// <summary>実績の永続化ポート(実装はインフラ層)。</summary>
 public interface IActualEntryRepository
 {
+    /// <summary>IDで実績を1件取得する。無ければ null。</summary>
     Task<ActualEntry?> FindByIdAsync(ActualEntryId id, CancellationToken ct = default);
+
+    /// <summary>(課, 半期)の実績を全件取得する(分析時に区分・キーで合算する)。</summary>
     Task<IReadOnlyList<ActualEntry>> ListAsync(DepartmentId departmentId, FiscalHalf fiscalHalf,
         CancellationToken ct = default);
+
+    /// <summary>実績を1件追加する。</summary>
     Task AddAsync(ActualEntry entry, CancellationToken ct = default);
+
+    /// <summary>実績を1件削除する。</summary>
     Task DeleteAsync(ActualEntryId id, CancellationToken ct = default);
 }

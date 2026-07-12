@@ -52,6 +52,7 @@ public sealed class DivisionBudgetSummaryService
     private static readonly BudgetCategory[] AllCategories =
         [BudgetCategory.Revenue, BudgetCategory.Processing, BudgetCategory.Outsourcing, BudgetCategory.PeriodCost];
 
+    /// <summary>配下課の予実差異分析結果を合計し、区分別・全体・課別内訳の部サマリを返す。</summary>
     public DivisionSummaryReport Summarize(IReadOnlyCollection<DepartmentVarianceInput> inputs)
     {
         var categories = AllCategories

@@ -4,15 +4,18 @@ using Dapper;
 
 namespace CostManagement.Infrastructure.Repositories;
 
+/// <summary>部の永続化ポート <see cref="IDivisionRepository"/> の Dapper/SQLite 実装。</summary>
 public sealed class DivisionRepository : IDivisionRepository
 {
     private readonly SqliteConnectionFactory _factory;
 
+    /// <summary>接続ファクトリを受け取る。</summary>
     public DivisionRepository(SqliteConnectionFactory factory)
     {
         _factory = factory;
     }
 
+    /// <summary>divisions テーブルの1行に対応する DTO。</summary>
     private sealed record Row(Guid Id, string Code, string Name, DateTime CreatedAt);
 
     private const string SelectSql = """
@@ -20,6 +23,7 @@ public sealed class DivisionRepository : IDivisionRepository
         FROM divisions
         """;
 
+    /// <inheritdoc />
     public async Task<Division?> FindByIdAsync(DivisionId id, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -28,6 +32,7 @@ public sealed class DivisionRepository : IDivisionRepository
         return row is null ? null : ToEntity(row);
     }
 
+    /// <inheritdoc />
     public async Task<Division?> FindByCodeAsync(string code, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -36,6 +41,7 @@ public sealed class DivisionRepository : IDivisionRepository
         return row is null ? null : ToEntity(row);
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Division>> ListAsync(CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -43,6 +49,7 @@ public sealed class DivisionRepository : IDivisionRepository
         return rows.Select(ToEntity).ToList();
     }
 
+    /// <inheritdoc />
     public async Task AddAsync(Division division, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -58,6 +65,7 @@ public sealed class DivisionRepository : IDivisionRepository
         });
     }
 
+    /// <inheritdoc />
     public async Task UpdateAsync(Division division, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -66,6 +74,7 @@ public sealed class DivisionRepository : IDivisionRepository
             """, new { Id = division.Id.Value, division.Name });
     }
 
+    /// <summary>取得行を部エンティティへ復元する。</summary>
     private static Division ToEntity(Row row) =>
         Division.Restore(row.Id, row.Code, row.Name, row.CreatedAt);
 }

@@ -19,6 +19,7 @@ public sealed class DepartmentBudgetService
     private readonly ICostElementRepository _elements;
     private readonly ISystemClock _clock;
 
+    /// <summary>依存する課予算・課・案件・費目の各リポジトリと時計を受け取る。</summary>
     public DepartmentBudgetService(IDepartmentBudgetRepository budgets,
         IDepartmentRepository departments, IProjectRepository projects,
         ICostElementRepository elements, ISystemClock clock)
@@ -66,6 +67,7 @@ public sealed class DepartmentBudgetService
         return ToDetailDto(draft);
     }
 
+    /// <summary>(課, 半期)の全バージョンをバージョン降順で取得する。</summary>
     public async Task<IReadOnlyList<BudgetSummaryDto>> ListAsync(Guid departmentId,
         string fiscalHalf, CancellationToken ct = default)
     {
@@ -74,9 +76,14 @@ public sealed class DepartmentBudgetService
         return budgets.OrderByDescending(b => b.Version).Select(ToSummaryDto).ToList();
     }
 
+    /// <summary>予算を明細込みで取得する。存在しなければ <see cref="NotFoundException"/>。</summary>
     public async Task<BudgetDetailDto> GetAsync(Guid budgetId, CancellationToken ct = default) =>
         ToDetailDto(await RequireAsync(budgetId, ct));
 
+    /// <summary>
+    /// 明細を追加または更新する(区分に応じて案件別 or 費目別)。
+    /// 承認済み予算は編集不可(ドメイン側で拒否)。
+    /// </summary>
     public async Task<BudgetDetailDto> UpsertLineAsync(Guid budgetId,
         UpsertBudgetLineRequest request, CancellationToken ct = default)
     {
@@ -99,6 +106,7 @@ public sealed class DepartmentBudgetService
         return ToDetailDto(budget);
     }
 
+    /// <summary>明細を削除する(区分に応じて案件別 or 費目別)。承認済み予算は編集不可。</summary>
     public async Task<BudgetDetailDto> RemoveLineAsync(Guid budgetId, string category,
         Guid? projectId, string? elementCode, CancellationToken ct = default)
     {
@@ -140,6 +148,7 @@ public sealed class DepartmentBudgetService
         return ToDetailDto(budget);
     }
 
+    /// <summary>区分の文字列を <see cref="BudgetCategory"/> に変換する。不正値は <see cref="DomainException"/>。</summary>
     internal static BudgetCategory ParseCategory(string category)
     {
         if (!Enum.TryParse<BudgetCategory>(category, ignoreCase: false, out var parsed))
@@ -147,6 +156,7 @@ public sealed class DepartmentBudgetService
         return parsed;
     }
 
+    /// <summary>案件が存在し、かつ指定の課に属していることを検証してIDを返す内部ヘルパ。</summary>
     private async Task<ProjectId> RequireProjectInDepartmentAsync(Guid? projectId,
         DepartmentId departmentId, CancellationToken ct)
     {
@@ -159,6 +169,7 @@ public sealed class DepartmentBudgetService
         return project.Id;
     }
 
+    /// <summary>費目コードが必須かつマスタに存在することを検証して返す内部ヘルパ。</summary>
     private async Task<CostElementCode> RequireElementAsync(string? elementCode, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(elementCode))
@@ -169,10 +180,12 @@ public sealed class DepartmentBudgetService
         return code;
     }
 
+    /// <summary>IDで予算を取得する。無ければ <see cref="NotFoundException"/> を投げる内部ヘルパ。</summary>
     private async Task<DepartmentBudget> RequireAsync(Guid budgetId, CancellationToken ct) =>
         await _budgets.FindByIdAsync(new DepartmentBudgetId(budgetId), ct)
         ?? throw new NotFoundException($"予算が見つかりません: {budgetId}");
 
+    /// <summary>予算を一覧用サマリ DTO(区分合計・計画損益つき)へ変換する。</summary>
     internal static BudgetSummaryDto ToSummaryDto(DepartmentBudget b) =>
         new(b.Id.Value, b.DepartmentId.Value, b.FiscalHalf.ToString(), b.Version, b.Label,
             b.Status.ToString(), b.CreatedAt, b.ApprovedAt,
@@ -182,6 +195,7 @@ public sealed class DepartmentBudgetService
             b.CategoryTotal(BudgetCategory.PeriodCost).Value,
             b.PlannedProfit.Value);
 
+    /// <summary>予算を明細つき詳細 DTO(区分順→費目→案件で整列)へ変換する。</summary>
     internal static BudgetDetailDto ToDetailDto(DepartmentBudget b) =>
         new(b.Id.Value, b.DepartmentId.Value, b.FiscalHalf.ToString(), b.Version, b.Label,
             b.Status.ToString(), b.CreatedAt, b.ApprovedAt,

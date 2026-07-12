@@ -9,17 +9,20 @@ public sealed class CostElementService
 {
     private readonly ICostElementRepository _elements;
 
+    /// <summary>依存する費目マスタリポジトリを受け取る。</summary>
     public CostElementService(ICostElementRepository elements)
     {
         _elements = elements;
     }
 
+    /// <summary>全ての費目をコード順で取得する。</summary>
     public async Task<IReadOnlyList<CostElementDto>> ListAsync(CancellationToken ct = default)
     {
         var elements = await _elements.ListAsync(ct);
         return elements.OrderBy(e => e.Code.Value).Select(ToDto).ToList();
     }
 
+    /// <summary>費目を新規登録する。費目コードの重複は <see cref="DomainException"/>。</summary>
     public async Task<CostElementDto> CreateAsync(CreateCostElementRequest request,
         CancellationToken ct = default)
     {
@@ -31,5 +34,6 @@ public sealed class CostElementService
         return ToDto(element);
     }
 
+    /// <summary>ドメインの費目を応答 DTO へ変換する。</summary>
     internal static CostElementDto ToDto(CostElement e) => new(e.Code.Value, e.Name);
 }

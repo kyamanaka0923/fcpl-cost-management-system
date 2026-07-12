@@ -5,15 +5,18 @@ using Dapper;
 
 namespace CostManagement.Infrastructure.Repositories;
 
+/// <summary>課の永続化ポート <see cref="IDepartmentRepository"/> の Dapper/SQLite 実装。</summary>
 public sealed class DepartmentRepository : IDepartmentRepository
 {
     private readonly SqliteConnectionFactory _factory;
 
+    /// <summary>接続ファクトリを受け取る。</summary>
     public DepartmentRepository(SqliteConnectionFactory factory)
     {
         _factory = factory;
     }
 
+    /// <summary>departments テーブルの1行に対応する DTO。</summary>
     private sealed record Row(Guid Id, Guid DivisionId, string Code, string Name, DateTime CreatedAt);
 
     private const string SelectSql = """
@@ -21,6 +24,7 @@ public sealed class DepartmentRepository : IDepartmentRepository
         FROM departments
         """;
 
+    /// <inheritdoc />
     public async Task<Department?> FindByIdAsync(DepartmentId id, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -29,6 +33,7 @@ public sealed class DepartmentRepository : IDepartmentRepository
         return row is null ? null : ToEntity(row);
     }
 
+    /// <inheritdoc />
     public async Task<Department?> FindByCodeAsync(string code, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -37,6 +42,7 @@ public sealed class DepartmentRepository : IDepartmentRepository
         return row is null ? null : ToEntity(row);
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Department>> ListByDivisionAsync(DivisionId divisionId,
         CancellationToken ct = default)
     {
@@ -46,6 +52,7 @@ public sealed class DepartmentRepository : IDepartmentRepository
         return rows.Select(ToEntity).ToList();
     }
 
+    /// <inheritdoc />
     public async Task AddAsync(Department department, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -62,6 +69,7 @@ public sealed class DepartmentRepository : IDepartmentRepository
         });
     }
 
+    /// <inheritdoc />
     public async Task UpdateAsync(Department department, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -70,6 +78,7 @@ public sealed class DepartmentRepository : IDepartmentRepository
             """, new { Id = department.Id.Value, department.Name });
     }
 
+    /// <summary>取得行を課エンティティへ復元する。</summary>
     private static Department ToEntity(Row row) =>
         Department.Restore(row.Id, row.DivisionId, row.Code, row.Name, row.CreatedAt);
 }

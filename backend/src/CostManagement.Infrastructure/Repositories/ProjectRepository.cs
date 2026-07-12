@@ -5,15 +5,18 @@ using Dapper;
 
 namespace CostManagement.Infrastructure.Repositories;
 
+/// <summary>案件マスタの永続化ポート <see cref="IProjectRepository"/> の Dapper/SQLite 実装。</summary>
 public sealed class ProjectRepository : IProjectRepository
 {
     private readonly SqliteConnectionFactory _factory;
 
+    /// <summary>接続ファクトリを受け取る。</summary>
     public ProjectRepository(SqliteConnectionFactory factory)
     {
         _factory = factory;
     }
 
+    /// <summary>projects テーブルの1行に対応する DTO。</summary>
     private sealed record Row(Guid Id, Guid DepartmentId, string Code, string Name,
         DateTime CreatedAt);
 
@@ -23,6 +26,7 @@ public sealed class ProjectRepository : IProjectRepository
         FROM projects
         """;
 
+    /// <inheritdoc />
     public async Task<Project?> FindByIdAsync(ProjectId id, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -31,6 +35,7 @@ public sealed class ProjectRepository : IProjectRepository
         return row is null ? null : ToEntity(row);
     }
 
+    /// <inheritdoc />
     public async Task<Project?> FindByCodeAsync(DepartmentId departmentId, string code,
         CancellationToken ct = default)
     {
@@ -41,6 +46,7 @@ public sealed class ProjectRepository : IProjectRepository
         return row is null ? null : ToEntity(row);
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Project>> ListByDepartmentAsync(DepartmentId departmentId,
         CancellationToken ct = default)
     {
@@ -51,6 +57,7 @@ public sealed class ProjectRepository : IProjectRepository
         return rows.Select(ToEntity).ToList();
     }
 
+    /// <inheritdoc />
     public async Task AddAsync(Project project, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -67,6 +74,7 @@ public sealed class ProjectRepository : IProjectRepository
         });
     }
 
+    /// <inheritdoc />
     public async Task UpdateAsync(Project project, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -79,6 +87,7 @@ public sealed class ProjectRepository : IProjectRepository
         });
     }
 
+    /// <summary>取得行を案件エンティティへ復元する。</summary>
     private static Project ToEntity(Row row) =>
         Project.Restore(row.Id, row.DepartmentId, row.Code, row.Name, row.CreatedAt);
 }

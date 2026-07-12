@@ -25,6 +25,7 @@ public sealed class AnalysisService
     private readonly ProfitAnalysisService _profitAnalysis;
     private readonly DivisionBudgetSummaryService _divisionSummary;
 
+    /// <summary>依存するリポジトリ群と、ステートレスな分析ドメインサービス群を受け取る。</summary>
     public AnalysisService(IDepartmentBudgetRepository budgets, IActualEntryRepository actuals,
         IProjectRepository projects, ICostElementRepository elements,
         IDepartmentRepository departments, IDivisionRepository divisions,
@@ -193,6 +194,10 @@ public sealed class AnalysisService
             approval is not null, approval?.ApprovedAt, canApprove);
     }
 
+    /// <summary>
+    /// 分析基準の予算を決定する内部ヘルパ。budgetId 指定時はその予算(課・半期の一致を検証)、
+    /// 未指定時は最新の承認済み予算を返す。該当なしは <see cref="NotFoundException"/>。
+    /// </summary>
     private async Task<DepartmentBudget> ResolveBudgetAsync(DepartmentId departmentId,
         FiscalHalf fiscalHalf, Guid? budgetId, CancellationToken ct)
     {
@@ -218,16 +223,20 @@ public sealed class AnalysisService
             elements.ToDictionary(e => e.Code.Value, e => e.Name));
     }
 
+    /// <summary>案件ID・費目コードから表示名を引くための内部ルックアップ。</summary>
     private sealed record NameLookup(
         IReadOnlyDictionary<Guid, (string Code, string Name)> Projects,
         IReadOnlyDictionary<string, string> Elements)
     {
+        /// <summary>案件IDから案件名を引く。無ければ null。</summary>
         public string? ProjectName(Guid? projectId) =>
             projectId is { } id && Projects.TryGetValue(id, out var p) ? p.Name : null;
 
+        /// <summary>案件IDから案件コードを引く。無ければ空文字。</summary>
         public string ProjectCode(Guid projectId) =>
             Projects.TryGetValue(projectId, out var p) ? p.Code : "";
 
+        /// <summary>費目コードから費目名を引く。無ければ null。</summary>
         public string? ElementName(string? elementCode) =>
             elementCode is { } code && Elements.TryGetValue(code, out var name) ? name : null;
     }

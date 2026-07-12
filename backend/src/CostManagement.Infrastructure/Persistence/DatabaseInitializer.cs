@@ -12,11 +12,16 @@ public sealed class DatabaseInitializer
 {
     private readonly SqliteConnectionFactory _factory;
 
+    /// <summary>接続ファクトリを受け取る。</summary>
     public DatabaseInitializer(SqliteConnectionFactory factory)
     {
         _factory = factory;
     }
 
+    /// <summary>
+    /// スキーマを初期化する。旧世代テーブルの破棄・現世代内マイグレーションを実行し、
+    /// 新スキーマの CREATE TABLE(IF NOT EXISTS)と費目シードを適用する。アプリ起動時に一度呼ぶ。
+    /// </summary>
     public void Initialize()
     {
         using var connection = _factory.Create();

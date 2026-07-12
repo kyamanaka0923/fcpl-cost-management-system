@@ -2,9 +2,13 @@ using CostManagement.Domain.Shared;
 
 namespace CostManagement.Domain.Divisions;
 
+/// <summary>部予算承認を識別する型付きID(値オブジェクト)。</summary>
 public readonly record struct DivisionBudgetApprovalId(Guid Value)
 {
+    /// <summary>新しい一意なIDを採番する。</summary>
     public static DivisionBudgetApprovalId New() => new(Guid.NewGuid());
+
+    /// <summary>GUID 文字列を返す。</summary>
     public override string ToString() => Value.ToString();
 }
 
@@ -15,9 +19,16 @@ public readonly record struct DivisionBudgetApprovalId(Guid Value)
 /// </summary>
 public sealed class DivisionBudgetApproval
 {
+    /// <summary>部予算承認ID。</summary>
     public DivisionBudgetApprovalId Id { get; }
+
+    /// <summary>承認対象の部ID。</summary>
     public DivisionId DivisionId { get; }
+
+    /// <summary>承認対象の半期。</summary>
     public FiscalHalf FiscalHalf { get; }
+
+    /// <summary>承認日時(UTC)。</summary>
     public DateTime ApprovedAt { get; }
 
     private DivisionBudgetApproval(DivisionBudgetApprovalId id, DivisionId divisionId,
@@ -29,6 +40,7 @@ public sealed class DivisionBudgetApproval
         ApprovedAt = approvedAt;
     }
 
+    /// <summary>(部, 半期)の承認レコードを新規に作る。承認可否の判定は Application 層の責務。</summary>
     public static DivisionBudgetApproval Approve(DivisionId divisionId, FiscalHalf fiscalHalf,
         DateTime now) =>
         new(DivisionBudgetApprovalId.New(), divisionId, fiscalHalf, now);
@@ -40,10 +52,16 @@ public sealed class DivisionBudgetApproval
             Domain.Shared.FiscalHalf.Parse(fiscalHalf), approvedAt);
 }
 
+/// <summary>部予算承認の永続化ポート(実装はインフラ層)。承認状態はレコードの有無で表す。</summary>
 public interface IDivisionBudgetApprovalRepository
 {
+    /// <summary>(部, 半期)の承認レコードを取得する。無ければ null(= 未承認)。</summary>
     Task<DivisionBudgetApproval?> FindAsync(DivisionId divisionId, FiscalHalf fiscalHalf,
         CancellationToken ct = default);
+
+    /// <summary>承認レコードを追加する(= 承認する)。</summary>
     Task AddAsync(DivisionBudgetApproval approval, CancellationToken ct = default);
+
+    /// <summary>(部, 半期)の承認レコードを削除する(= 承認を取り消す)。</summary>
     Task DeleteAsync(DivisionId divisionId, FiscalHalf fiscalHalf, CancellationToken ct = default);
 }

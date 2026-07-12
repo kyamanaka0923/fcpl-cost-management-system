@@ -6,15 +6,21 @@ using Dapper;
 
 namespace CostManagement.Infrastructure.Repositories;
 
+/// <summary>実績の永続化ポート <see cref="IActualEntryRepository"/> の Dapper/SQLite 実装。</summary>
 public sealed class ActualEntryRepository : IActualEntryRepository
 {
     private readonly SqliteConnectionFactory _factory;
 
+    /// <summary>接続ファクトリを受け取る。</summary>
     public ActualEntryRepository(SqliteConnectionFactory factory)
     {
         _factory = factory;
     }
 
+    /// <summary>
+    /// actual_entries テーブルの1行に対応する DTO。
+    /// 未使用の project_id / element_code は空文字で保存されるため <see cref="ToEntity"/> で null に読み替える。
+    /// </summary>
     private sealed record Row(Guid Id, Guid DepartmentId, string FiscalHalf, string Category,
         string ProjectId, string ElementCode, decimal Amount, string? Note, DateTime RecordedAt);
 
@@ -25,6 +31,7 @@ public sealed class ActualEntryRepository : IActualEntryRepository
         FROM actual_entries
         """;
 
+    /// <inheritdoc />
     public async Task<ActualEntry?> FindByIdAsync(ActualEntryId id, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -33,6 +40,7 @@ public sealed class ActualEntryRepository : IActualEntryRepository
         return row is null ? null : ToEntity(row);
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<ActualEntry>> ListAsync(DepartmentId departmentId,
         FiscalHalf fiscalHalf, CancellationToken ct = default)
     {
@@ -43,6 +51,7 @@ public sealed class ActualEntryRepository : IActualEntryRepository
         return rows.Select(ToEntity).ToList();
     }
 
+    /// <inheritdoc />
     public async Task AddAsync(ActualEntry entry, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -64,12 +73,14 @@ public sealed class ActualEntryRepository : IActualEntryRepository
         });
     }
 
+    /// <inheritdoc />
     public async Task DeleteAsync(ActualEntryId id, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
         await conn.ExecuteAsync("DELETE FROM actual_entries WHERE id = @Id", new { Id = id.Value });
     }
 
+    /// <summary>取得行を実績エンティティへ復元する(空文字の案件/費目は null に読み替える)。</summary>
     private static ActualEntry ToEntity(Row row) =>
         ActualEntry.Restore(row.Id, row.DepartmentId, row.FiscalHalf, row.Category,
             row.ProjectId == "" ? null : Guid.Parse(row.ProjectId),

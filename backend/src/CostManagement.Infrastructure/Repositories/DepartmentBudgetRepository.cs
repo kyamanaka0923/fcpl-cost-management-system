@@ -7,18 +7,25 @@ using Microsoft.Data.Sqlite;
 
 namespace CostManagement.Infrastructure.Repositories;
 
+/// <summary>
+/// 課予算の永続化ポート <see cref="IDepartmentBudgetRepository"/> の Dapper/SQLite 実装。
+/// ヘッダ(department_budgets)と明細(department_budget_lines)をまとめて1つの集約として扱う。
+/// </summary>
 public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
 {
     private readonly SqliteConnectionFactory _factory;
 
+    /// <summary>接続ファクトリを受け取る。</summary>
     public DepartmentBudgetRepository(SqliteConnectionFactory factory)
     {
         _factory = factory;
     }
 
+    /// <summary>department_budgets(ヘッダ)テーブルの1行に対応する DTO。</summary>
     private sealed record BudgetRow(Guid Id, Guid DepartmentId, string FiscalHalf, long Version,
         string Label, string Status, DateTime CreatedAt, DateTime? ApprovedAt);
 
+    /// <summary>department_budget_lines(明細)テーブルの1行に対応する DTO。</summary>
     private sealed record LineRow(Guid Id, Guid BudgetId, string Category, string ProjectId,
         string ElementCode, decimal Amount);
 
@@ -35,6 +42,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
         FROM department_budget_lines
         """;
 
+    /// <inheritdoc />
     public async Task<DepartmentBudget?> FindByIdAsync(DepartmentBudgetId id,
         CancellationToken ct = default)
     {
@@ -48,6 +56,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
         return ToEntity(budget, lines);
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<DepartmentBudget>> ListAsync(DepartmentId departmentId,
         FiscalHalf fiscalHalf, CancellationToken ct = default)
     {
@@ -55,6 +64,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
         var budgets = (await conn.QueryAsync<BudgetRow>(
             $"{SelectBudgetSql} WHERE department_id = @Did AND fiscal_half = @Half ORDER BY version",
             new { Did = departmentId.Value, Half = fiscalHalf.ToString() })).ToList();
+        // 明細は JOIN で一括取得し、予算IDでルックアップして N+1 を避ける。
         var lines = (await conn.QueryAsync<LineRow>("""
             SELECT l.id AS Id, l.budget_id AS BudgetId, l.category AS Category,
                    l.project_id AS ProjectId, l.element_code AS ElementCode, l.amount AS Amount
@@ -66,6 +76,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
         return budgets.Select(b => ToEntity(b, lines[b.Id])).ToList();
     }
 
+    /// <inheritdoc />
     public async Task<DepartmentBudget?> FindLatestApprovedAsync(DepartmentId departmentId,
         FiscalHalf fiscalHalf, CancellationToken ct = default)
     {
@@ -80,6 +91,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
         return ToEntity(budget, lines);
     }
 
+    /// <inheritdoc />
     public async Task<int> GetMaxVersionAsync(DepartmentId departmentId, FiscalHalf fiscalHalf,
         CancellationToken ct = default)
     {
@@ -89,6 +101,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
             new { Did = departmentId.Value, Half = fiscalHalf.ToString() });
     }
 
+    /// <inheritdoc />
     public async Task AddAsync(DepartmentBudget budget, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -112,6 +125,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
         tx.Commit();
     }
 
+    /// <inheritdoc />
     public async Task UpdateAsync(DepartmentBudget budget, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -134,6 +148,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
         tx.Commit();
     }
 
+    /// <summary>予算の全明細を INSERT する(未使用の案件/費目は空文字で保存)。</summary>
     private static async Task InsertLinesAsync(SqliteConnection conn, SqliteTransaction tx,
         DepartmentBudget budget)
     {
@@ -154,6 +169,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
         }
     }
 
+    /// <summary>ヘッダ行と明細行から課予算の集約を復元する(空文字の案件/費目は null に読み替える)。</summary>
     private static DepartmentBudget ToEntity(BudgetRow budget, IEnumerable<LineRow> lines) =>
         DepartmentBudget.Restore(budget.Id, budget.DepartmentId, budget.FiscalHalf,
             (int)budget.Version, budget.Label, Enum.Parse<BudgetStatus>(budget.Status),

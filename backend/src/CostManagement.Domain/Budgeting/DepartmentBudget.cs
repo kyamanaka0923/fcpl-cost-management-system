@@ -5,12 +5,17 @@ using CostManagement.Domain.Shared;
 
 namespace CostManagement.Domain.Budgeting;
 
+/// <summary>課予算を識別する型付きID(値オブジェクト)。</summary>
 public readonly record struct DepartmentBudgetId(Guid Value)
 {
+    /// <summary>新しい一意なIDを採番する。</summary>
     public static DepartmentBudgetId New() => new(Guid.NewGuid());
+
+    /// <summary>GUID 文字列を返す。</summary>
     public override string ToString() => Value.ToString();
 }
 
+/// <summary>課予算のライフサイクル状態。</summary>
 public enum BudgetStatus
 {
     /// <summary>策定中。明細の編集が可能。</summary>
@@ -77,7 +82,10 @@ public static class BudgetCategories
 /// </summary>
 public sealed class BudgetLine
 {
+    /// <summary>明細ID(集約内で一意)。</summary>
     public Guid Id { get; }
+
+    /// <summary>予算区分(売上高/加工費/外注費/期間費用)。</summary>
     public BudgetCategory Category { get; }
 
     /// <summary>案件。売上高・加工費・外注費の明細で必須。期間費用では null。</summary>
@@ -86,8 +94,13 @@ public sealed class BudgetLine
     /// <summary>費目。期間費用の明細で必須。案件別区分では null。</summary>
     public CostElementCode? ElementCode { get; }
 
+    /// <summary>半期一括の金額。</summary>
     public Money Amount { get; private set; }
 
+    /// <summary>
+    /// 明細を生成する(集約内部からのみ)。区分と案件/費目の排他を
+    /// <see cref="BudgetCategories.ValidateKey"/> で検証する(復元経路でも通る)。
+    /// </summary>
     internal BudgetLine(Guid id, BudgetCategory category, ProjectId? projectId,
         CostElementCode? elementCode, Money amount)
     {
@@ -99,8 +112,10 @@ public sealed class BudgetLine
         Amount = amount;
     }
 
+    /// <summary>金額を上書きする。</summary>
     internal void Update(Money amount) => Amount = amount;
 
+    /// <summary>改定版へ引き継ぐため、新しいIDで明細を複製する。</summary>
     internal BudgetLine Copy() => new(Guid.NewGuid(), Category, ProjectId, ElementCode, Amount);
 }
 
@@ -115,8 +130,13 @@ public sealed class DepartmentBudget
 {
     private readonly List<BudgetLine> _lines;
 
+    /// <summary>課予算ID。</summary>
     public DepartmentBudgetId Id { get; }
+
+    /// <summary>予算を策定する課のID。</summary>
     public DepartmentId DepartmentId { get; }
+
+    /// <summary>対象半期。</summary>
     public FiscalHalf FiscalHalf { get; }
 
     /// <summary>同一 (課, 半期) 内で単調増加するバージョン番号(1 が当初予算)。</summary>
@@ -125,10 +145,16 @@ public sealed class DepartmentBudget
     /// <summary>「当初予算」「下期見直し」などの名称。</summary>
     public string Label { get; }
 
+    /// <summary>ライフサイクル状態(策定中/承認済/失効)。</summary>
     public BudgetStatus Status { get; private set; }
+
+    /// <summary>作成日時(UTC)。</summary>
     public DateTime CreatedAt { get; }
+
+    /// <summary>承認日時(UTC)。未承認は null。</summary>
     public DateTime? ApprovedAt { get; private set; }
 
+    /// <summary>明細の読み取り専用ビュー。</summary>
     public IReadOnlyList<BudgetLine> Lines => _lines.AsReadOnly();
 
     /// <summary>区分の合計(= 明細の合計)。</summary>
@@ -212,6 +238,7 @@ public sealed class DepartmentBudget
             existing.Update(amount);
     }
 
+    /// <summary>案件別明細(売上高・加工費・外注費)を削除する。存在しなければ例外。</summary>
     public void RemoveProjectLine(BudgetCategory category, ProjectId projectId)
     {
         EnsureDraft();
@@ -222,6 +249,7 @@ public sealed class DepartmentBudget
             throw new DomainException("指定された明細が存在しません。");
     }
 
+    /// <summary>期間費用の明細を削除する。存在しなければ例外。</summary>
     public void RemovePeriodCostLine(CostElementCode elementCode)
     {
         EnsureDraft();
@@ -250,18 +278,21 @@ public sealed class DepartmentBudget
         Status = BudgetStatus.Superseded;
     }
 
+    /// <summary>ドラフト状態でなければ編集を拒否する(承認済み予算の不変条件)。</summary>
     private void EnsureDraft()
     {
         if (Status != BudgetStatus.Draft)
             throw new DomainException("承認済み・失効済みの予算は編集できません。改定版を作成してください。");
     }
 
+    /// <summary>金額が0以上であることを検証する。</summary>
     private static void ValidateAmount(Money amount)
     {
         if (amount.IsNegative)
             throw new DomainException("金額は0以上で入力してください。");
     }
 
+    /// <summary>予算名が空でないことを検証する。</summary>
     private static void ValidateLabel(string label)
     {
         if (string.IsNullOrWhiteSpace(label))
@@ -284,15 +315,27 @@ public sealed class DepartmentBudget
     }
 }
 
+/// <summary>課予算の永続化ポート(実装はインフラ層)。</summary>
 public interface IDepartmentBudgetRepository
 {
+    /// <summary>IDで予算を1件取得する(明細を含む)。無ければ null。</summary>
     Task<DepartmentBudget?> FindByIdAsync(DepartmentBudgetId id, CancellationToken ct = default);
+
+    /// <summary>(課, 半期)の全バージョンを取得する。</summary>
     Task<IReadOnlyList<DepartmentBudget>> ListAsync(DepartmentId departmentId, FiscalHalf fiscalHalf,
         CancellationToken ct = default);
+
+    /// <summary>(課, 半期)の最新の承認済みバージョンを取得する。無ければ null。</summary>
     Task<DepartmentBudget?> FindLatestApprovedAsync(DepartmentId departmentId, FiscalHalf fiscalHalf,
         CancellationToken ct = default);
+
+    /// <summary>(課, 半期)の最大バージョン番号を取得する(改定版の採番に使う。無ければ0)。</summary>
     Task<int> GetMaxVersionAsync(DepartmentId departmentId, FiscalHalf fiscalHalf,
         CancellationToken ct = default);
+
+    /// <summary>予算を新規追加する(ヘッダ + 明細)。</summary>
     Task AddAsync(DepartmentBudget budget, CancellationToken ct = default);
+
+    /// <summary>予算を更新する(ヘッダ更新 + 明細の洗い替え)。</summary>
     Task UpdateAsync(DepartmentBudget budget, CancellationToken ct = default);
 }

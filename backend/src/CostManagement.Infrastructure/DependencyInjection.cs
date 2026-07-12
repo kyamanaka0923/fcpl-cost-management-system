@@ -13,11 +13,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace CostManagement.Infrastructure;
 
+/// <summary>システム時刻を提供する <see cref="ISystemClock"/> の本番実装。</summary>
 public sealed class SystemClock : ISystemClock
 {
+    /// <inheritdoc />
     public DateTime UtcNow => DateTime.UtcNow;
 }
 
+/// <summary>インフラ層のアダプタと各層のサービスを DI コンテナに登録する拡張。</summary>
 public static class DependencyInjection
 {
     /// <summary>ヘキサゴナルアーキテクチャの出力アダプタ(永続化)と入力ポート(ユースケース)を登録する。</summary>
