@@ -4,8 +4,10 @@ import {
   api,
   categoryLabel,
   currentFiscalHalf,
+  formatPercent,
   formatYen,
   halfLabel,
+  marginRate,
   projectCategories,
   type BudgetCategory,
   type BudgetDetail,
@@ -107,6 +109,9 @@ export default function BudgetEditPage() {
     projectAmount(projectId, 'Revenue') -
     projectAmount(projectId, 'Processing') -
     projectAmount(projectId, 'Outsourcing')
+  // 案件粗利率 = 損益 ÷ 売上高。売上高が0なら「—」。
+  const projectMargin = (projectId: string): number | null =>
+    marginRate(projectProfit(projectId), projectAmount(projectId, 'Revenue'))
 
   // ---- 期間費用(費目別) ----
   const periodKey = (code: string) => `PeriodCost-${code}`
@@ -133,16 +138,6 @@ export default function BudgetEditPage() {
       setError((err as Error).message)
     } finally {
       setAddingProject(false)
-    }
-  }
-
-  const completeProject = async (projectId: string) => {
-    setError(null)
-    try {
-      await api.completeProject(projectId)
-      loadProjects()
-    } catch (err) {
-      setError((err as Error).message)
     }
   }
 
@@ -201,6 +196,9 @@ export default function BudgetEditPage() {
             <div className={`value ${(budget?.plannedProfit ?? 0) >= 0 ? 'favorable' : 'adverse'}`}>
               ¥{formatYen(budget?.plannedProfit ?? 0)}
             </div>
+            <div className="label">
+              粗利率 {formatPercent(marginRate(budget?.plannedProfit ?? 0, budget?.revenueTotal ?? 0))}
+            </div>
           </div>
         </div>
         {editable && (
@@ -219,7 +217,7 @@ export default function BudgetEditPage() {
         <h2>案件別の売上高・加工費・外注費</h2>
         <p className="muted small">
           案件ごとに半期一括の金額を入力します(空欄・0 は明細なし)。
-          {editable && '金額を入力して次の欄へ移ると自動保存されます。終了にした案件も予算を承認するまでは編集できます。'}
+          {editable && '金額を入力して次の欄へ移ると自動保存されます。'}
           課の区分合計は案件明細の合計として上部サマリに反映されます。
         </p>
         <table>
@@ -230,13 +228,13 @@ export default function BudgetEditPage() {
               <th className="num">{categoryLabel.Processing}</th>
               <th className="num">{categoryLabel.Outsourcing}</th>
               <th className="num">損益</th>
-              {editable && <th></th>}
+              <th className="num">粗利率</th>
             </tr>
           </thead>
           <tbody>
             {projects.length === 0 ? (
               <tr>
-                <td colSpan={editable ? 6 : 5} className="muted small">
+                <td colSpan={6} className="muted small">
                   案件がありません。{editable ? '下の行から案件を追加してください。' : ''}
                 </td>
               </tr>
@@ -246,11 +244,6 @@ export default function BudgetEditPage() {
                   <td>
                     {p.name}
                     <span className="muted small">({p.code})</span>
-                    {p.status === 'Completed' && (
-                      <span className="badge superseded" style={{ marginLeft: 6 }}>
-                        終了
-                      </span>
-                    )}
                   </td>
                   {projectCategories.map((category) => (
                     <td className="num" key={category}>
@@ -271,13 +264,7 @@ export default function BudgetEditPage() {
                   <td className={`num ${projectProfit(p.id) >= 0 ? 'favorable' : 'adverse'}`}>
                     ¥{formatYen(projectProfit(p.id))}
                   </td>
-                  {editable && (
-                    <td>
-                      {p.status === 'Active' && (
-                        <button onClick={() => completeProject(p.id)}>終了</button>
-                      )}
-                    </td>
-                  )}
+                  <td className="num muted">{formatPercent(projectMargin(p.id))}</td>
                 </tr>
               ))
             )}
@@ -293,7 +280,16 @@ export default function BudgetEditPage() {
                     (budget?.outsourcingTotal ?? 0),
                 )}
               </td>
-              {editable && <td></td>}
+              <td className="num muted">
+                {formatPercent(
+                  marginRate(
+                    (budget?.revenueTotal ?? 0) -
+                      (budget?.processingTotal ?? 0) -
+                      (budget?.outsourcingTotal ?? 0),
+                    budget?.revenueTotal ?? 0,
+                  ),
+                )}
+              </td>
             </tr>
           </tbody>
         </table>

@@ -23,6 +23,7 @@ public sealed class DatabaseInitializer
 
         DropLegacyTables(connection);
         MigrateProjectCodeUniqueness(connection);
+        MigrateDropProjectStatus(connection);
 
         connection.Execute("""
             CREATE TABLE IF NOT EXISTS divisions (
@@ -46,7 +47,6 @@ public sealed class DatabaseInitializer
                 department_id TEXT NOT NULL REFERENCES departments(id),
                 code          TEXT NOT NULL,
                 name          TEXT NOT NULL,
-                status        TEXT NOT NULL,
                 created_at    TEXT NOT NULL,
                 UNIQUE (department_id, code)
             );
@@ -201,16 +201,53 @@ public sealed class DatabaseInitializer
                 department_id TEXT NOT NULL REFERENCES departments(id),
                 code          TEXT NOT NULL,
                 name          TEXT NOT NULL,
-                status        TEXT NOT NULL,
                 created_at    TEXT NOT NULL,
                 UNIQUE (department_id, code)
             );
 
-            INSERT INTO projects (id, department_id, code, name, status, created_at)
-            SELECT id, department_id, code, name, status, created_at
+            INSERT INTO projects (id, department_id, code, name, created_at)
+            SELECT id, department_id, code, name, created_at
             FROM projects_pre_dept_unique;
 
             DROP TABLE projects_pre_dept_unique;
+            """, transaction: tx);
+        tx.Commit();
+    }
+
+    /// <summary>
+    /// 案件の終了ステータス(status 列)を廃止するマイグレーション(Issue #2)。
+    /// 案件は終了の概念を持たなくなったため、status 列を持つ現世代 projects を
+    /// データ(id/コード/名称/作成日時)を保持したまま作り直す。冪等(status 列がなければ何もしない)。
+    /// </summary>
+    private static void MigrateDropProjectStatus(SqliteConnection connection)
+    {
+        var hasDepartmentId = connection.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM pragma_table_info('projects') WHERE name = 'department_id'") > 0;
+        if (!hasDepartmentId)
+            return; // projects 未作成、または旧世代(DropLegacyTables が破棄する)
+        var hasStatus = connection.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM pragma_table_info('projects') WHERE name = 'status'") > 0;
+        if (!hasStatus)
+            return; // 既に status 列は廃止済み
+
+        using var tx = connection.BeginTransaction();
+        connection.Execute("""
+            ALTER TABLE projects RENAME TO projects_pre_drop_status;
+
+            CREATE TABLE projects (
+                id            TEXT PRIMARY KEY,
+                department_id TEXT NOT NULL REFERENCES departments(id),
+                code          TEXT NOT NULL,
+                name          TEXT NOT NULL,
+                created_at    TEXT NOT NULL,
+                UNIQUE (department_id, code)
+            );
+
+            INSERT INTO projects (id, department_id, code, name, created_at)
+            SELECT id, department_id, code, name, created_at
+            FROM projects_pre_drop_status;
+
+            DROP TABLE projects_pre_drop_status;
             """, transaction: tx);
         tx.Commit();
     }

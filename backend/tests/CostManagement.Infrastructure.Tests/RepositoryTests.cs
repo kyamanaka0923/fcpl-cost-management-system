@@ -110,7 +110,6 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         Assert.NotNull(restored);
         Assert.Equal(dept.Id, restored.DepartmentId);
         Assert.Equal(project.Code, restored.Code);
-        Assert.Equal(ProjectStatus.Active, restored.Status);
     }
 
     [Fact]
@@ -121,12 +120,10 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         var project = await _fx.案件を保存(dept.Id);
 
         project.Rename("名称変更後");
-        project.Complete();
         await repo.UpdateAsync(project);
 
         var restored = await repo.FindByIdAsync(project.Id);
         Assert.Equal("名称変更後", restored!.Name);
-        Assert.Equal(ProjectStatus.Completed, restored.Status);
     }
 
     [Fact]

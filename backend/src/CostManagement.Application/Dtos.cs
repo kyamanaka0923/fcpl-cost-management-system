@@ -20,7 +20,6 @@ public sealed record ProjectDto(
     Guid DepartmentId,
     string Code,
     string Name,
-    string Status,
     DateTime CreatedAt);
 
 public sealed record CostElementDto(

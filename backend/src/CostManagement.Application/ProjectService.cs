@@ -45,18 +45,10 @@ public sealed class ProjectService
     public async Task<ProjectDto> GetAsync(Guid id, CancellationToken ct = default) =>
         ToDto(await RequireAsync(id, ct));
 
-    public async Task<ProjectDto> CompleteAsync(Guid id, CancellationToken ct = default)
-    {
-        var project = await RequireAsync(id, ct);
-        project.Complete();
-        await _projects.UpdateAsync(project, ct);
-        return ToDto(project);
-    }
-
     private async Task<Project> RequireAsync(Guid id, CancellationToken ct) =>
         await _projects.FindByIdAsync(new ProjectId(id), ct)
         ?? throw new NotFoundException($"案件が見つかりません: {id}");
 
     internal static ProjectDto ToDto(Project p) =>
-        new(p.Id.Value, p.DepartmentId.Value, p.Code, p.Name, p.Status.ToString(), p.CreatedAt);
+        new(p.Id.Value, p.DepartmentId.Value, p.Code, p.Name, p.CreatedAt);
 }

@@ -15,11 +15,11 @@ public sealed class ProjectRepository : IProjectRepository
     }
 
     private sealed record Row(Guid Id, Guid DepartmentId, string Code, string Name,
-        string Status, DateTime CreatedAt);
+        DateTime CreatedAt);
 
     private const string SelectSql = """
         SELECT id AS Id, department_id AS DepartmentId, code AS Code, name AS Name,
-               status AS Status, created_at AS CreatedAt
+               created_at AS CreatedAt
         FROM projects
         """;
 
@@ -55,15 +55,14 @@ public sealed class ProjectRepository : IProjectRepository
     {
         using var conn = _factory.Create();
         await conn.ExecuteAsync("""
-            INSERT INTO projects (id, department_id, code, name, status, created_at)
-            VALUES (@Id, @DepartmentId, @Code, @Name, @Status, @CreatedAt)
+            INSERT INTO projects (id, department_id, code, name, created_at)
+            VALUES (@Id, @DepartmentId, @Code, @Name, @CreatedAt)
             """, new
         {
             Id = project.Id.Value,
             DepartmentId = project.DepartmentId.Value,
             project.Code,
             project.Name,
-            Status = project.Status.ToString(),
             project.CreatedAt,
         });
     }
@@ -72,16 +71,14 @@ public sealed class ProjectRepository : IProjectRepository
     {
         using var conn = _factory.Create();
         await conn.ExecuteAsync("""
-            UPDATE projects SET name = @Name, status = @Status WHERE id = @Id
+            UPDATE projects SET name = @Name WHERE id = @Id
             """, new
         {
             Id = project.Id.Value,
             project.Name,
-            Status = project.Status.ToString(),
         });
     }
 
     private static Project ToEntity(Row row) =>
-        Project.Restore(row.Id, row.DepartmentId, row.Code, row.Name,
-            Enum.Parse<ProjectStatus>(row.Status), row.CreatedAt);
+        Project.Restore(row.Id, row.DepartmentId, row.Code, row.Name, row.CreatedAt);
 }

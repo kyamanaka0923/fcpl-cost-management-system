@@ -9,12 +9,6 @@ public readonly record struct ProjectId(Guid Value)
     public override string ToString() => Value.ToString();
 }
 
-public enum ProjectStatus
-{
-    Active,
-    Completed,
-}
-
 /// <summary>課に属する案件。予算・実績の明細の内訳次元。集約ルート。</summary>
 public sealed class Project
 {
@@ -22,17 +16,15 @@ public sealed class Project
     public DepartmentId DepartmentId { get; }
     public string Code { get; }
     public string Name { get; private set; }
-    public ProjectStatus Status { get; private set; }
     public DateTime CreatedAt { get; }
 
     private Project(ProjectId id, DepartmentId departmentId, string code, string name,
-        ProjectStatus status, DateTime createdAt)
+        DateTime createdAt)
     {
         Id = id;
         DepartmentId = departmentId;
         Code = code;
         Name = name;
-        Status = status;
         CreatedAt = createdAt;
     }
 
@@ -42,8 +34,7 @@ public sealed class Project
             throw new DomainException("案件コードは必須です。");
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("案件名は必須です。");
-        return new Project(ProjectId.New(), departmentId, code.Trim(), name.Trim(),
-            ProjectStatus.Active, now);
+        return new Project(ProjectId.New(), departmentId, code.Trim(), name.Trim(), now);
     }
 
     public void Rename(string name)
@@ -53,12 +44,10 @@ public sealed class Project
         Name = name.Trim();
     }
 
-    public void Complete() => Status = ProjectStatus.Completed;
-
     /// <summary>永続化層からの復元用ファクトリ。</summary>
     public static Project Restore(Guid id, Guid departmentId, string code, string name,
-        ProjectStatus status, DateTime createdAt) =>
-        new(new ProjectId(id), new DepartmentId(departmentId), code, name, status, createdAt);
+        DateTime createdAt) =>
+        new(new ProjectId(id), new DepartmentId(departmentId), code, name, createdAt);
 }
 
 public interface IProjectRepository

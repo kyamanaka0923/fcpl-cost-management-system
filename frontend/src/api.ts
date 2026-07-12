@@ -62,7 +62,6 @@ export interface Project {
   departmentId: string
   code: string
   name: string
-  status: 'Active' | 'Completed'
   createdAt: string
 }
 
@@ -263,8 +262,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  completeProject: (projectId: string) =>
-    request<Project>(`/projects/${projectId}/complete`, { method: 'POST' }),
 
   // ---- 費目マスタ(期間費用) ----
   listCostElements: () => request<CostElement[]>('/cost-elements'),

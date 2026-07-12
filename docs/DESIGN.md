@@ -194,19 +194,12 @@ classDiagram
         +DepartmentId DepartmentId ※所属する課
         +string Code ※課ごとに一意
         +string Name
-        +ProjectStatus Status
         +Create(departmentId, code, name, now) Project$
         +Rename(name)
-        +Complete()
     }
     class ProjectId {
         <<Value Object>>
         +Guid Value
-    }
-    class ProjectStatus {
-        <<enumeration>>
-        Active
-        Completed
     }
     class CostElement {
         <<Aggregate Root>>
@@ -223,7 +216,6 @@ classDiagram
     Department --> DepartmentId
     Department ..> Division : DivisionId で参照
     Project --> ProjectId
-    Project --> ProjectStatus
     Project ..> Department : DepartmentId で参照
     CostElement --> CostElementCode
 ```
@@ -346,7 +338,7 @@ classDiagram
     class IProjectRepository {
         <<interface>>
         +FindByIdAsync(ProjectId) Project?
-        +FindByCodeAsync(string) Project?
+        +FindByCodeAsync(DepartmentId, string) Project?
         +ListByDepartmentAsync(DepartmentId) IReadOnlyList~Project~
         +AddAsync(Project)
         +UpdateAsync(Project)

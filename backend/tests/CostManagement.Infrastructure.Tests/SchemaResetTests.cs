@@ -106,6 +106,7 @@ public class スキーマの作り直し : IDisposable
         // 同名テーブルは新構造で作り直される(旧データは引き継がない)
         Assert.True(カラムが存在する("projects", "department_id"));
         Assert.False(カラムが存在する("projects", "fiscal_year"));
+        Assert.False(カラムが存在する("projects", "status")); // 終了ステータスは廃止(Issue #2)
         Assert.False(カラムが存在する("cost_elements", "element_type"));
 
         // 新スキーマのテーブルが揃う
@@ -269,7 +270,7 @@ public class 案件コードの課ごと一意化マイグレーション : IDis
 
         // 別の課で同じコードを登録できる(以前はグローバル UNIQUE で不可だった)
         conn.Execute(
-            "INSERT INTO projects VALUES ('p2', 'd2', 'PJ-001', '課2の案件', 'Active', '2026-04-01')");
+            "INSERT INTO projects VALUES ('p2', 'd2', 'PJ-001', '課2の案件', '2026-04-01')");
         Assert.Equal(2, conn.ExecuteScalar<long>("SELECT COUNT(*) FROM projects WHERE code = 'PJ-001'"));
     }
 
@@ -282,7 +283,7 @@ public class 案件コードの課ごと一意化マイグレーション : IDis
         using var conn = _factory.Create();
         var ex = Assert.ThrowsAny<Microsoft.Data.Sqlite.SqliteException>(() =>
             conn.Execute(
-                "INSERT INTO projects VALUES ('p3', 'd1', 'PJ-001', '課1の別案件', 'Active', '2026-04-01')"));
+                "INSERT INTO projects VALUES ('p3', 'd1', 'PJ-001', '課1の別案件', '2026-04-01')"));
         Assert.Contains("UNIQUE", ex.Message);
     }
 
@@ -300,5 +301,103 @@ public class 案件コードの課ごと一意化マイグレーション : IDis
         // 一時テーブルが残っていない
         Assert.Equal(0, conn.ExecuteScalar<long>(
             "SELECT COUNT(*) FROM sqlite_master WHERE name = 'projects_pre_dept_unique'"));
+    }
+}
+
+/// <summary>
+/// 案件の終了ステータス(status 列)を廃止するマイグレーションの検証(Issue #2)。
+/// 課ごと一意へ移行済みで status 列を持つ現世代 projects が、案件データを保持したまま
+/// status 列なしに作り直されることを確認する。
+/// </summary>
+public class 案件の終了ステータス廃止マイグレーション : IDisposable
+{
+    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _factory;
+
+    public 案件の終了ステータス廃止マイグレーション()
+    {
+        _dbPath = Path.Combine(Path.GetTempPath(), $"cm-projstatus-{Guid.NewGuid():N}.db");
+        _factory = new SqliteConnectionFactory($"Data Source={_dbPath}");
+    }
+
+    public void Dispose()
+    {
+        if (File.Exists(_dbPath))
+            File.Delete(_dbPath);
+    }
+
+    /// <summary>課ごと一意へ移行済みで、まだ status 列を持つ現世代 projects のDBを作る。</summary>
+    private void 終了ステータスありのDBを作成()
+    {
+        using var conn = _factory.Create();
+        conn.Execute("""
+            CREATE TABLE divisions (
+                id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE TABLE departments (
+                id TEXT PRIMARY KEY, division_id TEXT NOT NULL, code TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE TABLE projects (
+                id            TEXT PRIMARY KEY,
+                department_id TEXT NOT NULL REFERENCES departments(id),
+                code          TEXT NOT NULL,
+                name          TEXT NOT NULL,
+                status        TEXT NOT NULL,
+                created_at    TEXT NOT NULL,
+                UNIQUE (department_id, code)
+            );
+            INSERT INTO divisions VALUES ('v1', 'SALES', '営業本部', '2026-04-01');
+            INSERT INTO departments VALUES ('d1', 'v1', 'DEV-1', '開発1課', '2026-04-01');
+            INSERT INTO projects VALUES ('p1', 'd1', 'PJ-001', '課1の案件', 'Completed', '2026-04-01');
+            """);
+    }
+
+    private bool カラムが存在する(string table, string column)
+    {
+        using var conn = _factory.Create();
+        return conn.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM pragma_table_info(@Table) WHERE name = @Column",
+            new { Table = table, Column = column }) > 0;
+    }
+
+    [Fact]
+    public void status列を持つDBは案件データを保持したままstatus列なしに作り直される()
+    {
+        終了ステータスありのDBを作成();
+        Assert.True(カラムが存在する("projects", "status"));
+
+        new DatabaseInitializer(_factory).Initialize();
+
+        // status 列は消える
+        Assert.False(カラムが存在する("projects", "status"));
+        Assert.True(カラムが存在する("projects", "department_id"));
+
+        using var conn = _factory.Create();
+        // 既存の案件(id/コード/名称/作成日時)は保持される
+        var name = conn.ExecuteScalar<string>("SELECT name FROM projects WHERE id = 'p1'");
+        Assert.Equal("課1の案件", name);
+        // 課ごと一意制約も維持される
+        var ex = Assert.ThrowsAny<Microsoft.Data.Sqlite.SqliteException>(() =>
+            conn.Execute(
+                "INSERT INTO projects VALUES ('p2', 'd1', 'PJ-001', '課1の別案件', '2026-04-01')"));
+        Assert.Contains("UNIQUE", ex.Message);
+    }
+
+    [Fact]
+    public void 移行は冪等で2回実行しても壊れない()
+    {
+        終了ステータスありのDBを作成();
+
+        var initializer = new DatabaseInitializer(_factory);
+        initializer.Initialize();
+        initializer.Initialize(); // 2回目は移行済みのため何もしない
+
+        using var conn = _factory.Create();
+        Assert.Equal(1, conn.ExecuteScalar<long>("SELECT COUNT(*) FROM projects"));
+        Assert.False(カラムが存在する("projects", "status"));
+        // 一時テーブルが残っていない
+        Assert.Equal(0, conn.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'projects_pre_drop_status'"));
     }
 }

@@ -40,11 +40,14 @@ model: claude-sonnet-5
 方針: 旧世代スキーマからの**データ移行は行わない**(2026-07-11 の課×半期再構築で決定)。
 旧世代のテーブルは起動時に破棄して新スキーマで作り直す(`DropLegacyTables`)。
 
-例外: **現世代スキーマ内での制約緩和**(既存データが衝突しない変更)は、データを保持したまま
-テーブルを作り直すマイグレーションを行ってよい。例: 案件コードの一意制約を
-グローバル→課ごとへ変更(`MigrateProjectCodeUniqueness`。Issue #1)。
-検出は `sqlite_master.sql` に新しい制約文字列(`UNIQUE (department_id, code)`)が含まれるかで判定し、
-未移行のときだけ RENAME→CREATE→INSERT SELECT→DROP。冪等にする。
+例外: **現世代スキーマ内での変更**(制約緩和や不要カラム削除など、既存データが衝突しない変更)は、
+データを保持したままテーブルを作り直すマイグレーションを行ってよい。RENAME→CREATE→INSERT SELECT→DROP を
+トランザクションで、必ず冪等に。例(いずれも `projects`、順に適用):
+- 案件コードの一意制約をグローバル→課ごとへ変更(`MigrateProjectCodeUniqueness`。Issue #1)。
+  検出は `sqlite_master.sql` に `UNIQUE (department_id, code)` が含まれるかで判定
+- 案件の終了ステータス `status` 列の廃止(`MigrateDropProjectStatus`。Issue #2)。
+  検出は `pragma_table_info` に `status` 列が残っているかで判定
+複数の移行が連なる場合、後段は前段の結果に対して冪等(該当列/制約がなければ何もしない)であること。
 
 1. `DatabaseInitializer` の CREATE TABLE を新スキーマに更新
 2. 同名テーブルの構造が変わる場合は `DropLegacyTables` に判定を追加:
