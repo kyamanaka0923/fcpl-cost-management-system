@@ -15,6 +15,7 @@
 | `testing` | テストの追加・修正・実行 | claude-sonnet-5 |
 | `docs-update` | README/MANUAL/DESIGN の同期 | claude-haiku-4-5 |
 | `ci-and-env` | CI・環境・スキーマ移行・プッシュ運用 | claude-sonnet-5 |
+| `issue-response` | GitHub Issue を確認し未対応のものを対応する運用 | claude-opus-4-8 |
 
 ## 絶対のルール(スキルより先に知るべき最小限)
 
