@@ -34,6 +34,12 @@ export default function BudgetEditPage() {
   const [newName, setNewName] = useState('')
   const [addingProject, setAddingProject] = useState(false)
 
+  // 案件のインライン編集(コード・名称)
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null)
+  const [editProjectCode, setEditProjectCode] = useState('')
+  const [editProjectName, setEditProjectName] = useState('')
+  const [savingProject, setSavingProject] = useState(false)
+
   // 費目追加フォーム
 
   const loadBudget = useCallback(() => {
@@ -141,6 +147,29 @@ export default function BudgetEditPage() {
     }
   }
 
+  const startEditProject = (p: Project) => {
+    setEditingProjectId(p.id)
+    setEditProjectCode(p.code)
+    setEditProjectName(p.name)
+    setError(null)
+  }
+
+  const cancelEditProject = () => setEditingProjectId(null)
+
+  const saveEditProject = async (projectId: string) => {
+    setSavingProject(true)
+    setError(null)
+    try {
+      await api.updateProject(projectId, { code: editProjectCode, name: editProjectName })
+      setEditingProjectId(null)
+      loadProjects()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setSavingProject(false)
+    }
+  }
+
   const approve = async () => {
     setError(null)
     try {
@@ -218,6 +247,7 @@ export default function BudgetEditPage() {
         <p className="muted small">
           案件ごとに半期一括の金額を入力します(空欄・0 は明細なし)。
           {editable && '金額を入力して次の欄へ移ると自動保存されます。'}
+          案件名の横の「編集」からコード・名称を後から変更できます(参照はGUIDのため予算・実績は保持されます)。
           課の区分合計は案件明細の合計として上部サマリに反映されます。
         </p>
         <table>
@@ -242,8 +272,44 @@ export default function BudgetEditPage() {
               projects.map((p) => (
                 <tr key={p.id}>
                   <td>
-                    {p.name}
-                    <span className="muted small">({p.code})</span>
+                    {editingProjectId === p.id ? (
+                      <span className="project-edit">
+                        <input
+                          aria-label="案件コード編集"
+                          value={editProjectCode}
+                          onChange={(e) => setEditProjectCode(e.target.value)}
+                          style={{ width: '7rem' }}
+                        />
+                        <input
+                          aria-label="案件名編集"
+                          value={editProjectName}
+                          onChange={(e) => setEditProjectName(e.target.value)}
+                          style={{ width: '10rem' }}
+                        />
+                        <button
+                          className="primary"
+                          onClick={() => saveEditProject(p.id)}
+                          disabled={savingProject}
+                        >
+                          保存
+                        </button>
+                        <button onClick={cancelEditProject} disabled={savingProject}>
+                          取消
+                        </button>
+                      </span>
+                    ) : (
+                      <>
+                        {p.name}
+                        <span className="muted small">({p.code})</span>
+                        <button
+                          className="row-edit-link"
+                          onClick={() => startEditProject(p)}
+                          aria-label={`${p.name} を編集`}
+                        >
+                          編集
+                        </button>
+                      </>
+                    )}
                   </td>
                   {projectCategories.map((category) => (
                     <td className="num" key={category}>

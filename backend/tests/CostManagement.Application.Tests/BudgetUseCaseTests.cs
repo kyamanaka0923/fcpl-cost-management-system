@@ -172,4 +172,79 @@ public class 課予算の策定と改定 : IDisposable
         // 同じ課で同じコードは不可
         await Assert.ThrowsAsync<DomainException>(() => _fx.案件を作成(課1.Id, "PJ-001", "課1の別案件"));
     }
+
+    [Fact]
+    public async Task 案件のコードと名称を後から編集できる()
+    {
+        var dept = await _fx.部と課を作成();
+        var project = await _fx.案件を作成(dept.Id, "PJ-001", "受託開発A");
+
+        var updated = await _fx.Projects.UpdateAsync(project.Id,
+            new UpdateProjectRequest("PJ-100", "受託開発A（改称）"));
+
+        Assert.Equal("PJ-100", updated.Code);
+        Assert.Equal("受託開発A（改称）", updated.Name);
+
+        // 取得し直しても反映されている
+        var reloaded = await _fx.Projects.GetAsync(project.Id);
+        Assert.Equal("PJ-100", reloaded.Code);
+    }
+
+    [Fact]
+    public async Task 案件コードを変更しても予算明細の案件参照は保たれる()
+    {
+        var dept = await _fx.部と課を作成();
+        var project = await _fx.案件を作成(dept.Id, "PJ-001", "受託開発A");
+        var budget = await _fx.Budgets.CreateDraftAsync(dept.Id,
+            new CreateBudgetRequest("2026-H1", "当初予算"));
+        await _fx.Budgets.UpsertLineAsync(budget.Id,
+            new UpsertBudgetLineRequest("Revenue", project.Id, null, 5_000_000m));
+
+        // 案件コードを変更(参照は案件Id=GUIDのため明細は壊れない)
+        await _fx.Projects.UpdateAsync(project.Id, new UpdateProjectRequest("PJ-999", "受託開発A"));
+
+        var reloaded = await _fx.Budgets.GetAsync(budget.Id);
+        var line = Assert.Single(reloaded.Lines);
+        Assert.Equal(project.Id, line.ProjectId);
+        Assert.Equal(5_000_000m, reloaded.RevenueTotal);
+    }
+
+    [Fact]
+    public async Task 編集で同一課の別案件とコードが重複するとエラーになる()
+    {
+        var dept = await _fx.部と課を作成();
+        await _fx.案件を作成(dept.Id, "PJ-001", "案件A");
+        var b = await _fx.案件を作成(dept.Id, "PJ-002", "案件B");
+
+        await Assert.ThrowsAsync<DomainException>(() =>
+            _fx.Projects.UpdateAsync(b.Id, new UpdateProjectRequest("PJ-001", "案件B")));
+    }
+
+    [Fact]
+    public async Task 編集では別の課の案件と同じコードに変更できる()
+    {
+        var div = await _fx.部を作成();
+        var 課1 = await _fx.課を作成(div.Id, "DEV-1", "開発1課");
+        var 課2 = await _fx.課を作成(div.Id, "DEV-2", "開発2課");
+        await _fx.案件を作成(課1.Id, "PJ-001", "課1の案件");
+        var 課2案件 = await _fx.案件を作成(課2.Id, "PJ-XXX", "課2の案件");
+
+        // 別の課なら同じコードに変更できる
+        var updated = await _fx.Projects.UpdateAsync(課2案件.Id,
+            new UpdateProjectRequest("PJ-001", "課2の案件"));
+        Assert.Equal("PJ-001", updated.Code);
+    }
+
+    [Fact]
+    public async Task 同じ案件を同じコードのまま名称だけ編集できる()
+    {
+        var dept = await _fx.部と課を作成();
+        var project = await _fx.案件を作成(dept.Id, "PJ-001", "旧名称");
+
+        // 自分自身のコードは重複扱いにならない
+        var updated = await _fx.Projects.UpdateAsync(project.Id,
+            new UpdateProjectRequest("PJ-001", "新名称"));
+        Assert.Equal("PJ-001", updated.Code);
+        Assert.Equal("新名称", updated.Name);
+    }
 }

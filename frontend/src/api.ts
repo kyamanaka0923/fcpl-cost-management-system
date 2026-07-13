@@ -262,6 +262,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  updateProject: (projectId: string, body: { code: string; name: string }) =>
+    request<Project>(`/projects/${projectId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
 
   // ---- 費目マスタ(期間費用) ----
   listCostElements: () => request<CostElement[]>('/cost-elements'),

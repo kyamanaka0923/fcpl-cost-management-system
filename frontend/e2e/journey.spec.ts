@@ -60,6 +60,16 @@ test('計画策定: 部と課を登録し予算編集で案件別に金額を入
   await 案件を追加(projectACode, '案件A')
   await 案件を追加(projectBCode, '案件B')
 
+  // 案件マスタは後からコード・名称を編集できる(専用の案件Cで検証。
+  // 参照は案件Id=GUIDのため、後続テストが使う案件A・Bには影響しない)
+  await 案件を追加('PJC-TMP', '案件C')
+  await page.locator('tr', { hasText: '案件C' }).getByRole('button', { name: '案件C を編集' }).click()
+  // 編集モードでは名称が入力欄になるため、行スコープではなくページ全体で入力欄を特定する
+  await page.getByLabel('案件コード編集').fill('PJC-EDIT')
+  await page.getByLabel('案件名編集').fill('案件C改')
+  await page.getByRole('button', { name: '保存' }).click()
+  await expect(page.locator('tr', { hasText: '案件C改' })).toContainText('PJC-EDIT')
+
   // ---- 案件×区分のグリッドで金額を入力(セルを離れると自動保存) ----
   const セル入力 = async (案件: string, 区分: string, 金額: string) => {
     const cell = page.getByLabel(`${案件} ${区分}`)

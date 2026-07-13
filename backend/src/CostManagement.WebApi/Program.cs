@@ -86,6 +86,9 @@ api.MapPost("/departments/{id:guid}/projects",
         Results.Created((string?)null, await svc.CreateAsync(id, req, ct)));
 api.MapGet("/projects/{id:guid}", (Guid id, ProjectService svc, CancellationToken ct) =>
     svc.GetAsync(id, ct));
+api.MapPut("/projects/{id:guid}",
+    (Guid id, UpdateProjectRequest req, ProjectService svc, CancellationToken ct) =>
+        svc.UpdateAsync(id, req, ct));
 
 // ---- 費目マスタ(期間費用) ----
 api.MapGet("/cost-elements", (CostElementService svc, CancellationToken ct) => svc.ListAsync(ct));

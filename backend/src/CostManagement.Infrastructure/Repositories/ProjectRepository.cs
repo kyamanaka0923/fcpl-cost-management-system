@@ -79,10 +79,11 @@ public sealed class ProjectRepository : IProjectRepository
     {
         using var conn = _factory.Create();
         await conn.ExecuteAsync("""
-            UPDATE projects SET name = @Name WHERE id = @Id
+            UPDATE projects SET code = @Code, name = @Name WHERE id = @Id
             """, new
         {
             Id = project.Id.Value,
+            project.Code,
             project.Name,
         });
     }

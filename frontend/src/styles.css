@@ -163,6 +163,33 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* 案件行のインライン編集 */
+.project-edit {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.project-edit input {
+  padding: 4px 8px;
+}
+.row-edit-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 0 0 6px;
+  text-decoration: underline;
+}
+.row-edit-link:hover {
+  border: none;
+  opacity: 0.8;
+}
+.project-edit button {
+  padding: 4px 10px;
+}
+
 input,
 select {
   font: inherit;

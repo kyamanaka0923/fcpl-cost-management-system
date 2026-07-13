@@ -227,6 +227,9 @@ public sealed record CreateDepartmentRequest(string Code, string Name);
 /// <summary>案件の新規登録リクエスト。</summary>
 public sealed record CreateProjectRequest(string Code, string Name);
 
+/// <summary>案件コード・名称の更新リクエスト。</summary>
+public sealed record UpdateProjectRequest(string Code, string Name);
+
 /// <summary>費目の新規登録リクエスト。</summary>
 public sealed record CreateCostElementRequest(string Code, string Name);
 

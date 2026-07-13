@@ -190,12 +190,13 @@ classDiagram
     }
     class Project {
         <<Aggregate Root>>
-        +ProjectId Id
+        +ProjectId Id ※GUID・他集約からの参照キー
         +DepartmentId DepartmentId ※所属する課
-        +string Code ※課ごとに一意
+        +string Code ※課ごとに一意・編集可
         +string Name
         +Create(departmentId, code, name, now) Project$
         +Rename(name)
+        +Edit(code, name) ※コード・名称を変更(参照はIdで保持)
     }
     class ProjectId {
         <<Value Object>>

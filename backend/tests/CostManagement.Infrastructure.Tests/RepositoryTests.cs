@@ -119,11 +119,12 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         var repo = new ProjectRepository(_fx.Factory);
         var project = await _fx.案件を保存(dept.Id);
 
-        project.Rename("名称変更後");
+        project.Edit("PJ-CHG", "名称変更後");
         await repo.UpdateAsync(project);
 
         var restored = await repo.FindByIdAsync(project.Id);
         Assert.Equal("名称変更後", restored!.Name);
+        Assert.Equal("PJ-CHG", restored.Code);
     }
 
     [Fact]

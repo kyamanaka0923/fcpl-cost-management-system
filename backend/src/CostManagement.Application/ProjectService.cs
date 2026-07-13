@@ -52,6 +52,25 @@ public sealed class ProjectService
     public async Task<ProjectDto> GetAsync(Guid id, CancellationToken ct = default) =>
         ToDto(await RequireAsync(id, ct));
 
+    /// <summary>
+    /// 案件のコード・名称を更新する。案件が無ければ <see cref="NotFoundException"/>。
+    /// 同一課内で別の案件がそのコードを使っている場合は <see cref="DomainException"/>
+    /// (別の課では同じコード可)。案件の同一性は GUID で保たれるため、予算明細・実績の参照は壊れない。
+    /// </summary>
+    public async Task<ProjectDto> UpdateAsync(Guid id, UpdateProjectRequest request,
+        CancellationToken ct = default)
+    {
+        var project = await RequireAsync(id, ct);
+        var newCode = request.Code?.Trim() ?? "";
+        var duplicate = await _projects.FindByCodeAsync(project.DepartmentId, newCode, ct);
+        if (duplicate is not null && duplicate.Id != project.Id)
+            throw new DomainException($"この課には既に案件コード '{request.Code}' が存在します。");
+
+        project.Edit(request.Code!, request.Name);
+        await _projects.UpdateAsync(project, ct);
+        return ToDto(project);
+    }
+
     /// <summary>IDで案件を取得する。無ければ <see cref="NotFoundException"/> を投げる内部ヘルパ。</summary>
     private async Task<Project> RequireAsync(Guid id, CancellationToken ct) =>
         await _projects.FindByIdAsync(new ProjectId(id), ct)

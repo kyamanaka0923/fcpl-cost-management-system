@@ -22,8 +22,8 @@ public sealed class Project
     /// <summary>所属する課のID。</summary>
     public DepartmentId DepartmentId { get; }
 
-    /// <summary>案件コード(課ごとに一意)。</summary>
-    public string Code { get; }
+    /// <summary>案件コード(課ごとに一意)。編集可能だが、他集約からの参照は <see cref="Id"/>(GUID)で行う。</summary>
+    public string Code { get; private set; }
 
     /// <summary>案件名(表示用)。</summary>
     public string Name { get; private set; }
@@ -56,6 +56,21 @@ public sealed class Project
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("案件名は必須です。");
+        Name = name.Trim();
+    }
+
+    /// <summary>
+    /// 案件コードと名称を変更する。コード・名称は必須。
+    /// 案件の同一性は <see cref="Id"/>(GUID)で保たれるため、コードを変えても
+    /// 予算明細・実績など他集約からの参照は壊れない(課ごとのコード一意性は Application 層で検証)。
+    /// </summary>
+    public void Edit(string code, string name)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            throw new DomainException("案件コードは必須です。");
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("案件名は必須です。");
+        Code = code.Trim();
         Name = name.Trim();
     }
 

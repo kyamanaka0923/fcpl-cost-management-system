@@ -35,7 +35,10 @@ model: claude-opus-4-8
   **案件コードは課ごとに一意**(別の課では同じコード可)。`IProjectRepository.FindByCodeAsync`
   は `(DepartmentId, code)` でスコープし、DB は `UNIQUE (department_id, code)`(Issue #1)。
   **案件はライフサイクル状態(終了/Completed 等)を持たない**(Issue #2 で ProjectStatus/Complete を廃止。
-  復活させない)。案件は明細の内訳次元にすぎず、予算承認で明細が確定する
+  復活させない)。案件は明細の内訳次元にすぎず、予算承認で明細が確定する。
+  **案件のコード・名称は登録後も編集可**(`Project.Edit(code, name)` / `ProjectService.UpdateAsync`。Issue #3)。
+  他集約(BudgetLine/ActualEntry)は案件を **`ProjectId`(生成時採番の GUID)**で参照するため、
+  コード変更で参照は壊れない。編集時も課ごとのコード一意性を Application 層で検証(自分自身は除外)
 - **費目(CostElement)は期間費用専用のシステム全体で共通なマスタ**(課ごとの設定ではない)。
   管理はフロントの専用画面 `/cost-elements`(課の予算編集からは選択のみ)。
   シードは人件費(PERSONNEL)・ライセンス費(LICENSE)、マスタで拡張可能。
