@@ -60,16 +60,6 @@ test('計画策定: 部と課を登録し予算編集で案件別に金額を入
   await 案件を追加(projectACode, '案件A')
   await 案件を追加(projectBCode, '案件B')
 
-  // 案件マスタは後からコード・名称を編集できる(専用の案件Cで検証。
-  // 参照は案件Id=GUIDのため、後続テストが使う案件A・Bには影響しない)
-  await 案件を追加('PJC-TMP', '案件C')
-  await page.locator('tr', { hasText: '案件C' }).getByRole('button', { name: '案件C を編集' }).click()
-  // 編集モードでは名称が入力欄になるため、行スコープではなくページ全体で入力欄を特定する
-  await page.getByLabel('案件コード編集').fill('PJC-EDIT')
-  await page.getByLabel('案件名編集').fill('案件C改')
-  await page.getByRole('button', { name: '保存' }).click()
-  await expect(page.locator('tr', { hasText: '案件C改' })).toContainText('PJC-EDIT')
-
   // ---- 案件×区分のグリッドで金額を入力(セルを離れると自動保存) ----
   const セル入力 = async (案件: string, 区分: string, 金額: string) => {
     const cell = page.getByLabel(`${案件} ${区分}`)
@@ -251,5 +241,52 @@ test('案件コード: 別の課では同じ案件コードを登録できる', 
 
   // エラーにならず、案件が追加される
   await expect(page.getByRole('cell', { name: '2課目の案件' })).toBeVisible()
+  await expect(page.locator('.error-banner')).toHaveCount(0)
+})
+
+test('案件編集: 登録済みの案件のコード・名称を後から変更できる', async ({ page }) => {
+  // 他テストと独立した専用の部・課・ドラフト予算を用意する
+  const eDivCode = `DIVE-${suffix}`
+  const eDivName = `編集検証部-${suffix}`
+  const eDeptCode = `DEVE-${suffix}`
+  const eDeptName = `編集検証課-${suffix}`
+
+  await page.goto('/')
+  await page.getByLabel('部コード').fill(eDivCode)
+  await page.getByLabel('部名').fill(eDivName)
+  await page.getByRole('button', { name: '登録' }).click()
+  await page.getByRole('link', { name: eDivName }).click()
+  await expect(page.getByRole('heading', { name: new RegExp(eDivCode) })).toBeVisible()
+
+  await page.getByLabel('課コード').fill(eDeptCode)
+  await page.getByLabel('課名').fill(eDeptName)
+  await page.getByRole('button', { name: '登録' }).click()
+  await page.getByRole('link', { name: eDeptName }).click()
+  await expect(page.getByRole('heading', { name: new RegExp(eDeptCode) })).toBeVisible()
+
+  const 予算カード = page.locator('.card', { hasText: '予算バージョン' })
+  await 予算カード.getByLabel('予算名').fill('当初予算')
+  await 予算カード.getByRole('button', { name: 'ドラフト作成' }).click()
+  await expect(page.getByRole('heading', { name: /当初予算/ })).toBeVisible()
+
+  // 案件を追加
+  const form = page.locator('form', { hasText: '案件コード' })
+  await form.getByLabel('案件コード').fill('PJE-1')
+  await form.getByLabel('案件名').fill('編集前案件')
+  await form.getByRole('button', { name: '追加' }).click()
+  await expect(page.getByRole('cell', { name: /編集前案件/ })).toBeVisible()
+
+  // コード・名称を後から編集できる(参照は案件Id=GUID)
+  await page
+    .locator('tr', { hasText: '編集前案件' })
+    .getByRole('button', { name: '編集前案件 を編集' })
+    .click()
+  // 編集モードでは名称が入力欄になるため、ページ全体で入力欄を特定する
+  await page.getByLabel('案件コード編集').fill('PJE-2')
+  await page.getByLabel('案件名編集').fill('編集後案件')
+  await page.getByRole('button', { name: '保存' }).click()
+
+  const 編集後行 = page.locator('tr', { hasText: '編集後案件' })
+  await expect(編集後行).toContainText('PJE-2')
   await expect(page.locator('.error-banner')).toHaveCount(0)
 })
