@@ -120,3 +120,56 @@ jobs:
 
       - name: 型チェックとビルド
         run: npm run build
+
+  metrics:
+    name: コードメトリクス(行数・複雑度)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cloc をインストール
+        run: sudo apt-get update && sudo apt-get install -y cloc
+
+      - name: scc をインストール(クロスプラットフォームのメトリクス集計)
+        run: go install github.com/boyter/scc/v3@latest
+
+      - name: 行数(cloc)と複雑度(scc)を3区分で集計
+        run: |
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          OUT=metrics-report.md
+          : > "$OUT"
+          EXCLUDES="bin,obj,dist,node_modules"
+          区分() {
+            local label="$1" dir="$2"
+            {
+              echo "#### ${label}（\`${dir}\`）"
+              echo
+              echo '**行数（cloc）**'
+              echo
+              cloc "$dir" --md --quiet --exclude-dir="$EXCLUDES"
+              echo
+              echo '**複雑度・行数（scc）**'
+              echo
+              echo '```'
+              scc "$dir" --no-cocomo --exclude-dir "$EXCLUDES"
+              echo '```'
+              echo
+            } >> "$OUT"
+          }
+          {
+            echo '## コードメトリクス'
+            echo
+            echo '`cloc` は言語別の行数（コード/コメント/空行）、`scc` は行数＋複雑度（分岐数ベースの循環的複雑度の近似）を集計します。'
+            echo
+          } >> "$OUT"
+          区分 'バックエンド 本体' backend/src
+          区分 'バックエンド テスト' backend/tests
+          区分 'フロントエンド' frontend/src
+          cat "$OUT" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: メトリクスレポートを保存(アーティファクト)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-metrics
+          path: metrics-report.md

@@ -232,6 +232,10 @@ npm run test:e2e
 詳細な HTML レポートは実行のアーティファクト `coverage-report` からダウンロードできます。
 ローカルでは `dotnet test --collect:"XPlat Code Coverage"` で計測できます。
 
+**コードメトリクス**: CI の `metrics` ジョブが **cloc(言語別の行数)** と
+**scc(行数＋複雑度)** を `backend/src` / `backend/tests` / `frontend/src` の3区分で集計し、
+各実行の Summary ページに表示します(レポートは `code-metrics` アーティファクト)。
+
 ## AWS へのデプロイ(サーバーレス構成)
 
 EC2・コンテナを使わず費用を抑えたサーバーレス構成の IaC(AWS SAM)を `infra/` に用意しています。
