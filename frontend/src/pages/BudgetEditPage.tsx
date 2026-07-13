@@ -15,6 +15,7 @@ import {
   type Project,
 } from '../api'
 import MoneyInput from '../components/MoneyInput'
+import Toast from '../components/Toast'
 
 export default function BudgetEditPage() {
   const { departmentId, budgetId } = useParams<{ departmentId: string; budgetId: string }>()
@@ -191,7 +192,7 @@ export default function BudgetEditPage() {
         <Link to="/">課一覧</Link> /{' '}
         <Link to={`/departments/${departmentId}?half=${half}`}>課詳細</Link> / 予算編集
       </div>
-      {error && <div className="error-banner">{error}</div>}
+      <Toast message={error} onClose={() => setError(null)} />
 
       <div className="card">
         <h2>

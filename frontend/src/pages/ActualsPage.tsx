@@ -12,6 +12,7 @@ import {
   type Project,
 } from '../api'
 import MoneyInput from '../components/MoneyInput'
+import Toast from '../components/Toast'
 
 export default function ActualsPage() {
   const { departmentId } = useParams<{ departmentId: string }>()
@@ -88,7 +89,7 @@ export default function ActualsPage() {
         <Link to="/">課一覧</Link> /{' '}
         <Link to={`/departments/${departmentId}?half=${half}`}>課詳細</Link> / 実績入力
       </div>
-      {error && <div className="error-banner">{error}</div>}
+      <Toast message={error} onClose={() => setError(null)} />
 
       <div className="card">
         <h2>実績の計上({halfLabel(half)})</h2>

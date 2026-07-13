@@ -13,6 +13,7 @@ import {
   type VarianceReport,
 } from '../api'
 import { PlannedVsActualChart, VarianceBarChart } from '../components/charts'
+import Toast from '../components/Toast'
 
 type Tab = 'variance' | 'profit'
 
@@ -69,7 +70,7 @@ function VarianceTab({ departmentId, half }: { departmentId: string; half: strin
 
   return (
     <>
-      {error && <div className="error-banner">{error}</div>}
+      <Toast message={error} onClose={() => setError(null)} />
       <div className="card">
         <h2>分析条件</h2>
         <div className="form-row">
@@ -215,7 +216,7 @@ function ProfitTab({ departmentId, half }: { departmentId: string; half: string 
 
   return (
     <>
-      {error && <div className="error-banner">{error}</div>}
+      <Toast message={error} onClose={() => setError(null)} />
 
       {summary && (
         <>

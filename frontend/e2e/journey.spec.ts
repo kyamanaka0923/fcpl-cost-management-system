@@ -241,7 +241,7 @@ test('案件コード: 別の課では同じ案件コードを登録できる', 
 
   // エラーにならず、案件が追加される
   await expect(page.getByRole('cell', { name: '2課目の案件' })).toBeVisible()
-  await expect(page.locator('.error-banner')).toHaveCount(0)
+  await expect(page.locator('.toast-error')).toHaveCount(0)
 })
 
 test('案件編集: 登録済みの案件のコード・名称を後から変更できる', async ({ page }) => {
@@ -288,5 +288,43 @@ test('案件編集: 登録済みの案件のコード・名称を後から変更
 
   const 編集後行 = page.locator('tr', { hasText: '編集後案件' })
   await expect(編集後行).toContainText('PJE-2')
-  await expect(page.locator('.error-banner')).toHaveCount(0)
+  await expect(page.locator('.toast-error')).toHaveCount(0)
+})
+
+test('エラー表示: 失敗時は画面隅のトーストで通知される', async ({ page }) => {
+  // 独立した部・課・ドラフトを用意し、案件コードを重複させてエラーを発生させる
+  const s = `ERR-${suffix}`
+  await page.goto('/')
+  await page.getByLabel('部コード').fill(`DIV${s}`)
+  await page.getByLabel('部名').fill(`エラー検証部-${suffix}`)
+  await page.getByRole('button', { name: '登録' }).click()
+  await page.getByRole('link', { name: `エラー検証部-${suffix}` }).click()
+
+  await page.getByLabel('課コード').fill(`DEV${s}`)
+  await page.getByLabel('課名').fill(`エラー検証課-${suffix}`)
+  await page.getByRole('button', { name: '登録' }).click()
+  await page.getByRole('link', { name: `エラー検証課-${suffix}` }).click()
+
+  const 予算カード = page.locator('.card', { hasText: '予算バージョン' })
+  await 予算カード.getByLabel('予算名').fill('当初予算')
+  await 予算カード.getByRole('button', { name: 'ドラフト作成' }).click()
+  await expect(page.getByRole('heading', { name: /当初予算/ })).toBeVisible()
+
+  const form = page.locator('form', { hasText: '案件コード' })
+  const 案件追加 = async (name: string) => {
+    await form.getByLabel('案件コード').fill('PJ-DUP')
+    await form.getByLabel('案件名').fill(name)
+    await form.getByRole('button', { name: '追加' }).click()
+  }
+  await 案件追加('案件X')
+  await expect(page.getByRole('cell', { name: /案件X/ })).toBeVisible()
+
+  // 同一課で重複コード → トーストにエラーが表示される
+  await 案件追加('案件Y')
+  const トースト = page.locator('.toast-error')
+  await expect(トースト).toBeVisible()
+  await expect(トースト).toContainText('案件コード')
+  // 手動で閉じられる
+  await トースト.getByRole('button', { name: 'エラーを閉じる' }).click()
+  await expect(page.locator('.toast-error')).toHaveCount(0)
 })

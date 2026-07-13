@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, type Division } from '../api'
+import Toast from '../components/Toast'
 
 export default function DivisionListPage() {
   const [divisions, setDivisions] = useState<Division[]>([])
@@ -32,7 +33,7 @@ export default function DivisionListPage() {
 
   return (
     <>
-      {error && <div className="error-banner">{error}</div>}
+      <Toast message={error} onClose={() => setError(null)} />
 
       <div className="card">
         <h2>部の新規登録</h2>

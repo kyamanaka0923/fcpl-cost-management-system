@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import Toast from '../components/Toast'
 import {
   api,
   categoryLabel,
@@ -344,7 +345,7 @@ export default function DivisionDetailPage() {
       <div className="breadcrumbs">
         <Link to="/">部一覧</Link> / {division?.name ?? '…'}
       </div>
-      {error && <div className="error-banner">{error}</div>}
+      <Toast message={error} onClose={() => setError(null)} />
 
       <div className="card">
         <h2>

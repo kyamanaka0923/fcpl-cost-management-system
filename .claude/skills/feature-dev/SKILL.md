@@ -35,6 +35,9 @@ model: claude-sonnet-5
   対象半期は `?half=` クエリでページ間を引き回す(既定は `currentFiscalHalf()`)。
   有利/不利の色はコスト=正が赤(adverse)、売上高・損益=正が緑(favorable)。
   ダークモード対応必須(CSS変数)
+  エラーは各ページの `error`/`setError` state を **`<Toast message={error} onClose={() => setError(null)} />`**
+  (`components/Toast.tsx`・画面右下固定・自動消去)で表示する。最上部バナー(`.error-banner`)は
+  スクロール時に気づけないため廃止(Issue #4)。新規ページも Toast を使う
 - チャートを追加・変更するときは dataviz スキル(バンドル)を先に読み込み、検証済みパレット
   (`frontend/src/styles.css` の CSS 変数)を使う
 

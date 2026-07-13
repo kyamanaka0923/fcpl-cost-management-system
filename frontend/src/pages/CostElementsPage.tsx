@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, type CostElement } from '../api'
+import Toast from '../components/Toast'
 
 /**
  * 費目マスタ管理(システム共通)。
@@ -39,7 +40,7 @@ export default function CostElementsPage() {
       <div className="breadcrumbs">
         <Link to="/">部一覧</Link> / 費目マスタ
       </div>
-      {error && <div className="error-banner">{error}</div>}
+      <Toast message={error} onClose={() => setError(null)} />
 
       <div className="card">
         <h2>費目マスタ(期間費用)</h2>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import Toast from '../components/Toast'
 import {
   api,
   currentFiscalHalf,
@@ -210,7 +211,7 @@ export default function DepartmentDetailPage() {
         <Link to={`/divisions/${department?.divisionId}?half=${half}`}>{division?.name ?? '…'}</Link>{' '}
         / {department?.name ?? '…'}
       </div>
-      {error && <div className="error-banner">{error}</div>}
+      <Toast message={error} onClose={() => setError(null)} />
 
       <div className="card">
         <h2>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import Toast from '../components/Toast'
 import {
   api,
   categoryLabel,
@@ -65,7 +66,7 @@ export default function ComparisonPage() {
         <Link to={`/departments/${departmentId}?half=${half}`}>課詳細</Link> / 予算バージョン比較(
         {halfLabel(half)})
       </div>
-      {error && <div className="error-banner">{error}</div>}
+      <Toast message={error} onClose={() => setError(null)} />
 
       <div className="card">
         <h2>比較条件</h2>
