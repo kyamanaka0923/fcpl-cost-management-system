@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker build *)",
+      "Bash(docker run *)",
+      "Bash(dotnet build *)",
+      "Bash(dotnet test *)",
+      "Bash(git commit -m ' *)",
+      "Bash(cat /workspace/frontend/playwright.config.ts | head -40; ls /opt/pw-browsers 2>/dev/null || echo \"no /opt/pw-browsers\")",
+      "Read(//opt/**)",
+      "Bash(npx playwright *)",
+      "Bash(gh auth *)"
+    ]
+  }
+}
