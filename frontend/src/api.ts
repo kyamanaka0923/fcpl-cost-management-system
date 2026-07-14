@@ -76,6 +76,9 @@ export interface BudgetLine {
   projectId: string | null
   elementCode: string | null
   amount: number
+  isMonthly: boolean
+  /** 月次モードの月別金額(月インデックス "1".."6" → 金額)。半期一括モードでは空。 */
+  monthlyAmounts: Record<string, number>
 }
 
 export interface BudgetSummary {
@@ -105,6 +108,8 @@ export interface ActualEntry {
   category: BudgetCategory
   projectId: string | null
   elementCode: string | null
+  /** 計上対象の月(半期内 1..6)。半期一括の計上は null。 */
+  month: number | null
   amount: number
   note: string | null
   recordedAt: string
@@ -294,6 +299,8 @@ export const api = {
       projectId?: string | null
       elementCode?: string | null
       amount: number
+      /** 指定すると月次モード(月インデックス 1..6 → 金額)。未指定なら amount による半期一括。 */
+      monthlyAmounts?: Record<number, number>
     },
   ) =>
     request<BudgetDetail>(`/budgets/${budgetId}/lines`, {
@@ -327,6 +334,8 @@ export const api = {
       projectId?: string | null
       elementCode?: string | null
       amount: number
+      /** 指定すると特定月の計上(半期内 1..6)。未指定なら半期一括。 */
+      month?: number | null
       note?: string | null
     },
   ) =>
@@ -392,6 +401,19 @@ export const projectCategories: BudgetCategory[] = ['Revenue', 'Processing', 'Ou
 export const halfLabel = (fiscalHalf: string): string => {
   const [year, half] = fiscalHalf.split('-')
   return `${year}年度 ${half === 'H1' ? '上期' : '下期'}`
+}
+
+/**
+ * 半期を構成する6ヶ月を、月インデックス(1..6)と暦月ラベルで返す。
+ * 上期(H1)= 4〜9月、下期(H2)= 10〜3月。
+ */
+export const halfMonths = (fiscalHalf: string): { index: number; label: string }[] => {
+  const isH1 = fiscalHalf.endsWith('H1')
+  const startMonth = isH1 ? 4 : 10
+  return Array.from({ length: 6 }, (_, i) => ({
+    index: i + 1,
+    label: `${((startMonth - 1 + i) % 12) + 1}月`,
+  }))
 }
 
 /** 今日の日付が属する会計半期(年度は4月始まり: 4〜9月 = 上期、10〜3月 = 前年度の下期)。 */

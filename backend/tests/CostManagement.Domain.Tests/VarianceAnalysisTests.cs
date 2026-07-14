@@ -34,7 +34,7 @@ public class VarianceAnalysisTests
 
     private static ActualEntry Actual(BudgetCategory category, ProjectId? project,
         CostElementCode? element, decimal amount) =>
-        ActualEntry.Record(Dept, Half, category, project, element, new Money(amount), null, Now);
+        ActualEntry.Record(Dept, Half, category, project, element, null, new Money(amount), null, Now);
 
     private static readonly BudgetVarianceAnalysisService Service = new();
 

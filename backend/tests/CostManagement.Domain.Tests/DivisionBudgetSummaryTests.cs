@@ -33,9 +33,9 @@ public class DivisionBudgetSummaryTests
 
         var actuals = new[]
         {
-            ActualEntry.Record(dept, Half, BudgetCategory.Revenue, project, null, new Money(売上実績), null, Now),
-            ActualEntry.Record(dept, Half, BudgetCategory.Processing, project, null, new Money(加工費実績), null, Now),
-            ActualEntry.Record(dept, Half, BudgetCategory.PeriodCost, null, Personnel, new Money(期間費用実績), null, Now),
+            ActualEntry.Record(dept, Half, BudgetCategory.Revenue, project, null, null, new Money(売上実績), null, Now),
+            ActualEntry.Record(dept, Half, BudgetCategory.Processing, project, null, null, new Money(加工費実績), null, Now),
+            ActualEntry.Record(dept, Half, BudgetCategory.PeriodCost, null, Personnel, null, new Money(期間費用実績), null, Now),
         };
 
         return new DepartmentVarianceInput(dept, VarianceService.Analyze(budget, actuals));

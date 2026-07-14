@@ -6,6 +6,7 @@ import {
   currentFiscalHalf,
   formatYen,
   halfLabel,
+  halfMonths,
   type ActualEntry,
   type BudgetCategory,
   type CostElement,
@@ -27,9 +28,14 @@ export default function ActualsPage() {
   const [category, setCategory] = useState<BudgetCategory>('Revenue')
   const [projectId, setProjectId] = useState('')
   const [elementCode, setElementCode] = useState('')
+  const [month, setMonth] = useState('') // '' = 半期一括
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const months = halfMonths(half)
+  const monthLabel = (m: number | null) =>
+    m === null ? '半期一括' : (months.find((x) => x.index === m)?.label ?? `${m}月`)
 
   const load = useCallback(() => {
     if (!departmentId) return
@@ -58,6 +64,7 @@ export default function ActualsPage() {
         category,
         projectId: isProjectCategory ? projectId : null,
         elementCode: isProjectCategory ? null : elementCode,
+        month: month ? Number(month) : null,
         amount: Number(amount),
         note: note || null,
       })
@@ -95,6 +102,7 @@ export default function ActualsPage() {
         <h2>実績の計上({halfLabel(half)})</h2>
         <p className="muted small">
           売上高・加工費・外注費は案件ごとに、期間費用は費目ごとに計上します。
+          「月」を選ぶと特定月の計上、「半期一括」なら半期まとめての計上になります。
           同じ案件(または費目)に複数回計上でき、分析時に合算されます。
         </p>
         <form onSubmit={record} className="form-row">
@@ -134,6 +142,17 @@ export default function ActualsPage() {
             </label>
           )}
           <label>
+            月
+            <select value={month} onChange={(e) => setMonth(e.target.value)}>
+              <option value="">半期一括</option>
+              {months.map((m) => (
+                <option key={m.index} value={m.index}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             金額(円)
             <MoneyInput value={amount} onChange={setAmount} required />
           </label>
@@ -158,6 +177,7 @@ export default function ActualsPage() {
                 <th>計上日時</th>
                 <th>区分</th>
                 <th>案件 / 費目</th>
+                <th>月</th>
                 <th className="num">金額</th>
                 <th>備考</th>
                 <th></th>
@@ -173,6 +193,7 @@ export default function ActualsPage() {
                       ? elementName(e.elementCode)
                       : projectName(e.projectId)}
                   </td>
+                  <td className="small muted">{monthLabel(e.month)}</td>
                   <td className="num">¥{formatYen(e.amount)}</td>
                   <td className="small muted">{e.note ?? ''}</td>
                   <td>
@@ -181,7 +202,7 @@ export default function ActualsPage() {
                 </tr>
               ))}
               <tr className="total-row">
-                <td colSpan={3}>合計(全区分)</td>
+                <td colSpan={4}>合計(全区分)</td>
                 <td className="num">¥{formatYen(total)}</td>
                 <td colSpan={2}></td>
               </tr>

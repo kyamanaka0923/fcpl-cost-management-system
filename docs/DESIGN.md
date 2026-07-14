@@ -266,7 +266,9 @@ classDiagram
         +BudgetCategory Category
         +ProjectId? ProjectId ※案件系区分で必須
         +CostElementCode? ElementCode ※期間費用で必須
-        +Money Amount ※半期一括
+        +Money Amount ※半期合計
+        +IReadOnlyDictionary~int,Money~ MonthlyAmounts ※月次モードのみ
+        +bool IsMonthly ※月別金額を持つ=月次
     }
 
     class ActualEntry {
@@ -277,6 +279,7 @@ classDiagram
         +BudgetCategory Category
         +ProjectId? ProjectId ※案件系区分で必須
         +CostElementCode? ElementCode ※期間費用で必須
+        +int? Month ※計上月(1..6)。半期一括は null
         +Money Amount
         +string? Note
         +Record(...) ActualEntry$
@@ -446,7 +449,8 @@ classDiagram
 - 差異 = 実績金額 − 予算金額(符号付き)
   - コスト(加工費・外注費・期間費用): 正 = 予算超過 = **不利差異**(`IsAdverse`)
   - 売上高: 正 = 売上超過 = **有利差異**(`IsFavorable`)
-- 突き合わせ粒度: (区分, 案件) または (期間費用, 費目)。半期一括のため年月の軸はない。
+- 突き合わせ粒度: (区分, 案件) または (期間費用, 費目)。**分析・集計は半期粒度**
+  (明細は月次入力もできるが半期合計に畳んで比較する。Issue #5)。
   同一キーの実績は合算
 - 損益:
   - 課全体 = 売上高 −(加工費 + 外注費 + 期間費用)。利益率 = 損益 ÷ 売上高(売上高0は null)

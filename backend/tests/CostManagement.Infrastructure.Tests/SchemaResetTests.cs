@@ -401,3 +401,86 @@ public class 案件の終了ステータス廃止マイグレーション : IDis
             "SELECT COUNT(*) FROM sqlite_master WHERE name = 'projects_pre_drop_status'"));
     }
 }
+
+/// <summary>
+/// 実績に月次計上用の month 列を追加するマイグレーションの検証(Issue #5)。
+/// month 列を持たない現世代 actual_entries に列が追加され、既存データが保持されることを確認する。
+/// </summary>
+public class 実績の月列追加マイグレーション : IDisposable
+{
+    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _factory;
+
+    public 実績の月列追加マイグレーション()
+    {
+        _dbPath = Path.Combine(Path.GetTempPath(), $"cm-actmonth-{Guid.NewGuid():N}.db");
+        _factory = new SqliteConnectionFactory($"Data Source={_dbPath}");
+    }
+
+    public void Dispose()
+    {
+        if (File.Exists(_dbPath))
+            File.Delete(_dbPath);
+    }
+
+    /// <summary>month 列を持たない現世代 actual_entries のDBを作る。</summary>
+    private void 月列なしのDBを作成()
+    {
+        using var conn = _factory.Create();
+        conn.Execute("""
+            CREATE TABLE divisions (
+                id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE TABLE departments (
+                id TEXT PRIMARY KEY, division_id TEXT NOT NULL, code TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE TABLE actual_entries (
+                id TEXT PRIMARY KEY, department_id TEXT NOT NULL, fiscal_half TEXT NOT NULL,
+                category TEXT NOT NULL, project_id TEXT NOT NULL DEFAULT '', element_code TEXT NOT NULL DEFAULT '',
+                amount TEXT NOT NULL, note TEXT NULL, recorded_at TEXT NOT NULL
+            );
+            INSERT INTO divisions VALUES ('v1', 'SALES', '営業本部', '2026-04-01');
+            INSERT INTO departments VALUES ('d1', 'v1', 'DEV-1', '開発1課', '2026-04-01');
+            INSERT INTO actual_entries (id, department_id, fiscal_half, category, project_id, element_code, amount, note, recorded_at)
+            VALUES ('a1', 'd1', '2026-H1', 'Revenue', 'p1', '', '1000000', '旧実績', '2026-05-01');
+            """);
+    }
+
+    private bool カラムが存在する(string table, string column)
+    {
+        using var conn = _factory.Create();
+        return conn.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM pragma_table_info(@Table) WHERE name = @Column",
+            new { Table = table, Column = column }) > 0;
+    }
+
+    [Fact]
+    public void 月列が無い実績テーブルは月列が追加されデータは保持される()
+    {
+        月列なしのDBを作成();
+        Assert.False(カラムが存在する("actual_entries", "month"));
+
+        new DatabaseInitializer(_factory).Initialize();
+
+        Assert.True(カラムが存在する("actual_entries", "month"));
+        using var conn = _factory.Create();
+        // 既存の実績は保持され、month は NULL(半期一括)になる
+        Assert.Equal("旧実績", conn.ExecuteScalar<string>("SELECT note FROM actual_entries WHERE id = 'a1'"));
+        Assert.Null(conn.ExecuteScalar<long?>("SELECT month FROM actual_entries WHERE id = 'a1'"));
+    }
+
+    [Fact]
+    public void 移行は冪等で2回実行しても壊れない()
+    {
+        月列なしのDBを作成();
+
+        var initializer = new DatabaseInitializer(_factory);
+        initializer.Initialize();
+        initializer.Initialize(); // 2回目は month 列があるため何もしない
+
+        Assert.True(カラムが存在する("actual_entries", "month"));
+        using var conn = _factory.Create();
+        Assert.Equal(1, conn.ExecuteScalar<long>("SELECT COUNT(*) FROM actual_entries"));
+    }
+}

@@ -33,6 +33,63 @@ public class 課予算の策定と改定 : IDisposable
     }
 
     [Fact]
+    public async Task 明細を月次で入力すると半期合計は月次の合計になり応答に月別金額が入る()
+    {
+        var dept = await _fx.部と課を作成();
+        var project = await _fx.案件を作成(dept.Id);
+        var budget = await _fx.Budgets.CreateDraftAsync(dept.Id,
+            new CreateBudgetRequest("2026-H1", "当初予算"));
+
+        var updated = await _fx.Budgets.UpsertLineAsync(budget.Id, new UpsertBudgetLineRequest(
+            "Revenue", project.Id, null, 0m,
+            new Dictionary<int, decimal> { [1] = 1_000_000m, [2] = 2_000_000m }));
+
+        Assert.Equal(3_000_000m, updated.RevenueTotal);
+        var line = Assert.Single(updated.Lines);
+        Assert.True(line.IsMonthly);
+        Assert.Equal(2, line.MonthlyAmounts.Count);
+        Assert.Equal(1_000_000m, line.MonthlyAmounts[1]);
+
+        // 取得し直しても月別金額が復元される
+        var reloaded = await _fx.Budgets.GetAsync(budget.Id);
+        Assert.True(Assert.Single(reloaded.Lines).IsMonthly);
+    }
+
+    [Fact]
+    public async Task 月次明細を半期一括で上書きするとモードが戻る()
+    {
+        var dept = await _fx.部と課を作成();
+        var project = await _fx.案件を作成(dept.Id);
+        var budget = await _fx.Budgets.CreateDraftAsync(dept.Id,
+            new CreateBudgetRequest("2026-H1", "当初予算"));
+        await _fx.Budgets.UpsertLineAsync(budget.Id, new UpsertBudgetLineRequest(
+            "Processing", project.Id, null, 0m,
+            new Dictionary<int, decimal> { [1] = 500_000m }));
+
+        var updated = await _fx.Budgets.UpsertLineAsync(budget.Id,
+            new UpsertBudgetLineRequest("Processing", project.Id, null, 800_000m));
+
+        var line = Assert.Single(updated.Lines);
+        Assert.False(line.IsMonthly);
+        Assert.Empty(line.MonthlyAmounts);
+        Assert.Equal(800_000m, line.Amount);
+    }
+
+    [Fact]
+    public async Task 実績を月指定で計上でき応答に月が入る()
+    {
+        var dept = await _fx.部と課を作成();
+        var project = await _fx.案件を作成(dept.Id);
+
+        var recorded = await _fx.Actuals.RecordAsync(dept.Id,
+            new RecordActualRequest("2026-H1", "Revenue", project.Id, null, 700_000m, Month: 4));
+
+        Assert.Equal(4, recorded.Month);
+        var entries = await _fx.Actuals.ListAsync(dept.Id, "2026-H1");
+        Assert.Equal(4, Assert.Single(entries).Month);
+    }
+
+    [Fact]
     public async Task 策定中のドラフトがあると新しいドラフトは起票できない()
     {
         var dept = await _fx.部と課を作成();
@@ -126,9 +183,9 @@ public class 課予算の策定と改定 : IDisposable
         var project = await _fx.案件を作成(dept.Id);
 
         await _fx.Actuals.RecordAsync(dept.Id,
-            new RecordActualRequest("2026-H1", "Processing", project.Id, null, 400_000m, "4月分"));
+            new RecordActualRequest("2026-H1", "Processing", project.Id, null, 400_000m, null, "4月分"));
         await _fx.Actuals.RecordAsync(dept.Id,
-            new RecordActualRequest("2026-H1", "Processing", project.Id, null, 500_000m, "5月分"));
+            new RecordActualRequest("2026-H1", "Processing", project.Id, null, 500_000m, null, "5月分"));
 
         var entries = await _fx.Actuals.ListAsync(dept.Id, "2026-H1");
         Assert.Equal(2, entries.Count);

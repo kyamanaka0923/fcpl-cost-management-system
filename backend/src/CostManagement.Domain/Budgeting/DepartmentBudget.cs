@@ -75,13 +75,31 @@ public static class BudgetCategories
     }
 }
 
+/// <summary>半期を構成する月数(H1=4〜9月 / H2=10〜3月 の6ヶ月。月インデックスは 1..6)。</summary>
+public static class HalfMonths
+{
+    /// <summary>1半期の月数。</summary>
+    public const int Count = 6;
+
+    /// <summary>月インデックスが 1..6 の範囲かを検証する。</summary>
+    public static void Validate(int month)
+    {
+        if (month is < 1 or > Count)
+            throw new DomainException($"月は1〜{Count}で指定してください: {month}");
+    }
+}
+
 /// <summary>
 /// 課予算の明細。集約内エンティティ。
-/// 売上高・加工費・外注費は (区分, 案件)、期間費用は (期間費用, 費目) ごとに一意で、
-/// 半期一括の金額を直接持つ(数量×単価では管理しない)。
+/// 売上高・加工費・外注費は (区分, 案件)、期間費用は (期間費用, 費目) ごとに一意。
+/// 金額は「半期一括」または「月次(月インデックス1..6ごと)」で持つ(数量×単価では管理しない)。
+/// どちらのモードでも <see cref="Amount"/> は半期合計。月次のときは半期合計 = 月次の合計。
 /// </summary>
 public sealed class BudgetLine
 {
+    // 月次モードの月別金額(1..6 → 金額)。0の月は保持しない。空 = 半期一括モード。
+    private readonly Dictionary<int, Money> _monthly;
+
     /// <summary>明細ID(集約内で一意)。</summary>
     public Guid Id { get; }
 
@@ -94,29 +112,68 @@ public sealed class BudgetLine
     /// <summary>費目。期間費用の明細で必須。案件別区分では null。</summary>
     public CostElementCode? ElementCode { get; }
 
-    /// <summary>半期一括の金額。</summary>
+    /// <summary>半期合計の金額(月次モードでは月別金額の合計)。</summary>
     public Money Amount { get; private set; }
+
+    /// <summary>月次モードの月別金額(1..6 → 金額)。半期一括モードでは空。</summary>
+    public IReadOnlyDictionary<int, Money> MonthlyAmounts => _monthly;
+
+    /// <summary>月次モードかどうか(月別金額を持つ = 月次)。</summary>
+    public bool IsMonthly => _monthly.Count > 0;
 
     /// <summary>
     /// 明細を生成する(集約内部からのみ)。区分と案件/費目の排他を
     /// <see cref="BudgetCategories.ValidateKey"/> で検証する(復元経路でも通る)。
+    /// monthly を渡すと月次モード、null/空だと amount による半期一括モードになる。
     /// </summary>
     internal BudgetLine(Guid id, BudgetCategory category, ProjectId? projectId,
-        CostElementCode? elementCode, Money amount)
+        CostElementCode? elementCode, Money amount,
+        IReadOnlyDictionary<int, Money>? monthly = null)
     {
         BudgetCategories.ValidateKey(category, projectId, elementCode);
         Id = id;
         Category = category;
         ProjectId = projectId;
         ElementCode = elementCode;
+        _monthly = new Dictionary<int, Money>();
+        if (monthly is { Count: > 0 })
+            SetMonthly(monthly);
+        else
+            Amount = amount;
+    }
+
+    /// <summary>半期一括の金額で上書きする(月次モードを解除する)。</summary>
+    internal void UpdateHalf(Money amount)
+    {
+        _monthly.Clear();
         Amount = amount;
     }
 
-    /// <summary>金額を上書きする。</summary>
-    internal void Update(Money amount) => Amount = amount;
+    /// <summary>月別金額で上書きする(月次モードにする)。半期合計は月次の合計になる。</summary>
+    internal void UpdateMonthly(IReadOnlyDictionary<int, Money> monthly) => SetMonthly(monthly);
 
-    /// <summary>改定版へ引き継ぐため、新しいIDで明細を複製する。</summary>
-    internal BudgetLine Copy() => new(Guid.NewGuid(), Category, ProjectId, ElementCode, Amount);
+    private void SetMonthly(IReadOnlyDictionary<int, Money> monthly)
+    {
+        _monthly.Clear();
+        var total = Money.Zero;
+        foreach (var (month, amount) in monthly)
+        {
+            HalfMonths.Validate(month);
+            if (amount.IsNegative)
+                throw new DomainException("金額は0以上で入力してください。");
+            if (amount.Value != 0m)
+            {
+                _monthly[month] = amount;
+                total += amount;
+            }
+        }
+        Amount = total;
+    }
+
+    /// <summary>改定版へ引き継ぐため、新しいIDで明細を複製する(月次モードも引き継ぐ)。</summary>
+    internal BudgetLine Copy() =>
+        new(Guid.NewGuid(), Category, ProjectId, ElementCode, Amount,
+            _monthly.Count > 0 ? _monthly : null);
 }
 
 /// <summary>
@@ -208,23 +265,40 @@ public sealed class DepartmentBudget
     }
 
     /// <summary>
-    /// 案件別明細(売上高・加工費・外注費)を追加または更新する。(区分, 案件) が同じ明細は1件に統合される。
+    /// 案件別明細(売上高・加工費・外注費)を半期一括金額で追加または更新する。
+    /// (区分, 案件) が同じ明細は1件に統合され、月次モードだった場合は半期一括に切り替わる。
     /// </summary>
     public void UpsertProjectLine(BudgetCategory category, ProjectId projectId, Money amount)
     {
         EnsureDraft();
         ValidateAmount(amount);
-        if (!category.IsProjectBased())
-            throw new DomainException("期間費用の明細は費目で指定してください。");
+        RequireProjectCategory(category);
 
         var existing = _lines.FirstOrDefault(l => l.Category == category && l.ProjectId == projectId);
         if (existing is null)
             _lines.Add(new BudgetLine(Guid.NewGuid(), category, projectId, null, amount));
         else
-            existing.Update(amount);
+            existing.UpdateHalf(amount);
     }
 
-    /// <summary>期間費用の明細を追加または更新する。同一費目の明細は1件に統合される。</summary>
+    /// <summary>
+    /// 案件別明細を月別金額(1..6 → 金額)で追加または更新する(月次モード)。
+    /// 半期合計は月次の合計になる。(区分, 案件) が同じ明細は1件に統合される。
+    /// </summary>
+    public void UpsertProjectLineMonthly(BudgetCategory category, ProjectId projectId,
+        IReadOnlyDictionary<int, Money> monthly)
+    {
+        EnsureDraft();
+        RequireProjectCategory(category);
+
+        var existing = _lines.FirstOrDefault(l => l.Category == category && l.ProjectId == projectId);
+        if (existing is null)
+            _lines.Add(new BudgetLine(Guid.NewGuid(), category, projectId, null, Money.Zero, monthly));
+        else
+            existing.UpdateMonthly(monthly);
+    }
+
+    /// <summary>期間費用の明細を半期一括金額で追加または更新する。同一費目の明細は1件に統合される。</summary>
     public void UpsertPeriodCostLine(CostElementCode elementCode, Money amount)
     {
         EnsureDraft();
@@ -235,7 +309,28 @@ public sealed class DepartmentBudget
         if (existing is null)
             _lines.Add(new BudgetLine(Guid.NewGuid(), BudgetCategory.PeriodCost, null, elementCode, amount));
         else
-            existing.Update(amount);
+            existing.UpdateHalf(amount);
+    }
+
+    /// <summary>期間費用の明細を月別金額で追加または更新する(月次モード)。同一費目の明細は1件に統合される。</summary>
+    public void UpsertPeriodCostLineMonthly(CostElementCode elementCode,
+        IReadOnlyDictionary<int, Money> monthly)
+    {
+        EnsureDraft();
+
+        var existing = _lines.FirstOrDefault(l =>
+            l.Category == BudgetCategory.PeriodCost && l.ElementCode == elementCode);
+        if (existing is null)
+            _lines.Add(new BudgetLine(Guid.NewGuid(), BudgetCategory.PeriodCost, null, elementCode,
+                Money.Zero, monthly));
+        else
+            existing.UpdateMonthly(monthly);
+    }
+
+    private static void RequireProjectCategory(BudgetCategory category)
+    {
+        if (!category.IsProjectBased())
+            throw new DomainException("期間費用の明細は費目で指定してください。");
     }
 
     /// <summary>案件別明細(売上高・加工費・外注費)を削除する。存在しなければ例外。</summary>
@@ -299,16 +394,23 @@ public sealed class DepartmentBudget
             throw new DomainException("予算名は必須です。");
     }
 
-    /// <summary>永続化層からの復元用ファクトリ。</summary>
+    /// <summary>
+    /// 永続化層からの復元用ファクトリ。各明細の <c>Monthly</c> は月別金額(1..6 → 金額)で、
+    /// 空なら半期一括モード、非空なら月次モードとして復元する。
+    /// </summary>
     public static DepartmentBudget Restore(Guid id, Guid departmentId, string fiscalHalf,
         int version, string label, BudgetStatus status, DateTime createdAt, DateTime? approvedAt,
-        IEnumerable<(Guid Id, string Category, Guid? ProjectId, string? ElementCode, decimal Amount)> lines)
+        IEnumerable<(Guid Id, string Category, Guid? ProjectId, string? ElementCode, decimal Amount,
+            IReadOnlyDictionary<int, decimal> Monthly)> lines)
     {
         var restored = lines
             .Select(l => new BudgetLine(l.Id, Enum.Parse<BudgetCategory>(l.Category),
                 l.ProjectId is { } pid ? new ProjectId(pid) : null,
                 l.ElementCode is { } code ? new CostElementCode(code) : null,
-                new Money(l.Amount)))
+                new Money(l.Amount),
+                l.Monthly.Count > 0
+                    ? l.Monthly.ToDictionary(m => m.Key, m => new Money(m.Value))
+                    : null))
             .ToList();
         return new DepartmentBudget(new DepartmentBudgetId(id), new DepartmentId(departmentId),
             FiscalHalf.Parse(fiscalHalf), version, label, status, createdAt, approvedAt, restored);

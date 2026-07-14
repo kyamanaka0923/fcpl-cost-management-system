@@ -55,14 +55,15 @@ test('計画策定: 部と課を登録し予算編集で案件別に金額を入
     await form.getByLabel('案件コード').fill(code)
     await form.getByLabel('案件名').fill(name)
     await form.getByRole('button', { name: '追加' }).click()
-    await expect(page.getByRole('cell', { name: new RegExp(name) })).toBeVisible()
+    await expect(page.getByRole('cell', { name: new RegExp(name) }).first()).toBeVisible()
   }
   await 案件を追加(projectACode, '案件A')
   await 案件を追加(projectBCode, '案件B')
 
   // ---- 案件×区分のグリッドで金額を入力(セルを離れると自動保存) ----
   const セル入力 = async (案件: string, 区分: string, 金額: string) => {
-    const cell = page.getByLabel(`${案件} ${区分}`)
+    // 月次入力ボタンのaria-labelが前方一致するため exact で金額入力欄だけを特定する
+    const cell = page.getByLabel(`${案件} ${区分}`, { exact: true })
     await cell.fill(金額)
     await cell.blur()
   }
@@ -178,7 +179,7 @@ test('計画変更: 改定版の承認で旧バージョンが失効しバージ
   await expect(page.getByRole('heading', { name: /上期見直し/ })).toBeVisible()
 
   // 引き継いだ案件Aの加工費セルを 140万 → 150万 に変更(セルを離れると自動保存)
-  const 加工費セル = page.getByLabel('案件A 加工費')
+  const 加工費セル = page.getByLabel('案件A 加工費', { exact: true })
   await 加工費セル.fill('1500000')
   await 加工費セル.blur()
   await page.getByRole('button', { name: 'この予算を承認する' }).click()
@@ -240,7 +241,7 @@ test('案件コード: 別の課では同じ案件コードを登録できる', 
   await form.getByRole('button', { name: '追加' }).click()
 
   // エラーにならず、案件が追加される
-  await expect(page.getByRole('cell', { name: '2課目の案件' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: '2課目の案件' }).first()).toBeVisible()
   await expect(page.locator('.toast-error')).toHaveCount(0)
 })
 
@@ -274,7 +275,7 @@ test('案件編集: 登録済みの案件のコード・名称を後から変更
   await form.getByLabel('案件コード').fill('PJE-1')
   await form.getByLabel('案件名').fill('編集前案件')
   await form.getByRole('button', { name: '追加' }).click()
-  await expect(page.getByRole('cell', { name: /編集前案件/ })).toBeVisible()
+  await expect(page.getByRole('cell', { name: /編集前案件/ }).first()).toBeVisible()
 
   // コード・名称を後から編集できる(参照は案件Id=GUID)
   await page
@@ -317,7 +318,7 @@ test('エラー表示: 失敗時は画面隅のトーストで通知される', 
     await form.getByRole('button', { name: '追加' }).click()
   }
   await 案件追加('案件X')
-  await expect(page.getByRole('cell', { name: /案件X/ })).toBeVisible()
+  await expect(page.getByRole('cell', { name: /案件X/ }).first()).toBeVisible()
 
   // 同一課で重複コード → トーストにエラーが表示される
   await 案件追加('案件Y')
@@ -327,4 +328,46 @@ test('エラー表示: 失敗時は画面隅のトーストで通知される', 
   // 手動で閉じられる
   await トースト.getByRole('button', { name: 'エラーを閉じる' }).click()
   await expect(page.locator('.toast-error')).toHaveCount(0)
+})
+
+test('月次入力: 明細を月ごとに入力でき半期合計に反映される', async ({ page }) => {
+  // 独立した部・課・ドラフトを用意
+  const s = `MON-${suffix}`
+  await page.goto('/')
+  await page.getByLabel('部コード').fill(`DIV${s}`)
+  await page.getByLabel('部名').fill(`月次検証部-${suffix}`)
+  await page.getByRole('button', { name: '登録' }).click()
+  await page.getByRole('link', { name: `月次検証部-${suffix}` }).click()
+
+  await page.getByLabel('課コード').fill(`DEV${s}`)
+  await page.getByLabel('課名').fill(`月次検証課-${suffix}`)
+  await page.getByRole('button', { name: '登録' }).click()
+  await page.getByRole('link', { name: `月次検証課-${suffix}` }).click()
+
+  const 予算カード = page.locator('.card', { hasText: '予算バージョン' })
+  await 予算カード.getByLabel('予算名').fill('当初予算')
+  await 予算カード.getByRole('button', { name: 'ドラフト作成' }).click()
+  await expect(page.getByRole('heading', { name: /当初予算/ })).toBeVisible()
+
+  const form = page.locator('form', { hasText: '案件コード' })
+  await form.getByLabel('案件コード').fill('PJM-1')
+  await form.getByLabel('案件名').fill('案件M')
+  await form.getByRole('button', { name: '追加' }).click()
+  await expect(page.getByRole('cell', { name: /案件M/ }).first()).toBeVisible()
+
+  // 売上高を月次入力(4月100万 + 5月50万 = 半期150万)
+  await page.getByRole('button', { name: '案件M 売上高 を月次入力' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await dialog.getByLabel('月次 4月').fill('1000000')
+  await dialog.getByLabel('月次 5月').fill('500000')
+  await expect(dialog.getByText('¥1,500,000')).toBeVisible() // 半期合計の自動計算
+  await dialog.getByRole('button', { name: '保存' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+
+  // 明細セルは月次バッジ + 半期合計、上部サマリの売上高も150万
+  const 案件M行 = page.locator('tr', { hasText: '案件M' })
+  await expect(案件M行.locator('.badge-monthly')).toBeVisible()
+  await expect(案件M行).toContainText('¥1,500,000')
+  await expect(page.locator('.stat-tile', { hasText: '売上高' })).toContainText('¥1,500,000')
 })

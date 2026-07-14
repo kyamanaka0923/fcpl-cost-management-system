@@ -29,6 +29,7 @@ public sealed class DatabaseInitializer
         DropLegacyTables(connection);
         MigrateProjectCodeUniqueness(connection);
         MigrateDropProjectStatus(connection);
+        MigrateAddActualMonth(connection);
 
         connection.Execute("""
             CREATE TABLE IF NOT EXISTS divisions (
@@ -86,6 +87,15 @@ public sealed class DatabaseInitializer
                 UNIQUE (budget_id, category, project_id, element_code)
             );
 
+            -- 明細の月次モードの月別金額(月インデックス 1..6 → 金額)。行が無い明細 = 半期一括モード。
+            CREATE TABLE IF NOT EXISTS department_budget_line_months (
+                line_id TEXT NOT NULL REFERENCES department_budget_lines(id) ON DELETE CASCADE,
+                month   INTEGER NOT NULL,
+                amount  TEXT NOT NULL,
+                PRIMARY KEY (line_id, month)
+            );
+
+            -- month は特定月の計上(半期内 1..6)。NULL は半期一括の計上。
             CREATE TABLE IF NOT EXISTS actual_entries (
                 id            TEXT PRIMARY KEY,
                 department_id TEXT NOT NULL REFERENCES departments(id),
@@ -93,6 +103,7 @@ public sealed class DatabaseInitializer
                 category      TEXT NOT NULL,
                 project_id    TEXT NOT NULL DEFAULT '',
                 element_code  TEXT NOT NULL DEFAULT '',
+                month         INTEGER NULL,
                 amount        TEXT NOT NULL,
                 note          TEXT NULL,
                 recorded_at   TEXT NOT NULL
@@ -111,6 +122,8 @@ public sealed class DatabaseInitializer
             CREATE INDEX IF NOT EXISTS ix_budgets_dept_half
                 ON department_budgets(department_id, fiscal_half);
             CREATE INDEX IF NOT EXISTS ix_budget_lines_budget ON department_budget_lines(budget_id);
+            CREATE INDEX IF NOT EXISTS ix_budget_line_months_line
+                ON department_budget_line_months(line_id);
             CREATE INDEX IF NOT EXISTS ix_actual_entries_dept_half
                 ON actual_entries(department_id, fiscal_half);
             """);
@@ -255,5 +268,24 @@ public sealed class DatabaseInitializer
             DROP TABLE projects_pre_drop_status;
             """, transaction: tx);
         tx.Commit();
+    }
+
+    /// <summary>
+    /// 実績に月次計上用の month 列を追加するマイグレーション(Issue #5)。
+    /// 現世代 actual_entries に month 列が無ければ ALTER TABLE で追加(既存行は NULL = 半期一括計上)。
+    /// 冪等(既に列があれば何もしない)。明細の月別金額テーブルは新規テーブルのため
+    /// CREATE TABLE IF NOT EXISTS で足りる(移行不要)。
+    /// </summary>
+    private static void MigrateAddActualMonth(SqliteConnection connection)
+    {
+        var tableExists = connection.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'actual_entries'") > 0;
+        if (!tableExists)
+            return; // 新規DBは CREATE TABLE 側で month 列込みで作られる
+        var hasMonth = connection.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM pragma_table_info('actual_entries') WHERE name = 'month'") > 0;
+        if (hasMonth)
+            return; // 既に追加済み
+        connection.Execute("ALTER TABLE actual_entries ADD COLUMN month INTEGER NULL;");
     }
 }

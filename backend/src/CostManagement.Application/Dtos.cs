@@ -30,13 +30,18 @@ public sealed record CostElementDto(
     string Code,
     string Name);
 
-/// <summary>予算明細の応答 DTO(案件別は ProjectId、期間費用は ElementCode を持つ)。</summary>
+/// <summary>
+/// 予算明細の応答 DTO(案件別は ProjectId、期間費用は ElementCode を持つ)。
+/// IsMonthly=true のとき MonthlyAmounts に月別金額(1..6 → 金額)を持ち、Amount はその合計。
+/// </summary>
 public sealed record BudgetLineDto(
     Guid Id,
     string Category,
     Guid? ProjectId,
     string? ElementCode,
-    decimal Amount);
+    decimal Amount,
+    bool IsMonthly,
+    IReadOnlyDictionary<int, decimal> MonthlyAmounts);
 
 /// <summary>予算バージョンの一覧用サマリ DTO(区分合計・計画損益つき)。</summary>
 public sealed record BudgetSummaryDto(
@@ -71,7 +76,7 @@ public sealed record BudgetDetailDto(
     decimal PlannedProfit,
     IReadOnlyList<BudgetLineDto> Lines);
 
-/// <summary>実績の応答 DTO。</summary>
+/// <summary>実績の応答 DTO。Month は計上対象の月(1..6)。半期一括の計上は null。</summary>
 public sealed record ActualEntryDto(
     Guid Id,
     Guid DepartmentId,
@@ -79,6 +84,7 @@ public sealed record ActualEntryDto(
     string Category,
     Guid? ProjectId,
     string? ElementCode,
+    int? Month,
     decimal Amount,
     string? Note,
     DateTime RecordedAt);
@@ -236,18 +242,27 @@ public sealed record CreateCostElementRequest(string Code, string Name);
 /// <summary>予算ドラフト起票リクエスト(BaseBudgetId 指定時はその版を引き継ぐ改定版)。</summary>
 public sealed record CreateBudgetRequest(string FiscalHalf, string Label, Guid? BaseBudgetId = null);
 
-/// <summary>予算明細の追加・更新リクエスト(案件別は ProjectId、期間費用は ElementCode)。</summary>
+/// <summary>
+/// 予算明細の追加・更新リクエスト(案件別は ProjectId、期間費用は ElementCode)。
+/// MonthlyAmounts を指定すると月次モード(月別金額 1..6 → 金額。半期合計は自動算出)、
+/// 未指定なら Amount による半期一括モード。
+/// </summary>
 public sealed record UpsertBudgetLineRequest(
     string Category,
     Guid? ProjectId,
     string? ElementCode,
-    decimal Amount);
+    decimal Amount,
+    IReadOnlyDictionary<int, decimal>? MonthlyAmounts = null);
 
-/// <summary>実績計上リクエスト(案件別は ProjectId、期間費用は ElementCode)。</summary>
+/// <summary>
+/// 実績計上リクエスト(案件別は ProjectId、期間費用は ElementCode)。
+/// Month を指定すると特定月の計上(1..6)、未指定なら半期一括の計上。
+/// </summary>
 public sealed record RecordActualRequest(
     string FiscalHalf,
     string Category,
     Guid? ProjectId,
     string? ElementCode,
     decimal Amount,
+    int? Month = null,
     string? Note = null);

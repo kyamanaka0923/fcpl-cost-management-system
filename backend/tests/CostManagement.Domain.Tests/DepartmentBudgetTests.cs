@@ -42,6 +42,56 @@ public class DepartmentBudgetTests
     }
 
     [Fact]
+    public void 明細を月次金額で登録すると半期合計は月次の合計になる()
+    {
+        var budget = NewDraft();
+        budget.UpsertProjectLineMonthly(BudgetCategory.Revenue, ProjectA,
+            new Dictionary<int, Money> { [1] = new(1_000_000m), [2] = new(1_500_000m), [3] = new(500_000m) });
+
+        var line = Assert.Single(budget.Lines);
+        Assert.True(line.IsMonthly);
+        Assert.Equal(3_000_000m, line.Amount.Value);
+        Assert.Equal(3_000_000m, budget.CategoryTotal(BudgetCategory.Revenue).Value);
+        Assert.Equal(3, line.MonthlyAmounts.Count);
+    }
+
+    [Fact]
+    public void 月次明細を半期一括で上書きすると月次モードは解除される()
+    {
+        var budget = NewDraft();
+        budget.UpsertProjectLineMonthly(BudgetCategory.Processing, ProjectA,
+            new Dictionary<int, Money> { [1] = new(200_000m), [2] = new(300_000m) });
+        budget.UpsertProjectLine(BudgetCategory.Processing, ProjectA, new Money(1_000_000m));
+
+        var line = Assert.Single(budget.Lines);
+        Assert.False(line.IsMonthly);
+        Assert.Empty(line.MonthlyAmounts);
+        Assert.Equal(1_000_000m, line.Amount.Value);
+    }
+
+    [Fact]
+    public void 半期一括の期間費用明細を月次で上書きできる()
+    {
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLine(Personnel, new Money(600_000m));
+        budget.UpsertPeriodCostLineMonthly(Personnel,
+            new Dictionary<int, Money> { [4] = new(100_000m), [5] = new(100_000m) });
+
+        var line = Assert.Single(budget.Lines);
+        Assert.True(line.IsMonthly);
+        Assert.Equal(200_000m, line.Amount.Value);
+    }
+
+    [Fact]
+    public void 範囲外の月を指定した月次明細は登録できない()
+    {
+        var budget = NewDraft();
+        Assert.Throws<DomainException>(() =>
+            budget.UpsertProjectLineMonthly(BudgetCategory.Revenue, ProjectA,
+                new Dictionary<int, Money> { [7] = new(100_000m) }));
+    }
+
+    [Fact]
     public void 同一費目の期間費用明細は上書きされる()
     {
         var budget = NewDraft();

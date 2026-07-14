@@ -41,6 +41,9 @@ public sealed class ActualEntry
     /// <summary>費目。期間費用の実績で必須。案件別区分では null。</summary>
     public CostElementCode? ElementCode { get; }
 
+    /// <summary>計上対象の月(半期内の 1..6)。半期一括で計上した場合は null。</summary>
+    public int? Month { get; }
+
     /// <summary>計上金額(0以上)。</summary>
     public Money Amount { get; }
 
@@ -52,7 +55,7 @@ public sealed class ActualEntry
 
     private ActualEntry(ActualEntryId id, DepartmentId departmentId, FiscalHalf fiscalHalf,
         BudgetCategory category, ProjectId? projectId, CostElementCode? elementCode,
-        Money amount, string? note, DateTime recordedAt)
+        int? month, Money amount, string? note, DateTime recordedAt)
     {
         Id = id;
         DepartmentId = departmentId;
@@ -60,6 +63,7 @@ public sealed class ActualEntry
         Category = category;
         ProjectId = projectId;
         ElementCode = elementCode;
+        Month = month;
         Amount = amount;
         Note = note;
         RecordedAt = recordedAt;
@@ -67,29 +71,31 @@ public sealed class ActualEntry
 
     /// <summary>
     /// 実績を計上する。区分と案件/費目の排他(<see cref="BudgetCategories.ValidateKey"/>)を検証し、
-    /// 金額は0以上を要求する。
+    /// 金額は0以上を要求する。month を指定すると特定月の計上(1..6)、null なら半期一括の計上。
     /// </summary>
     public static ActualEntry Record(DepartmentId departmentId, FiscalHalf fiscalHalf,
         BudgetCategory category, ProjectId? projectId, CostElementCode? elementCode,
-        Money amount, string? note, DateTime now)
+        int? month, Money amount, string? note, DateTime now)
     {
         BudgetCategories.ValidateKey(category, projectId, elementCode);
+        if (month is { } m)
+            HalfMonths.Validate(m);
         if (amount.IsNegative)
             throw new DomainException("金額は0以上で入力してください。");
         var trimmedNote = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
         return new ActualEntry(ActualEntryId.New(), departmentId, fiscalHalf, category,
-            projectId, elementCode, amount, trimmedNote, now);
+            projectId, elementCode, month, amount, trimmedNote, now);
     }
 
     /// <summary>永続化層からの復元用ファクトリ。</summary>
     public static ActualEntry Restore(Guid id, Guid departmentId, string fiscalHalf,
-        string category, Guid? projectId, string? elementCode, decimal amount,
+        string category, Guid? projectId, string? elementCode, int? month, decimal amount,
         string? note, DateTime recordedAt) =>
         new(new ActualEntryId(id), new DepartmentId(departmentId), FiscalHalf.Parse(fiscalHalf),
             Enum.Parse<BudgetCategory>(category),
             projectId is { } pid ? new ProjectId(pid) : null,
             elementCode is { } code ? new CostElementCode(code) : null,
-            new Money(amount), note, recordedAt);
+            month, new Money(amount), note, recordedAt);
 }
 
 /// <summary>実績の永続化ポート(実装はインフラ層)。</summary>

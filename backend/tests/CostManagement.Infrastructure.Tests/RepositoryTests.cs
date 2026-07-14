@@ -179,6 +179,42 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
     }
 
     [Fact]
+    public async Task 月次明細は月別金額を保持したままラウンドトリップする()
+    {
+        var dept = await _fx.課を保存();
+        var project = await _fx.案件を保存(dept.Id);
+        var repo = new DepartmentBudgetRepository(_fx.Factory);
+
+        var budget = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
+        budget.UpsertProjectLineMonthly(BudgetCategory.Revenue, project.Id,
+            new Dictionary<int, Money> { [1] = new(1_000_000m), [3] = new(500_000m) });
+        await repo.AddAsync(budget);
+
+        var restored = await repo.FindByIdAsync(budget.Id);
+
+        var line = Assert.Single(restored!.Lines);
+        Assert.True(line.IsMonthly);
+        Assert.Equal(1_500_000m, line.Amount.Value);
+        Assert.Equal(2, line.MonthlyAmounts.Count);
+        Assert.Equal(1_000_000m, line.MonthlyAmounts[1].Value);
+        Assert.Equal(500_000m, line.MonthlyAmounts[3].Value);
+    }
+
+    [Fact]
+    public async Task 実績は計上月を保持したままラウンドトリップする()
+    {
+        var dept = await _fx.課を保存();
+        var project = await _fx.案件を保存(dept.Id);
+        var repo = new ActualEntryRepository(_fx.Factory);
+
+        await repo.AddAsync(ActualEntry.Record(dept.Id, _fx.Half, BudgetCategory.Revenue,
+            project.Id, null, 5, new Money(700_000m), null, _fx.Now));
+
+        var restored = Assert.Single(await repo.ListAsync(dept.Id, _fx.Half));
+        Assert.Equal(5, restored.Month);
+    }
+
+    [Fact]
     public async Task 課予算の更新は明細の洗い替えとして永続化される()
     {
         var dept = await _fx.課を保存();
@@ -232,9 +268,9 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         var repo = new ActualEntryRepository(_fx.Factory);
 
         var projectEntry = ActualEntry.Record(dept.Id, _fx.Half, BudgetCategory.Processing,
-            project.Id, null, new Money(800_000m), "4月分", _fx.Now);
+            project.Id, null, null, new Money(800_000m), "4月分", _fx.Now);
         var periodEntry = ActualEntry.Record(dept.Id, _fx.Half, BudgetCategory.PeriodCost,
-            null, new CostElementCode("PERSONNEL"), new Money(500_000m), null, _fx.Now);
+            null, new CostElementCode("PERSONNEL"), null, new Money(500_000m), null, _fx.Now);
         await repo.AddAsync(projectEntry);
         await repo.AddAsync(periodEntry);
 
@@ -259,7 +295,7 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         var repo = new ActualEntryRepository(_fx.Factory);
 
         var entry = ActualEntry.Record(dept.Id, _fx.Half, BudgetCategory.Revenue,
-            project.Id, null, new Money(100_000m), null, _fx.Now);
+            project.Id, null, null, new Money(100_000m), null, _fx.Now);
         await repo.AddAsync(entry);
         await repo.DeleteAsync(entry.Id);
 

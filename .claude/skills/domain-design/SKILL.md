@@ -23,8 +23,13 @@ model: claude-opus-4-8
 - **予算は単一集約 DepartmentBudget**。売上高(Revenue)・加工費(Processing)・
   外注費(Outsourcing)・期間費用(PeriodCost)の4区分を1つの予算としてまとめて承認する
   (旧世代の「売上と原価の別集約・品目名の緩い結合」は廃止)
-- **明細は金額のみ・半期一括で管理する。数量×単価、年月の粒度は使わない**。
-  そのため価格差異・数量差異の分解は存在せず、差異 = 実績金額 − 予算金額 のみ
+- **明細は金額のみ**。半期一括に加えて**明細ごとに月次入力も可**(Issue #5)。
+  `BudgetLine` は月別金額 `MonthlyAmounts`(月インデックス1..6→Money)を持ち、`IsMonthly` は
+  月別金額の有無で判定。`Amount`(半期合計)は月次なら月別の合計。`UpsertProjectLineMonthly` /
+  `UpsertPeriodCostLineMonthly` で月次化、半期一括の Upsert で月次モードは解除される。
+  `ActualEntry` は計上月 `Month`(1..6 or null)を持つ。月の検証は `HalfMonths.Validate`。
+  **集計・差異分析・損益・部集計はすべて半期粒度のまま**(月次は入力の内訳にすぎない)。
+  数量×単価は廃止済み・復活させない(価格差異・数量差異の分解は存在せず、差異 = 実績金額 − 予算金額)
 - **明細キーの排他**: 売上高・加工費・外注費 = (区分, 案件ID)で案件必須・費目不可 /
   期間費用 = (期間費用, 費目コード)で費目必須・案件不可。
   検証は `BudgetCategories.ValidateKey`(BudgetLine と ActualEntry の両方から使う)

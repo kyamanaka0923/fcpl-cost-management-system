@@ -48,6 +48,11 @@ model: claude-sonnet-5
   検出は `sqlite_master.sql` に `UNIQUE (department_id, code)` が含まれるかで判定
 - 案件の終了ステータス `status` 列の廃止(`MigrateDropProjectStatus`。Issue #2)。
   検出は `pragma_table_info` に `status` 列が残っているかで判定
+- 実績への月次計上用 `month` 列の追加(`MigrateAddActualMonth`。Issue #5)。
+  `pragma_table_info` に `month` 列が無ければ `ALTER TABLE actual_entries ADD COLUMN month INTEGER NULL`。
+  **単純なカラム追加は RENAME→CREATE→INSERT の作り直しではなく ALTER ADD COLUMN でよい**
+- 新規テーブル(`department_budget_line_months` = 明細の月別金額)は移行不要。
+  `CREATE TABLE IF NOT EXISTS` で足りる(既存DBには空テーブルが増えるだけ)
 複数の移行が連なる場合、後段は前段の結果に対して冪等(該当列/制約がなければ何もしない)であること。
 
 1. `DatabaseInitializer` の CREATE TABLE を新スキーマに更新

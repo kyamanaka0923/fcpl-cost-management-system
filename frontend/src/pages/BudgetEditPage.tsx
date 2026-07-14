@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { Fragment, useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   api,
@@ -7,14 +7,17 @@ import {
   formatPercent,
   formatYen,
   halfLabel,
+  halfMonths,
   marginRate,
   projectCategories,
   type BudgetCategory,
   type BudgetDetail,
+  type BudgetLine,
   type CostElement,
   type Project,
 } from '../api'
 import MoneyInput from '../components/MoneyInput'
+import Modal from '../components/Modal'
 import Toast from '../components/Toast'
 
 export default function BudgetEditPage() {
@@ -40,6 +43,16 @@ export default function BudgetEditPage() {
   const [editProjectCode, setEditProjectCode] = useState('')
   const [editProjectName, setEditProjectName] = useState('')
   const [savingProject, setSavingProject] = useState(false)
+
+  // 月次入力ダイアログ(明細ごとに半期一括↔月次を切り替える)
+  const [monthlyTarget, setMonthlyTarget] = useState<{
+    category: BudgetCategory
+    projectId: string | null
+    elementCode: string | null
+    label: string
+  } | null>(null)
+  const [monthlyEdits, setMonthlyEdits] = useState<Record<number, string>>({})
+  const [savingMonthly, setSavingMonthly] = useState(false)
 
   // 費目追加フォーム
 
@@ -131,6 +144,92 @@ export default function BudgetEditPage() {
       (amount) => api.upsertBudgetLine(budgetId, { category: 'PeriodCost', elementCode: code, amount }),
       () => api.removeBudgetLine(budgetId, 'PeriodCost', null, code),
     )
+
+  // ---- 月次入力 ----
+  const findLine = (
+    category: BudgetCategory,
+    projectId: string | null,
+    elementCode: string | null,
+  ): BudgetLine | undefined =>
+    budget?.lines.find(
+      (l) =>
+        l.category === category &&
+        (l.projectId ?? null) === projectId &&
+        (l.elementCode ?? null) === elementCode,
+    )
+
+  const openMonthly = (
+    category: BudgetCategory,
+    projectId: string | null,
+    elementCode: string | null,
+    label: string,
+  ) => {
+    const line = findLine(category, projectId, elementCode)
+    const init: Record<number, string> = {}
+    if (line?.isMonthly) {
+      for (const [m, amt] of Object.entries(line.monthlyAmounts)) init[Number(m)] = String(amt)
+    }
+    setMonthlyEdits(init)
+    setMonthlyTarget({ category, projectId, elementCode, label })
+    setError(null)
+  }
+
+  const monthlyDialogTotal = halfMonths(half).reduce((sum, { index }) => {
+    const raw = (monthlyEdits[index] ?? '').trim()
+    const n = raw === '' ? 0 : Number(raw)
+    return sum + (Number.isNaN(n) ? 0 : n)
+  }, 0)
+
+  const saveMonthly = async () => {
+    if (!monthlyTarget) return
+    setSavingMonthly(true)
+    setError(null)
+    try {
+      const monthlyAmounts: Record<number, number> = {}
+      for (const { index } of halfMonths(half)) {
+        const raw = (monthlyEdits[index] ?? '').trim()
+        const n = raw === '' ? 0 : Number(raw)
+        if (!Number.isNaN(n) && n > 0) monthlyAmounts[index] = n
+      }
+      const { category, projectId, elementCode } = monthlyTarget
+      const updated =
+        Object.keys(monthlyAmounts).length === 0
+          ? await api.removeBudgetLine(budgetId, category, projectId, elementCode)
+          : await api.upsertBudgetLine(budgetId, {
+              category,
+              projectId,
+              elementCode,
+              amount: 0,
+              monthlyAmounts,
+            })
+      setBudget(updated)
+      setMonthlyTarget(null)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setSavingMonthly(false)
+    }
+  }
+
+  const revertMonthlyToHalf = async () => {
+    if (!monthlyTarget) return
+    setSavingMonthly(true)
+    setError(null)
+    try {
+      const { category, projectId, elementCode } = monthlyTarget
+      const total = findLine(category, projectId, elementCode)?.amount ?? 0
+      const updated =
+        total > 0
+          ? await api.upsertBudgetLine(budgetId, { category, projectId, elementCode, amount: total })
+          : await api.removeBudgetLine(budgetId, category, projectId, elementCode)
+      setBudget(updated)
+      setMonthlyTarget(null)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setSavingMonthly(false)
+    }
+  }
 
   const addProject = async (e: FormEvent) => {
     e.preventDefault()
@@ -247,7 +346,7 @@ export default function BudgetEditPage() {
         <h2>案件別の売上高・加工費・外注費</h2>
         <p className="muted small">
           案件ごとに半期一括の金額を入力します(空欄・0 は明細なし)。
-          {editable && '金額を入力して次の欄へ移ると自動保存されます。'}
+          {editable && '金額を入力して次の欄へ移ると自動保存されます。各セルの「月次入力」で月ごとの金額も入力でき、その明細は半期合計が自動算出されます。'}
           案件名の横の「編集」からコード・名称を後から変更できます(参照はGUIDのため予算・実績は保持されます)。
           課の区分合計は案件明細の合計として上部サマリに反映されます。
         </p>
@@ -312,22 +411,39 @@ export default function BudgetEditPage() {
                       </>
                     )}
                   </td>
-                  {projectCategories.map((category) => (
-                    <td className="num" key={category}>
-                      {editable ? (
-                        <MoneyInput
-                          className="num"
-                          style={{ width: '9rem' }}
-                          aria-label={`${p.name} ${categoryLabel[category]}`}
-                          value={cellValue(projectKey(p.id, category), projectAmount(p.id, category))}
-                          onChange={(v) => onCellChange(projectKey(p.id, category), v)}
-                          onBlur={() => onProjectBlur(p.id, category)}
-                        />
-                      ) : (
-                        <>¥{formatYen(projectAmount(p.id, category))}</>
-                      )}
-                    </td>
-                  ))}
+                  {projectCategories.map((category) => {
+                    const monthly = findLine(category, p.id, null)?.isMonthly ?? false
+                    const label = `${p.name} ${categoryLabel[category]}`
+                    return (
+                      <td className="num" key={category}>
+                        {editable && !monthly && (
+                          <MoneyInput
+                            className="num"
+                            style={{ width: '9rem' }}
+                            aria-label={label}
+                            value={cellValue(projectKey(p.id, category), projectAmount(p.id, category))}
+                            onChange={(v) => onCellChange(projectKey(p.id, category), v)}
+                            onBlur={() => onProjectBlur(p.id, category)}
+                          />
+                        )}
+                        {(!editable || monthly) && (
+                          <span>
+                            ¥{formatYen(projectAmount(p.id, category))}
+                            {monthly && <span className="badge-monthly">月次</span>}
+                          </span>
+                        )}
+                        {editable && (
+                          <button
+                            className="cell-monthly-btn"
+                            aria-label={`${label} を月次入力`}
+                            onClick={() => openMonthly(category, p.id, null, label)}
+                          >
+                            {monthly ? '月次編集' : '月次入力'}
+                          </button>
+                        )}
+                      </td>
+                    )
+                  })}
                   <td className={`num ${projectProfit(p.id) >= 0 ? 'favorable' : 'adverse'}`}>
                     ¥{formatYen(projectProfit(p.id))}
                   </td>
@@ -422,18 +538,39 @@ export default function BudgetEditPage() {
                     <span className="muted small">({el.code})</span>
                   </td>
                   <td className="num">
-                    {editable ? (
-                      <MoneyInput
-                        className="num"
-                        style={{ width: '9rem' }}
-                        aria-label={`${el.name} 金額`}
-                        value={cellValue(periodKey(el.code), periodAmount(el.code))}
-                        onChange={(v) => onCellChange(periodKey(el.code), v)}
-                        onBlur={() => onPeriodBlur(el.code)}
-                      />
-                    ) : (
-                      <>¥{formatYen(periodAmount(el.code))}</>
-                    )}
+                    {(() => {
+                      const monthly = findLine('PeriodCost', null, el.code)?.isMonthly ?? false
+                      const label = `${el.name} 金額`
+                      return (
+                        <>
+                          {editable && !monthly && (
+                            <MoneyInput
+                              className="num"
+                              style={{ width: '9rem' }}
+                              aria-label={label}
+                              value={cellValue(periodKey(el.code), periodAmount(el.code))}
+                              onChange={(v) => onCellChange(periodKey(el.code), v)}
+                              onBlur={() => onPeriodBlur(el.code)}
+                            />
+                          )}
+                          {(!editable || monthly) && (
+                            <span>
+                              ¥{formatYen(periodAmount(el.code))}
+                              {monthly && <span className="badge-monthly">月次</span>}
+                            </span>
+                          )}
+                          {editable && (
+                            <button
+                              className="cell-monthly-btn"
+                              aria-label={`${el.name} を月次入力`}
+                              onClick={() => openMonthly('PeriodCost', null, el.code, label)}
+                            >
+                              {monthly ? '月次編集' : '月次入力'}
+                            </button>
+                          )}
+                        </>
+                      )
+                    })()}
                   </td>
                 </tr>
               ))
@@ -452,6 +589,42 @@ export default function BudgetEditPage() {
           </p>
         )}
       </div>
+
+      {monthlyTarget && (
+        <Modal title={`月次入力 — ${monthlyTarget.label}`} onClose={() => setMonthlyTarget(null)}>
+          <p className="muted small">
+            {halfLabel(half)}の各月の金額を入力します。半期合計は自動計算され、月次入力にすると
+            この明細の半期一括入力は無効になります。
+          </p>
+          <div className="month-grid">
+            {halfMonths(half).map(({ index, label }) => (
+              <Fragment key={index}>
+                <label>{label}</label>
+                <MoneyInput
+                  aria-label={`月次 ${label}`}
+                  value={monthlyEdits[index] ?? ''}
+                  onChange={(v) => setMonthlyEdits((prev) => ({ ...prev, [index]: v }))}
+                />
+              </Fragment>
+            ))}
+          </div>
+          <div className="month-total">
+            <span>半期合計</span>
+            <span>¥{formatYen(monthlyDialogTotal)}</span>
+          </div>
+          <div className="modal-actions">
+            <button className="spacer" onClick={revertMonthlyToHalf} disabled={savingMonthly}>
+              半期一括に戻す
+            </button>
+            <button onClick={() => setMonthlyTarget(null)} disabled={savingMonthly}>
+              取消
+            </button>
+            <button className="primary" onClick={saveMonthly} disabled={savingMonthly}>
+              保存
+            </button>
+          </div>
+        </Modal>
+      )}
     </>
   )
 }

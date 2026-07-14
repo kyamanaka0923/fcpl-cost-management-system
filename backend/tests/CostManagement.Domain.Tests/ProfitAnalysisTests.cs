@@ -41,7 +41,7 @@ public class ProfitAnalysisTests
 
     private static ActualEntry Actual(BudgetCategory category, ProjectId? project,
         CostElementCode? element, decimal amount) =>
-        ActualEntry.Record(Dept, Half, category, project, element, new Money(amount), null, Now);
+        ActualEntry.Record(Dept, Half, category, project, element, null, new Money(amount), null, Now);
 
     [Fact]
     public void 全体損益は売上高から総コストを引いた額になる()

@@ -9,7 +9,8 @@ namespace CostManagement.Infrastructure.Repositories;
 
 /// <summary>
 /// 課予算の永続化ポート <see cref="IDepartmentBudgetRepository"/> の Dapper/SQLite 実装。
-/// ヘッダ(department_budgets)と明細(department_budget_lines)をまとめて1つの集約として扱う。
+/// ヘッダ(department_budgets)・明細(department_budget_lines)・明細の月別金額
+/// (department_budget_line_months)をまとめて1つの集約として扱う。
 /// </summary>
 public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
 {
@@ -28,6 +29,10 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
     /// <summary>department_budget_lines(明細)テーブルの1行に対応する DTO。</summary>
     private sealed record LineRow(Guid Id, Guid BudgetId, string Category, string ProjectId,
         string ElementCode, decimal Amount);
+
+    /// <summary>department_budget_line_months(明細の月別金額)テーブルの1行に対応する DTO。
+    /// SQLite の INTEGER は Int64 で返るため month は long で受ける。</summary>
+    private sealed record MonthRow(Guid LineId, long Month, decimal Amount);
 
     private const string SelectBudgetSql = """
         SELECT id AS Id, department_id AS DepartmentId, fiscal_half AS FiscalHalf,
@@ -53,7 +58,8 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
             return null;
         var lines = await conn.QueryAsync<LineRow>(
             $"{SelectLineSql} WHERE budget_id = @Id", new { Id = id.Value });
-        return ToEntity(budget, lines);
+        var months = await MonthsByLineAsync(conn, id.Value);
+        return ToEntity(budget, lines, months);
     }
 
     /// <inheritdoc />
@@ -61,19 +67,26 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
         FiscalHalf fiscalHalf, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
+        var arg = new { Did = departmentId.Value, Half = fiscalHalf.ToString() };
         var budgets = (await conn.QueryAsync<BudgetRow>(
             $"{SelectBudgetSql} WHERE department_id = @Did AND fiscal_half = @Half ORDER BY version",
-            new { Did = departmentId.Value, Half = fiscalHalf.ToString() })).ToList();
-        // 明細は JOIN で一括取得し、予算IDでルックアップして N+1 を避ける。
+            arg)).ToList();
+        // 明細・月別金額は JOIN で一括取得し、予算ID・明細IDでルックアップして N+1 を避ける。
         var lines = (await conn.QueryAsync<LineRow>("""
             SELECT l.id AS Id, l.budget_id AS BudgetId, l.category AS Category,
                    l.project_id AS ProjectId, l.element_code AS ElementCode, l.amount AS Amount
             FROM department_budget_lines l
             JOIN department_budgets b ON b.id = l.budget_id
             WHERE b.department_id = @Did AND b.fiscal_half = @Half
-            """, new { Did = departmentId.Value, Half = fiscalHalf.ToString() }))
-            .ToLookup(l => l.BudgetId);
-        return budgets.Select(b => ToEntity(b, lines[b.Id])).ToList();
+            """, arg)).ToLookup(l => l.BudgetId);
+        var months = (await conn.QueryAsync<MonthRow>("""
+            SELECT m.line_id AS LineId, m.month AS Month, m.amount AS Amount
+            FROM department_budget_line_months m
+            JOIN department_budget_lines l ON l.id = m.line_id
+            JOIN department_budgets b ON b.id = l.budget_id
+            WHERE b.department_id = @Did AND b.fiscal_half = @Half
+            """, arg)).ToLookup(m => m.LineId);
+        return budgets.Select(b => ToEntity(b, lines[b.Id], months)).ToList();
     }
 
     /// <inheritdoc />
@@ -88,7 +101,8 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
             return null;
         var lines = await conn.QueryAsync<LineRow>(
             $"{SelectLineSql} WHERE budget_id = @Id", new { Id = budget.Id });
-        return ToEntity(budget, lines);
+        var months = await MonthsByLineAsync(conn, budget.Id);
+        return ToEntity(budget, lines, months);
     }
 
     /// <inheritdoc />
@@ -141,14 +155,27 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
             Status = budget.Status.ToString(),
             budget.ApprovedAt,
         }, tx);
-        // 明細は洗い替え(集約単位での置き換え)とする。
+        // 明細は洗い替え(集約単位での置き換え)。月別金額は FK の ON DELETE CASCADE で一緒に消える。
         await conn.ExecuteAsync("DELETE FROM department_budget_lines WHERE budget_id = @Id",
             new { Id = budget.Id.Value }, tx);
         await InsertLinesAsync(conn, tx, budget);
         tx.Commit();
     }
 
-    /// <summary>予算の全明細を INSERT する(未使用の案件/費目は空文字で保存)。</summary>
+    /// <summary>予算IDに紐づく明細の月別金額を、明細IDでルックアップできる形で取得する。</summary>
+    private static async Task<ILookup<Guid, MonthRow>> MonthsByLineAsync(SqliteConnection conn,
+        Guid budgetId)
+    {
+        var rows = await conn.QueryAsync<MonthRow>("""
+            SELECT m.line_id AS LineId, m.month AS Month, m.amount AS Amount
+            FROM department_budget_line_months m
+            JOIN department_budget_lines l ON l.id = m.line_id
+            WHERE l.budget_id = @Id
+            """, new { Id = budgetId });
+        return rows.ToLookup(m => m.LineId);
+    }
+
+    /// <summary>予算の全明細を INSERT し、月次モードの明細は月別金額も INSERT する。</summary>
     private static async Task InsertLinesAsync(SqliteConnection conn, SqliteTransaction tx,
         DepartmentBudget budget)
     {
@@ -166,16 +193,30 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
                 ElementCode = line.ElementCode?.Value ?? "",
                 Amount = line.Amount.Value,
             }, tx);
+
+            foreach (var (month, amount) in line.MonthlyAmounts)
+            {
+                await conn.ExecuteAsync("""
+                    INSERT INTO department_budget_line_months (line_id, month, amount)
+                    VALUES (@LineId, @Month, @Amount)
+                    """, new { LineId = line.Id, Month = month, Amount = amount.Value }, tx);
+            }
         }
     }
 
-    /// <summary>ヘッダ行と明細行から課予算の集約を復元する(空文字の案件/費目は null に読み替える)。</summary>
-    private static DepartmentBudget ToEntity(BudgetRow budget, IEnumerable<LineRow> lines) =>
+    /// <summary>
+    /// ヘッダ行・明細行・月別金額から課予算の集約を復元する。
+    /// 空文字の案件/費目は null に、月別金額の有無で半期一括/月次モードを復元する。
+    /// </summary>
+    private static DepartmentBudget ToEntity(BudgetRow budget, IEnumerable<LineRow> lines,
+        ILookup<Guid, MonthRow> monthsByLine) =>
         DepartmentBudget.Restore(budget.Id, budget.DepartmentId, budget.FiscalHalf,
             (int)budget.Version, budget.Label, Enum.Parse<BudgetStatus>(budget.Status),
             budget.CreatedAt, budget.ApprovedAt,
             lines.Select(l => (l.Id, l.Category,
                 l.ProjectId == "" ? (Guid?)null : Guid.Parse(l.ProjectId),
                 l.ElementCode == "" ? null : l.ElementCode,
-                l.Amount)));
+                l.Amount,
+                (IReadOnlyDictionary<int, decimal>)monthsByLine[l.Id]
+                    .ToDictionary(m => (int)m.Month, m => m.Amount))));
 }

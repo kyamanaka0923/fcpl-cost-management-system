@@ -89,17 +89,27 @@ public sealed class DepartmentBudgetService
     {
         var budget = await RequireAsync(budgetId, ct);
         var category = ParseCategory(request.Category);
+        // MonthlyAmounts が来たら月次モード、無ければ半期一括モード。
+        var monthly = request.MonthlyAmounts is { } ma
+            ? ma.ToDictionary(kv => kv.Key, kv => new Money(kv.Value))
+            : null;
 
         if (category.IsProjectBased())
         {
             var projectId = await RequireProjectInDepartmentAsync(request.ProjectId,
                 budget.DepartmentId, ct);
-            budget.UpsertProjectLine(category, projectId, new Money(request.Amount));
+            if (monthly is not null)
+                budget.UpsertProjectLineMonthly(category, projectId, monthly);
+            else
+                budget.UpsertProjectLine(category, projectId, new Money(request.Amount));
         }
         else
         {
             var elementCode = await RequireElementAsync(request.ElementCode, ct);
-            budget.UpsertPeriodCostLine(elementCode, new Money(request.Amount));
+            if (monthly is not null)
+                budget.UpsertPeriodCostLineMonthly(elementCode, monthly);
+            else
+                budget.UpsertPeriodCostLine(elementCode, new Money(request.Amount));
         }
 
         await _budgets.UpdateAsync(budget, ct);
@@ -209,6 +219,7 @@ public sealed class DepartmentBudgetService
                 .ThenBy(l => l.ElementCode?.Value)
                 .ThenBy(l => l.ProjectId?.Value)
                 .Select(l => new BudgetLineDto(l.Id, l.Category.ToString(),
-                    l.ProjectId?.Value, l.ElementCode?.Value, l.Amount.Value))
+                    l.ProjectId?.Value, l.ElementCode?.Value, l.Amount.Value,
+                    l.IsMonthly, l.MonthlyAmounts.ToDictionary(m => m.Key, m => m.Value.Value)))
                 .ToList());
 }
