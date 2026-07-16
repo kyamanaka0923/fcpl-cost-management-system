@@ -121,6 +121,64 @@ jobs:
       - name: 型チェックとビルド
         run: npm run build
 
+  mutation:
+    name: ミューテーションテスト(Stryker.NET)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: .NET 10 SDK をセットアップ
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: ツールを復元(dotnet-stryker)
+        run: dotnet tool restore
+
+      - name: ミューテーションテストを実行(Domain + Application)
+        run: |
+          status=0
+          for proj in Domain Application; do
+            echo "::group::Stryker ${proj}"
+            (cd "tests/CostManagement.${proj}.Tests" && dotnet tool run dotnet-stryker) || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
+      - name: ミューテーションスコアを実行サマリに表示
+        if: always()
+        run: |
+          {
+            echo '## ミューテーションテスト(Stryker.NET)'
+            echo
+            echo 'ミュータント(意図的なコード改変)をテストが検出できた割合。スコアが低い箇所は「テストが通っても仕様を守れていない」可能性がある。対象は Domain・Application 層(閾値は high:80 / low:60、CIは非ブロッキング)。'
+            echo
+            for proj in Domain Application; do
+              md=$(ls -t "tests/CostManagement.${proj}.Tests"/StrykerOutput/*/reports/mutation-report.md 2>/dev/null | head -1)
+              if [ -n "$md" ]; then
+                echo "### ${proj} 層"
+                echo
+                cat "$md"
+                echo
+              else
+                echo "### ${proj} 層"
+                echo
+                echo '（レポートが生成されませんでした）'
+                echo
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: HTMLレポートを保存(アーティファクト)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: backend/tests/*/StrykerOutput/*/reports/mutation-report.html
+
   metrics:
     name: コードメトリクス(行数・複雑度)
     runs-on: ubuntu-latest

@@ -57,3 +57,27 @@ cd frontend && npm run test:e2e                            # ブラウザE2E
 ```
 
 カバレッジ目標: 全体85%以上を維持(現状 89.9%)。CI の実行サマリで確認できる。
+
+## ミューテーションテスト(Stryker.NET。Issue #6)
+
+行カバレッジは「実行したか」しか見ないため、テストが**仕様を実際に検証しているか**は
+Stryker.NET のミューテーションテストで補完する。ツールはローカルツールとして
+`backend/.config/dotnet-tools.json` に固定(`dotnet-stryker` 4.16.0)。
+
+- 対象は **Domain・Application 層のみ**(業務ロジックの中核。Infrastructure は SQL 文字列中心で
+  ミューテーションの価値が低く遅い、WebApi は薄いホスティングのため除外)
+- 設定は各テストプロジェクト直下の `stryker-config.json`
+  (`CostManagement.Domain.Tests` / `CostManagement.Application.Tests`)。
+  `project` で対象 src を明示(テストプロジェクトが複数 src を参照する場合の曖昧さ回避に必須)。
+  レポータは html/json/markdown/cleartext。閾値 high:80 low:60 **break:0(スコアで CI を落とさない)**
+- 実行(各テストプロジェクトのディレクトリで):
+
+  ```bash
+  cd backend && dotnet tool restore
+  cd tests/CostManagement.Domain.Tests      && dotnet tool run dotnet-stryker
+  cd tests/CostManagement.Application.Tests && dotnet tool run dotnet-stryker
+  ```
+
+- 出力は `StrykerOutput/<日時>/reports/`(gitignore 済み)。CI は `mutation` ジョブで
+  markdown を実行サマリへ、html を `mutation-report` アーティファクトへ出す(**非ブロッキング**)
+- 現状スコアの目安: Domain ≈ 54%、Application ≈ 54%。実行時間は各 1.5〜2 分程度

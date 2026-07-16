@@ -16,6 +16,7 @@ model: claude-sonnet-5
 | frontend | npm ci + tsc + vite build |
 | browser-e2e | Playwright(Chromium導入→バックエンド+Vite自動起動→E2E)。失敗時レポート保存 |
 | metrics | コードメトリクス。cloc(言語別行数)+ scc(行数+複雑度)を backend/src・backend/tests・frontend/src の3区分で実行サマリへ + `code-metrics` アーティファクト。scc は `go install github.com/boyter/scc/v3@latest`(ubuntu ランナーの Go を利用)。**Microsoft.CodeAnalysis.Metrics は Linux 不可 & 旧 Roslyn で現代 C# 非対応のため使わない** |
+| mutation | ミューテーションテスト(Stryker.NET)。`dotnet tool restore` → Domain・Application の各テストプロジェクトで `dotnet tool run dotnet-stryker`。markdown レポートを実行サマリへ + html を `mutation-report` アーティファクトへ。**非ブロッキング**(閾値 break:0 でスコアでは落とさない。Stryker 自体の失敗のみ赤)。設定は各テストプロジェクト直下 `stryker-config.json`、ツールは `backend/.config/dotnet-tools.json`。詳細は testing スキル(Issue #6) |
 
 - トリガ: push(main, claude/**)と pull_request。README 冒頭に CI バッジあり
 - **プッシュしたら必ず GitHub MCP(`actions_list`/`actions_get`)で結果を確認する**。

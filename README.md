@@ -237,6 +237,18 @@ npm run test:e2e
 **scc(行数＋複雑度)** を `backend/src` / `backend/tests` / `frontend/src` の3区分で集計し、
 各実行の Summary ページに表示します(レポートは `code-metrics` アーティファクト)。
 
+**ミューテーションテスト**: CI の `mutation` ジョブが **Stryker.NET** で Domain・Application 層の
+ミュータント(意図的なコード改変)をテストが検出できるかを測り、スコアの markdown レポートを
+各実行の Summary ページに表示します(HTML レポートは `mutation-report` アーティファクト)。
+行カバレッジが「実行したか」しか見ないのに対し、テストが**仕様を実際に検証しているか**を補完します
+(スコアでは CI を落とさない非ブロッキング運用)。ローカルでは:
+
+```bash
+cd backend && dotnet tool restore
+cd tests/CostManagement.Domain.Tests      && dotnet tool run dotnet-stryker
+cd tests/CostManagement.Application.Tests && dotnet tool run dotnet-stryker
+```
+
 ## AWS へのデプロイ(サーバーレス構成)
 
 EC2・コンテナを使わず費用を抑えたサーバーレス構成の IaC(AWS SAM)を `infra/` に用意しています。

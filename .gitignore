@@ -26,3 +26,6 @@ playwright-report/
 # AWS SAM
 .aws-sam/
 infra/packaged.yaml
+
+# Stryker.NET(ミューテーションテストの出力)
+StrykerOutput/
