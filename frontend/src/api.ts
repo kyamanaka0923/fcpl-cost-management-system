@@ -75,6 +75,8 @@ export interface BudgetLine {
   category: BudgetCategory
   projectId: string | null
   elementCode: string | null
+  /** 期間費用の明細名(費目内を細分)。null = 費目一括。 */
+  periodDetail: string | null
   amount: number
   isMonthly: boolean
   /** 月次モードの月別金額(月インデックス "1".."6" → 金額)。半期一括モードでは空。 */
@@ -108,6 +110,8 @@ export interface ActualEntry {
   category: BudgetCategory
   projectId: string | null
   elementCode: string | null
+  /** 期間費用の明細名(計画明細に対する計上)。null = 費目一括。 */
+  periodDetail: string | null
   /** 計上対象の月(半期内 1..6)。半期一括の計上は null。 */
   month: number | null
   amount: number
@@ -121,6 +125,7 @@ export interface VarianceLine {
   projectName: string | null
   elementCode: string | null
   elementName: string | null
+  periodDetail: string | null
   plannedAmount: number
   actualAmount: number
   variance: number
@@ -156,6 +161,7 @@ export interface BudgetComparisonLine {
   projectName: string | null
   elementCode: string | null
   elementName: string | null
+  periodDetail: string | null
   baseAmount: number
   targetAmount: number
   difference: number
@@ -301,6 +307,8 @@ export const api = {
       amount: number
       /** 指定すると月次モード(月インデックス 1..6 → 金額)。未指定なら amount による半期一括。 */
       monthlyAmounts?: Record<number, number>
+      /** 期間費用の明細名(費目内を細分)。未指定/空は費目一括。 */
+      periodDetail?: string | null
     },
   ) =>
     request<BudgetDetail>(`/budgets/${budgetId}/lines`, {
@@ -312,10 +320,12 @@ export const api = {
     category: BudgetCategory,
     projectId: string | null,
     elementCode: string | null,
+    periodDetail?: string | null,
   ) => {
     const params = new URLSearchParams({ category })
     if (projectId) params.set('projectId', projectId)
     if (elementCode) params.set('elementCode', elementCode)
+    if (periodDetail) params.set('periodDetail', periodDetail)
     return request<BudgetDetail>(`/budgets/${budgetId}/lines?${params}`, { method: 'DELETE' })
   },
   approveBudget: (budgetId: string) =>
@@ -337,6 +347,8 @@ export const api = {
       /** 指定すると特定月の計上(半期内 1..6)。未指定なら半期一括。 */
       month?: number | null
       note?: string | null
+      /** 期間費用の明細名(計画明細に対する計上)。未指定/空は費目一括。 */
+      periodDetail?: string | null
     },
   ) =>
     request<ActualEntry>(`/departments/${departmentId}/actuals`, {

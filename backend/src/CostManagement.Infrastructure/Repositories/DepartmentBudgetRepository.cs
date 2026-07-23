@@ -28,7 +28,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
 
     /// <summary>department_budget_lines(明細)テーブルの1行に対応する DTO。</summary>
     private sealed record LineRow(Guid Id, Guid BudgetId, string Category, string ProjectId,
-        string ElementCode, decimal Amount);
+        string ElementCode, string PeriodDetail, decimal Amount);
 
     /// <summary>department_budget_line_months(明細の月別金額)テーブルの1行に対応する DTO。
     /// SQLite の INTEGER は Int64 で返るため month は long で受ける。</summary>
@@ -43,7 +43,8 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
 
     private const string SelectLineSql = """
         SELECT id AS Id, budget_id AS BudgetId, category AS Category,
-               project_id AS ProjectId, element_code AS ElementCode, amount AS Amount
+               project_id AS ProjectId, element_code AS ElementCode,
+               period_detail AS PeriodDetail, amount AS Amount
         FROM department_budget_lines
         """;
 
@@ -74,7 +75,8 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
         // 明細・月別金額は JOIN で一括取得し、予算ID・明細IDでルックアップして N+1 を避ける。
         var lines = (await conn.QueryAsync<LineRow>("""
             SELECT l.id AS Id, l.budget_id AS BudgetId, l.category AS Category,
-                   l.project_id AS ProjectId, l.element_code AS ElementCode, l.amount AS Amount
+                   l.project_id AS ProjectId, l.element_code AS ElementCode,
+                   l.period_detail AS PeriodDetail, l.amount AS Amount
             FROM department_budget_lines l
             JOIN department_budgets b ON b.id = l.budget_id
             WHERE b.department_id = @Did AND b.fiscal_half = @Half
@@ -182,8 +184,9 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
         foreach (var line in budget.Lines)
         {
             await conn.ExecuteAsync("""
-                INSERT INTO department_budget_lines (id, budget_id, category, project_id, element_code, amount)
-                VALUES (@Id, @BudgetId, @Category, @ProjectId, @ElementCode, @Amount)
+                INSERT INTO department_budget_lines
+                    (id, budget_id, category, project_id, element_code, period_detail, amount)
+                VALUES (@Id, @BudgetId, @Category, @ProjectId, @ElementCode, @PeriodDetail, @Amount)
                 """, new
             {
                 line.Id,
@@ -191,6 +194,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
                 Category = line.Category.ToString(),
                 ProjectId = line.ProjectId?.Value.ToString("D") ?? "",
                 ElementCode = line.ElementCode?.Value ?? "",
+                PeriodDetail = line.PeriodDetail ?? "",
                 Amount = line.Amount.Value,
             }, tx);
 
@@ -216,6 +220,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
             lines.Select(l => (l.Id, l.Category,
                 l.ProjectId == "" ? (Guid?)null : Guid.Parse(l.ProjectId),
                 l.ElementCode == "" ? null : l.ElementCode,
+                l.PeriodDetail == "" ? null : l.PeriodDetail,
                 l.Amount,
                 (IReadOnlyDictionary<int, decimal>)monthsByLine[l.Id]
                     .ToDictionary(m => (int)m.Month, m => m.Amount))));

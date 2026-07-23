@@ -235,4 +235,98 @@ public class DepartmentBudgetTests
         Assert.Throws<DomainException>(() =>
             DepartmentBudget.CreateInitial(Dept, Half, " ", Now));
     }
+
+    [Fact]
+    public void 期間費用は費目内で明細名ごとに複数登録でき費目合計は明細の合計になる()
+    {
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLine(License, new Money(300_000m), "AWS");
+        budget.UpsertPeriodCostLine(License, new Money(200_000m), "GitHub");
+
+        Assert.Equal(2, budget.Lines.Count(l => l.Category == BudgetCategory.PeriodCost));
+        Assert.Equal(500_000m, budget.CategoryTotal(BudgetCategory.PeriodCost).Value);
+        Assert.Contains(budget.Lines, l => l.PeriodDetail == "AWS" && l.Amount.Value == 300_000m);
+    }
+
+    [Fact]
+    public void 同一費目同一明細名は上書きされる()
+    {
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLine(License, new Money(300_000m), "AWS");
+        budget.UpsertPeriodCostLine(License, new Money(350_000m), "AWS");
+
+        var line = Assert.Single(budget.Lines);
+        Assert.Equal("AWS", line.PeriodDetail);
+        Assert.Equal(350_000m, line.Amount.Value);
+    }
+
+    [Fact]
+    public void 費目一括の費目に明細を足すことはできない()
+    {
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLine(License, new Money(500_000m));
+
+        Assert.Throws<DomainException>(() =>
+            budget.UpsertPeriodCostLine(License, new Money(300_000m), "AWS"));
+    }
+
+    [Fact]
+    public void 明細のある費目に費目一括を足すことはできない()
+    {
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLine(License, new Money(300_000m), "AWS");
+
+        Assert.Throws<DomainException>(() =>
+            budget.UpsertPeriodCostLine(License, new Money(500_000m)));
+    }
+
+    [Fact]
+    public void 費目一括と明細は費目が異なれば併存できる()
+    {
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLine(Personnel, new Money(1_000_000m));
+        budget.UpsertPeriodCostLine(License, new Money(200_000m), "AWS");
+
+        Assert.Equal(1_200_000m, budget.CategoryTotal(BudgetCategory.PeriodCost).Value);
+    }
+
+    [Fact]
+    public void 期間費用の明細を月次で登録でき半期合計は月次の合計になる()
+    {
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLineMonthly(License,
+            new Dictionary<int, Money> { [1] = new(100_000m), [2] = new(150_000m) }, "AWS");
+
+        var line = Assert.Single(budget.Lines);
+        Assert.True(line.IsMonthly);
+        Assert.Equal("AWS", line.PeriodDetail);
+        Assert.Equal(250_000m, line.Amount.Value);
+    }
+
+    [Fact]
+    public void 期間費用の明細を明細名指定で削除できる()
+    {
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLine(License, new Money(300_000m), "AWS");
+        budget.UpsertPeriodCostLine(License, new Money(200_000m), "GitHub");
+
+        budget.RemovePeriodCostLine(License, "AWS");
+
+        var line = Assert.Single(budget.Lines);
+        Assert.Equal("GitHub", line.PeriodDetail);
+    }
+
+    [Fact]
+    public void 改定版は期間費用の明細名を引き継ぐ()
+    {
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLine(License, new Money(300_000m), "AWS");
+        budget.Approve(Now);
+
+        var revised = DepartmentBudget.ReviseFrom(budget, 2, "改定", Now);
+
+        var line = Assert.Single(revised.Lines);
+        Assert.Equal("AWS", line.PeriodDetail);
+        Assert.Equal(300_000m, line.Amount.Value);
+    }
 }

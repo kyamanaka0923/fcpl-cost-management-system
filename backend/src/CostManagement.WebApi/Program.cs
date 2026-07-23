@@ -109,9 +109,9 @@ api.MapPut("/budgets/{budgetId:guid}/lines",
     (Guid budgetId, UpsertBudgetLineRequest req, DepartmentBudgetService svc, CancellationToken ct) =>
         svc.UpsertLineAsync(budgetId, req, ct));
 api.MapDelete("/budgets/{budgetId:guid}/lines",
-    (Guid budgetId, string category, Guid? projectId, string? elementCode,
+    (Guid budgetId, string category, Guid? projectId, string? elementCode, string? periodDetail,
         DepartmentBudgetService svc, CancellationToken ct) =>
-        svc.RemoveLineAsync(budgetId, category, projectId, elementCode, ct));
+        svc.RemoveLineAsync(budgetId, category, projectId, elementCode, periodDetail, ct));
 api.MapPost("/budgets/{budgetId:guid}/approve",
     (Guid budgetId, DepartmentBudgetService svc, CancellationToken ct) =>
         svc.ApproveAsync(budgetId, ct));

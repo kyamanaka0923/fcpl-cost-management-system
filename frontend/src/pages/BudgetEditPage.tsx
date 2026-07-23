@@ -49,12 +49,16 @@ export default function BudgetEditPage() {
     category: BudgetCategory
     projectId: string | null
     elementCode: string | null
+    periodDetail: string | null
     label: string
   } | null>(null)
   const [monthlyEdits, setMonthlyEdits] = useState<Record<number, string>>({})
   const [savingMonthly, setSavingMonthly] = useState(false)
 
-  // 費目追加フォーム
+  // 期間費用の明細追加フォーム(費目コード → 入力中の明細名・金額)
+  const [detailName, setDetailName] = useState<Record<string, string>>({})
+  const [detailAmount, setDetailAmount] = useState<Record<string, string>>({})
+  const [addingDetail, setAddingDetail] = useState(false)
 
   const loadBudget = useCallback(() => {
     if (!budgetId) return
@@ -133,10 +137,11 @@ export default function BudgetEditPage() {
   const projectMargin = (projectId: string): number | null =>
     marginRate(projectProfit(projectId), projectAmount(projectId, 'Revenue'))
 
-  // ---- 期間費用(費目別) ----
+  // ---- 期間費用(費目別。費目内をさらに明細名で細分できる) ----
+  // 費目一括の明細(明細名なし)。人件費など細分不要な費目はこれだけを使う。
   const periodKey = (code: string) => `PeriodCost-${code}`
   const periodAmount = (code: string): number =>
-    budget?.lines.find((l) => l.category === 'PeriodCost' && l.elementCode === code)?.amount ?? 0
+    findLine('PeriodCost', null, code, null)?.amount ?? 0
   const onPeriodBlur = (code: string) =>
     saveCell(
       periodKey(code),
@@ -145,17 +150,82 @@ export default function BudgetEditPage() {
       () => api.removeBudgetLine(budgetId, 'PeriodCost', null, code),
     )
 
+  // 費目に属する全明細(費目一括 + 明細名つき)。
+  const periodLinesFor = (code: string): BudgetLine[] =>
+    budget?.lines.filter((l) => l.category === 'PeriodCost' && l.elementCode === code) ?? []
+  // 費目内の明細名つきの明細(名前順)。
+  const periodDetailsFor = (code: string): BudgetLine[] =>
+    periodLinesFor(code)
+      .filter((l) => l.periodDetail != null)
+      .sort((a, b) => (a.periodDetail ?? '').localeCompare(b.periodDetail ?? ''))
+  const periodSubtotal = (code: string): number =>
+    periodLinesFor(code).reduce((sum, l) => sum + l.amount, 0)
+
+  // 明細名つきの1明細の金額セル。
+  const periodDetailKey = (code: string, detail: string) => `PeriodCost-${code}::${detail}`
+  const onPeriodDetailBlur = (code: string, detail: string) =>
+    saveCell(
+      periodDetailKey(code, detail),
+      findLine('PeriodCost', null, code, detail)?.amount ?? 0,
+      (amount) =>
+        api.upsertBudgetLine(budgetId, {
+          category: 'PeriodCost',
+          elementCode: code,
+          amount,
+          periodDetail: detail,
+        }),
+      () => api.removeBudgetLine(budgetId, 'PeriodCost', null, code, detail),
+    )
+
+  const removePeriodDetail = async (code: string, detail: string) => {
+    setError(null)
+    try {
+      setBudget(await api.removeBudgetLine(budgetId, 'PeriodCost', null, code, detail))
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+
+  const addPeriodDetail = async (code: string) => {
+    const name = (detailName[code] ?? '').trim()
+    const raw = (detailAmount[code] ?? '').trim()
+    const amount = raw === '' ? 0 : Number(raw)
+    if (name === '' || Number.isNaN(amount) || amount <= 0) {
+      setError('明細名と金額(1以上)を入力してください。')
+      return
+    }
+    setAddingDetail(true)
+    setError(null)
+    try {
+      const updated = await api.upsertBudgetLine(budgetId, {
+        category: 'PeriodCost',
+        elementCode: code,
+        amount,
+        periodDetail: name,
+      })
+      setBudget(updated)
+      setDetailName((prev) => ({ ...prev, [code]: '' }))
+      setDetailAmount((prev) => ({ ...prev, [code]: '' }))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setAddingDetail(false)
+    }
+  }
+
   // ---- 月次入力 ----
   const findLine = (
     category: BudgetCategory,
     projectId: string | null,
     elementCode: string | null,
+    periodDetail: string | null = null,
   ): BudgetLine | undefined =>
     budget?.lines.find(
       (l) =>
         l.category === category &&
         (l.projectId ?? null) === projectId &&
-        (l.elementCode ?? null) === elementCode,
+        (l.elementCode ?? null) === elementCode &&
+        (l.periodDetail ?? null) === periodDetail,
     )
 
   const openMonthly = (
@@ -163,14 +233,15 @@ export default function BudgetEditPage() {
     projectId: string | null,
     elementCode: string | null,
     label: string,
+    periodDetail: string | null = null,
   ) => {
-    const line = findLine(category, projectId, elementCode)
+    const line = findLine(category, projectId, elementCode, periodDetail)
     const init: Record<number, string> = {}
     if (line?.isMonthly) {
       for (const [m, amt] of Object.entries(line.monthlyAmounts)) init[Number(m)] = String(amt)
     }
     setMonthlyEdits(init)
-    setMonthlyTarget({ category, projectId, elementCode, label })
+    setMonthlyTarget({ category, projectId, elementCode, periodDetail, label })
     setError(null)
   }
 
@@ -191,16 +262,17 @@ export default function BudgetEditPage() {
         const n = raw === '' ? 0 : Number(raw)
         if (!Number.isNaN(n) && n > 0) monthlyAmounts[index] = n
       }
-      const { category, projectId, elementCode } = monthlyTarget
+      const { category, projectId, elementCode, periodDetail } = monthlyTarget
       const updated =
         Object.keys(monthlyAmounts).length === 0
-          ? await api.removeBudgetLine(budgetId, category, projectId, elementCode)
+          ? await api.removeBudgetLine(budgetId, category, projectId, elementCode, periodDetail)
           : await api.upsertBudgetLine(budgetId, {
               category,
               projectId,
               elementCode,
               amount: 0,
               monthlyAmounts,
+              periodDetail,
             })
       setBudget(updated)
       setMonthlyTarget(null)
@@ -216,12 +288,18 @@ export default function BudgetEditPage() {
     setSavingMonthly(true)
     setError(null)
     try {
-      const { category, projectId, elementCode } = monthlyTarget
-      const total = findLine(category, projectId, elementCode)?.amount ?? 0
+      const { category, projectId, elementCode, periodDetail } = monthlyTarget
+      const total = findLine(category, projectId, elementCode, periodDetail)?.amount ?? 0
       const updated =
         total > 0
-          ? await api.upsertBudgetLine(budgetId, { category, projectId, elementCode, amount: total })
-          : await api.removeBudgetLine(budgetId, category, projectId, elementCode)
+          ? await api.upsertBudgetLine(budgetId, {
+              category,
+              projectId,
+              elementCode,
+              amount: total,
+              periodDetail,
+            })
+          : await api.removeBudgetLine(budgetId, category, projectId, elementCode, periodDetail)
       setBudget(updated)
       setMonthlyTarget(null)
     } catch (err) {
@@ -279,11 +357,14 @@ export default function BudgetEditPage() {
     }
   }
 
-  // 期間費用の行: 編集中は全費目、閲覧時は明細のある費目のみ。
+  // 期間費用の行: 編集中は全費目、閲覧時は明細のある費目のみ(費目コードで重複排除)。
   const periodCostLines = budget?.lines.filter((l) => l.category === 'PeriodCost') ?? []
   const periodRows = editable
     ? elements.map((el) => ({ code: el.code, name: el.name }))
-    : periodCostLines.map((l) => ({ code: l.elementCode!, name: elementName(l.elementCode) }))
+    : [...new Set(periodCostLines.map((l) => l.elementCode!))].map((code) => ({
+        code,
+        name: elementName(code),
+      }))
 
   return (
     <>
@@ -511,13 +592,15 @@ export default function BudgetEditPage() {
         <h2>期間費用</h2>
         <p className="muted small">
           課共通の費用(人件費・ライセンス費など)を費目ごとに入力します(空欄・0 は明細なし)。
-          {editable && '金額を入力して次の欄へ移ると自動保存されます。'}
+          {editable &&
+            '費目一括の金額を入力するか、費目内を「明細」で細分できます(例: ライセンス費 → AWS / GitHub)。' +
+              '明細を追加した費目は費目一括の入力ができなくなり、費目合計は明細の合計になります。各明細は月次入力にも対応します。'}
           費目はシステム共通のマスタで、「費目マスタ」画面で追加します。
         </p>
         <table>
           <thead>
             <tr>
-              <th>費目</th>
+              <th>費目 / 明細</th>
               <th className="num">金額</th>
             </tr>
           </thead>
@@ -531,49 +614,140 @@ export default function BudgetEditPage() {
                 </td>
               </tr>
             ) : (
-              periodRows.map((el) => (
-                <tr key={el.code}>
-                  <td>
-                    {el.name}
-                    <span className="muted small">({el.code})</span>
-                  </td>
-                  <td className="num">
-                    {(() => {
-                      const monthly = findLine('PeriodCost', null, el.code)?.isMonthly ?? false
-                      const label = `${el.name} 金額`
+              periodRows.map((el) => {
+                const details = periodDetailsFor(el.code)
+                const hasDetails = details.length > 0
+                const simpleAmt = periodAmount(el.code)
+                const simpleMonthly = findLine('PeriodCost', null, el.code)?.isMonthly ?? false
+                const simpleLabel = `${el.name} 金額`
+                return (
+                  <Fragment key={el.code}>
+                    <tr>
+                      <td>
+                        {el.name}
+                        <span className="muted small">({el.code})</span>
+                        {hasDetails && <span className="badge-monthly">明細</span>}
+                      </td>
+                      <td className="num">
+                        {hasDetails ? (
+                          <span className="muted">小計 ¥{formatYen(periodSubtotal(el.code))}</span>
+                        ) : (
+                          <>
+                            {editable && !simpleMonthly && (
+                              <MoneyInput
+                                className="num"
+                                style={{ width: '9rem' }}
+                                aria-label={simpleLabel}
+                                value={cellValue(periodKey(el.code), simpleAmt)}
+                                onChange={(v) => onCellChange(periodKey(el.code), v)}
+                                onBlur={() => onPeriodBlur(el.code)}
+                              />
+                            )}
+                            {(!editable || simpleMonthly) && (
+                              <span>
+                                ¥{formatYen(simpleAmt)}
+                                {simpleMonthly && <span className="badge-monthly">月次</span>}
+                              </span>
+                            )}
+                            {editable && (
+                              <button
+                                className="cell-monthly-btn"
+                                aria-label={`${el.name} を月次入力`}
+                                onClick={() => openMonthly('PeriodCost', null, el.code, simpleLabel)}
+                              >
+                                {simpleMonthly ? '月次編集' : '月次入力'}
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                    {details.map((d) => {
+                      const detail = d.periodDetail!
+                      const detailLabel = `${el.name} ${detail} 金額`
                       return (
-                        <>
-                          {editable && !monthly && (
-                            <MoneyInput
-                              className="num"
-                              style={{ width: '9rem' }}
-                              aria-label={label}
-                              value={cellValue(periodKey(el.code), periodAmount(el.code))}
-                              onChange={(v) => onCellChange(periodKey(el.code), v)}
-                              onBlur={() => onPeriodBlur(el.code)}
-                            />
-                          )}
-                          {(!editable || monthly) && (
-                            <span>
-                              ¥{formatYen(periodAmount(el.code))}
-                              {monthly && <span className="badge-monthly">月次</span>}
-                            </span>
-                          )}
-                          {editable && (
-                            <button
-                              className="cell-monthly-btn"
-                              aria-label={`${el.name} を月次入力`}
-                              onClick={() => openMonthly('PeriodCost', null, el.code, label)}
-                            >
-                              {monthly ? '月次編集' : '月次入力'}
-                            </button>
-                          )}
-                        </>
+                        <tr key={detail}>
+                          <td className="muted small" style={{ paddingLeft: '2rem' }}>
+                            └ {detail}
+                          </td>
+                          <td className="num">
+                            {editable && !d.isMonthly && (
+                              <MoneyInput
+                                className="num"
+                                style={{ width: '9rem' }}
+                                aria-label={detailLabel}
+                                value={cellValue(periodDetailKey(el.code, detail), d.amount)}
+                                onChange={(v) => onCellChange(periodDetailKey(el.code, detail), v)}
+                                onBlur={() => onPeriodDetailBlur(el.code, detail)}
+                              />
+                            )}
+                            {(!editable || d.isMonthly) && (
+                              <span>
+                                ¥{formatYen(d.amount)}
+                                {d.isMonthly && <span className="badge-monthly">月次</span>}
+                              </span>
+                            )}
+                            {editable && (
+                              <>
+                                <button
+                                  className="cell-monthly-btn"
+                                  aria-label={`${el.name} ${detail} を月次入力`}
+                                  onClick={() =>
+                                    openMonthly('PeriodCost', null, el.code, detailLabel, detail)
+                                  }
+                                >
+                                  {d.isMonthly ? '月次編集' : '月次入力'}
+                                </button>
+                                <button
+                                  className="row-edit-link"
+                                  aria-label={`${el.name} ${detail} を削除`}
+                                  onClick={() => removePeriodDetail(el.code, detail)}
+                                >
+                                  削除
+                                </button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
                       )
-                    })()}
-                  </td>
-                </tr>
-              ))
+                    })}
+                    {editable && (hasDetails || simpleAmt === 0) && !simpleMonthly && (
+                      <tr>
+                        <td style={{ paddingLeft: '2rem' }}>
+                          <input
+                            aria-label={`${el.name} 明細名`}
+                            placeholder="明細名(例: AWS)"
+                            value={detailName[el.code] ?? ''}
+                            onChange={(e) =>
+                              setDetailName((prev) => ({ ...prev, [el.code]: e.target.value }))
+                            }
+                            style={{ width: '10rem' }}
+                          />
+                        </td>
+                        <td className="num">
+                          <MoneyInput
+                            className="num"
+                            style={{ width: '9rem' }}
+                            aria-label={`${el.name} 明細金額`}
+                            value={detailAmount[el.code] ?? ''}
+                            onChange={(v) =>
+                              setDetailAmount((prev) => ({ ...prev, [el.code]: v }))
+                            }
+                          />
+                          <button
+                            className="cell-monthly-btn"
+                            aria-label={`${el.name} に明細を追加`}
+                            onClick={() => addPeriodDetail(el.code)}
+                            disabled={addingDetail}
+                          >
+                            明細を追加
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                )
+              })
             )}
             <tr className="total-row">
               <td>合計</td>

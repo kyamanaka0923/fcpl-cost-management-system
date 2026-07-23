@@ -64,7 +64,7 @@ public sealed class AnalysisService
                 c.Category.ToString(),
                 c.Lines.Select(l => new VarianceLineDto(
                     l.Category.ToString(), l.ProjectId, names.ProjectName(l.ProjectId),
-                    l.ElementCode, names.ElementName(l.ElementCode),
+                    l.ElementCode, names.ElementName(l.ElementCode), l.PeriodDetail,
                     l.PlannedAmount, l.ActualAmount, l.Variance,
                     l.IsUnplanned, l.IsFavorable, l.IsAdverse)).ToList(),
                 c.PlannedAmount, c.ActualAmount, c.Variance)).ToList(),
@@ -93,7 +93,7 @@ public sealed class AnalysisService
                 c.Category.ToString(),
                 c.Lines.Select(l => new BudgetComparisonLineDto(
                     l.Category.ToString(), l.ProjectId, names.ProjectName(l.ProjectId),
-                    l.ElementCode, names.ElementName(l.ElementCode),
+                    l.ElementCode, names.ElementName(l.ElementCode), l.PeriodDetail,
                     l.BaseAmount, l.TargetAmount, l.Difference)).ToList(),
                 c.BaseAmount, c.TargetAmount, c.Difference)).ToList());
     }

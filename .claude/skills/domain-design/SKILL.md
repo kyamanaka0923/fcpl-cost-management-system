@@ -31,8 +31,15 @@ model: claude-opus-4-8
   **集計・差異分析・損益・部集計はすべて半期粒度のまま**(月次は入力の内訳にすぎない)。
   数量×単価は廃止済み・復活させない(価格差異・数量差異の分解は存在せず、差異 = 実績金額 − 予算金額)
 - **明細キーの排他**: 売上高・加工費・外注費 = (区分, 案件ID)で案件必須・費目不可 /
-  期間費用 = (期間費用, 費目コード)で費目必須・案件不可。
+  期間費用 = (期間費用, 費目コード, 明細名)で費目必須・案件不可。
   検証は `BudgetCategories.ValidateKey`(BudgetLine と ActualEntry の両方から使う)
+- **期間費用の明細名(`PeriodDetail`。Issue #7)**: 費目内を自由入力の明細名でさらに細分できる
+  (例: ライセンス費 → "AWS" / "GitHub")。`BudgetLine.PeriodDetail` / `ActualEntry.PeriodDetail` は
+  null = 費目一括(従来どおり。人件費など細分不要な費目)、非null = 明細。**1費目内で費目一括と明細は
+  併用不可**(`DepartmentBudget.EnsurePeriodModeConsistent` が二重計上を防ぐ)。明細名は期間費用専用で、
+  案件別区分に指定すると例外。費目合計 = 明細の合計(`CategoryTotal` は変更不要)。分析(差異・比較)の
+  キーは (区分, 案件 or 費目, 明細名)。計画にない明細名の実績は「予定外」。マスタは作らず自由入力の文字列
+  (`BudgetLine.NormalizeDetail` で trim・空は null)。月次(Issue #5)は明細ごとに使える
 - **課の区分合計 = 常に明細合計**(`CategoryTotal`)。ヘッダに金額を持たないことで
   課レベルの直接入力を構造的に不可にしている。この構造を崩さない
 - **案件(Project)は課に属するマスタ**(DepartmentId 参照)。予算策定単位ではなく明細の内訳次元。

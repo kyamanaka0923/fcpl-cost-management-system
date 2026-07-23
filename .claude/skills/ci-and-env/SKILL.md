@@ -52,6 +52,12 @@ model: claude-sonnet-5
 - 実績への月次計上用 `month` 列の追加(`MigrateAddActualMonth`。Issue #5)。
   `pragma_table_info` に `month` 列が無ければ `ALTER TABLE actual_entries ADD COLUMN month INTEGER NULL`。
   **単純なカラム追加は RENAME→CREATE→INSERT の作り直しではなく ALTER ADD COLUMN でよい**
+- 期間費用の明細名 `period_detail` 列の追加(`MigrateAddPeriodDetail`。Issue #7)。
+  `department_budget_lines` は UNIQUE 制約に `period_detail` を含めるため**テーブルの作り直しが必要**。
+  子テーブル `department_budget_line_months` が FK 参照するので、作り直しの間だけ `PRAGMA foreign_keys=OFF`
+  (トランザクション外で設定)にし、**create-new → copy → drop-old → rename** で既存 id を保持する
+  (id を保つので月別金額の子行はそのまま有効)。`actual_entries` は一意制約に関与しないため ALTER ADD COLUMN。
+  既存行は `period_detail=''`(費目一括)として復元。判定は `period_detail` 列の有無で冪等に
 - 新規テーブル(`department_budget_line_months` = 明細の月別金額)は移行不要。
   `CREATE TABLE IF NOT EXISTS` で足りる(既存DBには空テーブルが増えるだけ)
 複数の移行が連なる場合、後段は前段の結果に対して冪等(該当列/制約がなければ何もしない)であること。

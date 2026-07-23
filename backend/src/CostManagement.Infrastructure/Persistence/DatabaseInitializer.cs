@@ -30,6 +30,7 @@ public sealed class DatabaseInitializer
         MigrateProjectCodeUniqueness(connection);
         MigrateDropProjectStatus(connection);
         MigrateAddActualMonth(connection);
+        MigrateAddPeriodDetail(connection);
 
         connection.Execute("""
             CREATE TABLE IF NOT EXISTS divisions (
@@ -77,14 +78,16 @@ public sealed class DatabaseInitializer
 
             -- project_id / element_code は区分により排他。未使用側は '' で保存する
             -- (NULL は SQLite の UNIQUE 制約で重複可となるため)。
+            -- period_detail は期間費用の明細名(費目内を細分)。'' = 費目一括。
             CREATE TABLE IF NOT EXISTS department_budget_lines (
-                id           TEXT PRIMARY KEY,
-                budget_id    TEXT NOT NULL REFERENCES department_budgets(id) ON DELETE CASCADE,
-                category     TEXT NOT NULL,
-                project_id   TEXT NOT NULL DEFAULT '',
-                element_code TEXT NOT NULL DEFAULT '',
-                amount       TEXT NOT NULL,
-                UNIQUE (budget_id, category, project_id, element_code)
+                id            TEXT PRIMARY KEY,
+                budget_id     TEXT NOT NULL REFERENCES department_budgets(id) ON DELETE CASCADE,
+                category      TEXT NOT NULL,
+                project_id    TEXT NOT NULL DEFAULT '',
+                element_code  TEXT NOT NULL DEFAULT '',
+                period_detail TEXT NOT NULL DEFAULT '',
+                amount        TEXT NOT NULL,
+                UNIQUE (budget_id, category, project_id, element_code, period_detail)
             );
 
             -- 明細の月次モードの月別金額(月インデックス 1..6 → 金額)。行が無い明細 = 半期一括モード。
@@ -96,6 +99,7 @@ public sealed class DatabaseInitializer
             );
 
             -- month は特定月の計上(半期内 1..6)。NULL は半期一括の計上。
+            -- period_detail は期間費用の明細名(計画明細に対する計上)。'' = 費目一括。
             CREATE TABLE IF NOT EXISTS actual_entries (
                 id            TEXT PRIMARY KEY,
                 department_id TEXT NOT NULL REFERENCES departments(id),
@@ -103,6 +107,7 @@ public sealed class DatabaseInitializer
                 category      TEXT NOT NULL,
                 project_id    TEXT NOT NULL DEFAULT '',
                 element_code  TEXT NOT NULL DEFAULT '',
+                period_detail TEXT NOT NULL DEFAULT '',
                 month         INTEGER NULL,
                 amount        TEXT NOT NULL,
                 note          TEXT NULL,
@@ -287,5 +292,62 @@ public sealed class DatabaseInitializer
         if (hasMonth)
             return; // 既に追加済み
         connection.Execute("ALTER TABLE actual_entries ADD COLUMN month INTEGER NULL;");
+    }
+
+    /// <summary>
+    /// 期間費用の明細名 period_detail 列を追加するマイグレーション(Issue #7)。
+    /// - department_budget_lines: UNIQUE 制約に period_detail を含める必要があるためテーブルを作り直す
+    ///   (create-new → copy → drop-old → rename)。子テーブル department_budget_line_months が FK で
+    ///   参照するため、作り直しの間だけ foreign_keys を OFF にする(既存 id を保持するので月別金額は保たれる)。
+    /// - actual_entries: 一意制約に関与しないため ALTER ADD COLUMN で足りる。
+    /// いずれも冪等(period_detail 列があれば何もしない)。既存行は '' = 費目一括として復元される。
+    /// </summary>
+    private static void MigrateAddPeriodDetail(SqliteConnection connection)
+    {
+        bool TableExists(string table) =>
+            connection.ExecuteScalar<long>(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @Table",
+                new { Table = table }) > 0;
+        bool HasColumn(string table, string column) =>
+            connection.ExecuteScalar<long>(
+                "SELECT COUNT(*) FROM pragma_table_info(@Table) WHERE name = @Column",
+                new { Table = table, Column = column }) > 0;
+
+        if (TableExists("department_budget_lines") && !HasColumn("department_budget_lines", "period_detail"))
+        {
+            // 作り直しの間だけ FK を無効化する(PRAGMA はトランザクション外で設定する)。
+            connection.Execute("PRAGMA foreign_keys = OFF;");
+            using (var tx = connection.BeginTransaction())
+            {
+                connection.Execute("""
+                    CREATE TABLE department_budget_lines_new (
+                        id            TEXT PRIMARY KEY,
+                        budget_id     TEXT NOT NULL REFERENCES department_budgets(id) ON DELETE CASCADE,
+                        category      TEXT NOT NULL,
+                        project_id    TEXT NOT NULL DEFAULT '',
+                        element_code  TEXT NOT NULL DEFAULT '',
+                        period_detail TEXT NOT NULL DEFAULT '',
+                        amount        TEXT NOT NULL,
+                        UNIQUE (budget_id, category, project_id, element_code, period_detail)
+                    );
+
+                    INSERT INTO department_budget_lines_new
+                        (id, budget_id, category, project_id, element_code, period_detail, amount)
+                    SELECT id, budget_id, category, project_id, element_code, '', amount
+                    FROM department_budget_lines;
+
+                    DROP TABLE department_budget_lines;
+                    ALTER TABLE department_budget_lines_new RENAME TO department_budget_lines;
+                    """, transaction: tx);
+                tx.Commit();
+            }
+            connection.Execute("PRAGMA foreign_keys = ON;");
+        }
+
+        if (TableExists("actual_entries") && !HasColumn("actual_entries", "period_detail"))
+        {
+            connection.Execute(
+                "ALTER TABLE actual_entries ADD COLUMN period_detail TEXT NOT NULL DEFAULT '';");
+        }
     }
 }

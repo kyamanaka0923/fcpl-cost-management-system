@@ -112,6 +112,12 @@ public sealed class BudgetLine
     /// <summary>費目。期間費用の明細で必須。案件別区分では null。</summary>
     public CostElementCode? ElementCode { get; }
 
+    /// <summary>
+    /// 期間費用を費目内でさらに細分する明細名(例: ライセンス費 → "AWS")。
+    /// null = 費目一括(従来どおり)。期間費用以外では常に null。
+    /// </summary>
+    public string? PeriodDetail { get; }
+
     /// <summary>半期合計の金額(月次モードでは月別金額の合計)。</summary>
     public Money Amount { get; private set; }
 
@@ -124,23 +130,32 @@ public sealed class BudgetLine
     /// <summary>
     /// 明細を生成する(集約内部からのみ)。区分と案件/費目の排他を
     /// <see cref="BudgetCategories.ValidateKey"/> で検証する(復元経路でも通る)。
+    /// periodDetail は期間費用の明細名(null=費目一括)。期間費用以外に指定すると例外。
     /// monthly を渡すと月次モード、null/空だと amount による半期一括モードになる。
     /// </summary>
     internal BudgetLine(Guid id, BudgetCategory category, ProjectId? projectId,
         CostElementCode? elementCode, Money amount,
-        IReadOnlyDictionary<int, Money>? monthly = null)
+        IReadOnlyDictionary<int, Money>? monthly = null, string? periodDetail = null)
     {
         BudgetCategories.ValidateKey(category, projectId, elementCode);
+        var detail = NormalizeDetail(periodDetail);
+        if (detail is not null && category != BudgetCategory.PeriodCost)
+            throw new DomainException("明細名は期間費用の明細にのみ指定できます。");
         Id = id;
         Category = category;
         ProjectId = projectId;
         ElementCode = elementCode;
+        PeriodDetail = detail;
         _monthly = new Dictionary<int, Money>();
         if (monthly is { Count: > 0 })
             SetMonthly(monthly);
         else
             Amount = amount;
     }
+
+    /// <summary>明細名を正規化する(前後の空白を除去し、空なら null = 費目一括)。</summary>
+    internal static string? NormalizeDetail(string? detail) =>
+        string.IsNullOrWhiteSpace(detail) ? null : detail.Trim();
 
     /// <summary>半期一括の金額で上書きする(月次モードを解除する)。</summary>
     internal void UpdateHalf(Money amount)
@@ -170,10 +185,10 @@ public sealed class BudgetLine
         Amount = total;
     }
 
-    /// <summary>改定版へ引き継ぐため、新しいIDで明細を複製する(月次モードも引き継ぐ)。</summary>
+    /// <summary>改定版へ引き継ぐため、新しいIDで明細を複製する(月次モード・明細名も引き継ぐ)。</summary>
     internal BudgetLine Copy() =>
         new(Guid.NewGuid(), Category, ProjectId, ElementCode, Amount,
-            _monthly.Count > 0 ? _monthly : null);
+            _monthly.Count > 0 ? _monthly : null, PeriodDetail);
 }
 
 /// <summary>
@@ -298,33 +313,63 @@ public sealed class DepartmentBudget
             existing.UpdateMonthly(monthly);
     }
 
-    /// <summary>期間費用の明細を半期一括金額で追加または更新する。同一費目の明細は1件に統合される。</summary>
-    public void UpsertPeriodCostLine(CostElementCode elementCode, Money amount)
+    /// <summary>
+    /// 期間費用の明細を半期一括金額で追加または更新する。
+    /// detailName を指定すると費目内の明細(例: ライセンス費 → "AWS")、null なら費目一括。
+    /// 同一 (費目, 明細名) の明細は1件に統合される。費目一括と明細は同一費目内で併用できない。
+    /// </summary>
+    public void UpsertPeriodCostLine(CostElementCode elementCode, Money amount, string? detailName = null)
     {
         EnsureDraft();
         ValidateAmount(amount);
+        var detail = BudgetLine.NormalizeDetail(detailName);
+        EnsurePeriodModeConsistent(elementCode, detail);
 
-        var existing = _lines.FirstOrDefault(l =>
-            l.Category == BudgetCategory.PeriodCost && l.ElementCode == elementCode);
+        var existing = FindPeriodLine(elementCode, detail);
         if (existing is null)
-            _lines.Add(new BudgetLine(Guid.NewGuid(), BudgetCategory.PeriodCost, null, elementCode, amount));
+            _lines.Add(new BudgetLine(Guid.NewGuid(), BudgetCategory.PeriodCost, null, elementCode,
+                amount, null, detail));
         else
             existing.UpdateHalf(amount);
     }
 
-    /// <summary>期間費用の明細を月別金額で追加または更新する(月次モード)。同一費目の明細は1件に統合される。</summary>
+    /// <summary>
+    /// 期間費用の明細を月別金額で追加または更新する(月次モード)。
+    /// detailName を指定すると費目内の明細、null なら費目一括。
+    /// 同一 (費目, 明細名) の明細は1件に統合される。費目一括と明細は同一費目内で併用できない。
+    /// </summary>
     public void UpsertPeriodCostLineMonthly(CostElementCode elementCode,
-        IReadOnlyDictionary<int, Money> monthly)
+        IReadOnlyDictionary<int, Money> monthly, string? detailName = null)
     {
         EnsureDraft();
+        var detail = BudgetLine.NormalizeDetail(detailName);
+        EnsurePeriodModeConsistent(elementCode, detail);
 
-        var existing = _lines.FirstOrDefault(l =>
-            l.Category == BudgetCategory.PeriodCost && l.ElementCode == elementCode);
+        var existing = FindPeriodLine(elementCode, detail);
         if (existing is null)
             _lines.Add(new BudgetLine(Guid.NewGuid(), BudgetCategory.PeriodCost, null, elementCode,
-                Money.Zero, monthly));
+                Money.Zero, monthly, detail));
         else
             existing.UpdateMonthly(monthly);
+    }
+
+    /// <summary>(費目, 明細名) が一致する期間費用の明細を探す。</summary>
+    private BudgetLine? FindPeriodLine(CostElementCode elementCode, string? detail) =>
+        _lines.FirstOrDefault(l => l.Category == BudgetCategory.PeriodCost
+            && l.ElementCode == elementCode && l.PeriodDetail == detail);
+
+    /// <summary>
+    /// 同一費目内で「費目一括(明細名なし)」と「明細(明細名あり)」が混在しないことを保証する。
+    /// 費目一括の明細があるところへ明細を足す/その逆はいずれも金額の二重計上を招くため拒否する。
+    /// </summary>
+    private void EnsurePeriodModeConsistent(CostElementCode elementCode, string? detail)
+    {
+        var elementLines = _lines.Where(l =>
+            l.Category == BudgetCategory.PeriodCost && l.ElementCode == elementCode).ToList();
+        if (detail is null && elementLines.Any(l => l.PeriodDetail is not null))
+            throw new DomainException("この費目には明細があります。費目一括の金額ではなく明細で入力してください。");
+        if (detail is not null && elementLines.Any(l => l.PeriodDetail is null))
+            throw new DomainException("この費目は費目一括で入力されています。明細を使うには先に費目一括の金額を削除してください。");
     }
 
     private static void RequireProjectCategory(BudgetCategory category)
@@ -344,12 +389,16 @@ public sealed class DepartmentBudget
             throw new DomainException("指定された明細が存在しません。");
     }
 
-    /// <summary>期間費用の明細を削除する。存在しなければ例外。</summary>
-    public void RemovePeriodCostLine(CostElementCode elementCode)
+    /// <summary>
+    /// 期間費用の明細を削除する。detailName を指定すると費目内の明細、null なら費目一括の明細。
+    /// 存在しなければ例外。
+    /// </summary>
+    public void RemovePeriodCostLine(CostElementCode elementCode, string? detailName = null)
     {
         EnsureDraft();
-        var removed = _lines.RemoveAll(l =>
-            l.Category == BudgetCategory.PeriodCost && l.ElementCode == elementCode);
+        var detail = BudgetLine.NormalizeDetail(detailName);
+        var removed = _lines.RemoveAll(l => l.Category == BudgetCategory.PeriodCost
+            && l.ElementCode == elementCode && l.PeriodDetail == detail);
         if (removed == 0)
             throw new DomainException("指定された明細が存在しません。");
     }
@@ -400,7 +449,8 @@ public sealed class DepartmentBudget
     /// </summary>
     public static DepartmentBudget Restore(Guid id, Guid departmentId, string fiscalHalf,
         int version, string label, BudgetStatus status, DateTime createdAt, DateTime? approvedAt,
-        IEnumerable<(Guid Id, string Category, Guid? ProjectId, string? ElementCode, decimal Amount,
+        IEnumerable<(Guid Id, string Category, Guid? ProjectId, string? ElementCode,
+            string? PeriodDetail, decimal Amount,
             IReadOnlyDictionary<int, decimal> Monthly)> lines)
     {
         var restored = lines
@@ -410,7 +460,8 @@ public sealed class DepartmentBudget
                 new Money(l.Amount),
                 l.Monthly.Count > 0
                     ? l.Monthly.ToDictionary(m => m.Key, m => new Money(m.Value))
-                    : null))
+                    : null,
+                l.PeriodDetail))
             .ToList();
         return new DepartmentBudget(new DepartmentBudgetId(id), new DepartmentId(departmentId),
             FiscalHalf.Parse(fiscalHalf), version, label, status, createdAt, approvedAt, restored);

@@ -39,6 +39,7 @@ public sealed record BudgetLineDto(
     string Category,
     Guid? ProjectId,
     string? ElementCode,
+    string? PeriodDetail,
     decimal Amount,
     bool IsMonthly,
     IReadOnlyDictionary<int, decimal> MonthlyAmounts);
@@ -84,6 +85,7 @@ public sealed record ActualEntryDto(
     string Category,
     Guid? ProjectId,
     string? ElementCode,
+    string? PeriodDetail,
     int? Month,
     decimal Amount,
     string? Note,
@@ -96,6 +98,7 @@ public sealed record VarianceLineDto(
     string? ProjectName,
     string? ElementCode,
     string? ElementName,
+    string? PeriodDetail,
     decimal PlannedAmount,
     decimal ActualAmount,
     decimal Variance,
@@ -131,6 +134,7 @@ public sealed record BudgetComparisonLineDto(
     string? ProjectName,
     string? ElementCode,
     string? ElementName,
+    string? PeriodDetail,
     decimal BaseAmount,
     decimal TargetAmount,
     decimal Difference);
@@ -246,17 +250,20 @@ public sealed record CreateBudgetRequest(string FiscalHalf, string Label, Guid? 
 /// 予算明細の追加・更新リクエスト(案件別は ProjectId、期間費用は ElementCode)。
 /// MonthlyAmounts を指定すると月次モード(月別金額 1..6 → 金額。半期合計は自動算出)、
 /// 未指定なら Amount による半期一括モード。
+/// PeriodDetail は期間費用の明細名(費目内を細分。未指定/空は費目一括)。
 /// </summary>
 public sealed record UpsertBudgetLineRequest(
     string Category,
     Guid? ProjectId,
     string? ElementCode,
     decimal Amount,
-    IReadOnlyDictionary<int, decimal>? MonthlyAmounts = null);
+    IReadOnlyDictionary<int, decimal>? MonthlyAmounts = null,
+    string? PeriodDetail = null);
 
 /// <summary>
 /// 実績計上リクエスト(案件別は ProjectId、期間費用は ElementCode)。
 /// Month を指定すると特定月の計上(1..6)、未指定なら半期一括の計上。
+/// PeriodDetail は期間費用の明細名(計画明細に対する計上。未指定/空は費目一括)。
 /// </summary>
 public sealed record RecordActualRequest(
     string FiscalHalf,
@@ -265,4 +272,5 @@ public sealed record RecordActualRequest(
     string? ElementCode,
     decimal Amount,
     int? Month = null,
-    string? Note = null);
+    string? Note = null,
+    string? PeriodDetail = null);

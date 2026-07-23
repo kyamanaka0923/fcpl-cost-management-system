@@ -13,6 +13,7 @@ public sealed record VarianceLine(
     BudgetCategory Category,
     Guid? ProjectId,
     string? ElementCode,
+    string? PeriodDetail,
     decimal PlannedAmount,
     decimal ActualAmount,
     decimal Variance,
@@ -59,22 +60,25 @@ public sealed class BudgetVarianceAnalysisService
     public VarianceReport Analyze(DepartmentBudget budget, IReadOnlyCollection<ActualEntry> actuals)
     {
         var plannedByKey = budget.Lines
-            .ToDictionary(l => (l.Category, ProjectId: l.ProjectId?.Value, ElementCode: l.ElementCode?.Value),
+            .ToDictionary(l => (l.Category, ProjectId: l.ProjectId?.Value,
+                    ElementCode: l.ElementCode?.Value, l.PeriodDetail),
                 l => l.Amount.Value);
 
-        // 同一 (区分, 案件 or 費目) の実績を合算する。
+        // 同一 (区分, 案件 or 費目 × 明細名) の実績を合算する。
         var actualByKey = actuals
-            .GroupBy(a => (a.Category, ProjectId: a.ProjectId?.Value, ElementCode: a.ElementCode?.Value))
+            .GroupBy(a => (a.Category, ProjectId: a.ProjectId?.Value,
+                ElementCode: a.ElementCode?.Value, a.PeriodDetail))
             .ToDictionary(g => g.Key, g => g.Sum(a => a.Amount.Value));
 
         var allLines = plannedByKey.Keys.Union(actualByKey.Keys)
-            .OrderBy(k => k.Category).ThenBy(k => k.ElementCode).ThenBy(k => k.ProjectId)
+            .OrderBy(k => k.Category).ThenBy(k => k.ElementCode).ThenBy(k => k.PeriodDetail)
+            .ThenBy(k => k.ProjectId)
             .Select(key =>
             {
                 var hasPlan = plannedByKey.TryGetValue(key, out var plannedAmount);
                 var actualAmount = actualByKey.GetValueOrDefault(key);
                 return new VarianceLine(
-                    key.Category, key.ProjectId, key.ElementCode,
+                    key.Category, key.ProjectId, key.ElementCode, key.PeriodDetail,
                     plannedAmount, actualAmount, actualAmount - plannedAmount,
                     IsUnplanned: !hasPlan);
             })
@@ -105,6 +109,7 @@ public sealed record BudgetComparisonLine(
     BudgetCategory Category,
     Guid? ProjectId,
     string? ElementCode,
+    string? PeriodDetail,
     decimal BaseAmount,
     decimal TargetAmount,
     decimal Difference);
@@ -141,20 +146,23 @@ public sealed class BudgetComparisonService
         }
 
         var baseByKey = baseBudget.Lines
-            .ToDictionary(l => (l.Category, ProjectId: l.ProjectId?.Value, ElementCode: l.ElementCode?.Value),
+            .ToDictionary(l => (l.Category, ProjectId: l.ProjectId?.Value,
+                    ElementCode: l.ElementCode?.Value, l.PeriodDetail),
                 l => l.Amount.Value);
         var targetByKey = targetBudget.Lines
-            .ToDictionary(l => (l.Category, ProjectId: l.ProjectId?.Value, ElementCode: l.ElementCode?.Value),
+            .ToDictionary(l => (l.Category, ProjectId: l.ProjectId?.Value,
+                    ElementCode: l.ElementCode?.Value, l.PeriodDetail),
                 l => l.Amount.Value);
 
         var allLines = baseByKey.Keys.Union(targetByKey.Keys)
-            .OrderBy(k => k.Category).ThenBy(k => k.ElementCode).ThenBy(k => k.ProjectId)
+            .OrderBy(k => k.Category).ThenBy(k => k.ElementCode).ThenBy(k => k.PeriodDetail)
+            .ThenBy(k => k.ProjectId)
             .Select(key =>
             {
                 var baseAmount = baseByKey.GetValueOrDefault(key);
                 var targetAmount = targetByKey.GetValueOrDefault(key);
                 return new BudgetComparisonLine(key.Category, key.ProjectId, key.ElementCode,
-                    baseAmount, targetAmount, targetAmount - baseAmount);
+                    key.PeriodDetail, baseAmount, targetAmount, targetAmount - baseAmount);
             })
             .ToList();
 

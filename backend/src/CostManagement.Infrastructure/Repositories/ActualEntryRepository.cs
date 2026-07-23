@@ -23,13 +23,14 @@ public sealed class ActualEntryRepository : IActualEntryRepository
     /// </summary>
     // SQLite の INTEGER は Int64 で返るため month は long? で受け、復元時に int? へ変換する。
     private sealed record Row(Guid Id, Guid DepartmentId, string FiscalHalf, string Category,
-        string ProjectId, string ElementCode, long? Month, decimal Amount, string? Note,
-        DateTime RecordedAt);
+        string ProjectId, string ElementCode, string PeriodDetail, long? Month, decimal Amount,
+        string? Note, DateTime RecordedAt);
 
     private const string SelectSql = """
         SELECT id AS Id, department_id AS DepartmentId, fiscal_half AS FiscalHalf,
                category AS Category, project_id AS ProjectId, element_code AS ElementCode,
-               month AS Month, amount AS Amount, note AS Note, recorded_at AS RecordedAt
+               period_detail AS PeriodDetail, month AS Month, amount AS Amount,
+               note AS Note, recorded_at AS RecordedAt
         FROM actual_entries
         """;
 
@@ -59,8 +60,8 @@ public sealed class ActualEntryRepository : IActualEntryRepository
         using var conn = _factory.Create();
         await conn.ExecuteAsync("""
             INSERT INTO actual_entries
-                (id, department_id, fiscal_half, category, project_id, element_code, month, amount, note, recorded_at)
-            VALUES (@Id, @DepartmentId, @FiscalHalf, @Category, @ProjectId, @ElementCode, @Month, @Amount, @Note, @RecordedAt)
+                (id, department_id, fiscal_half, category, project_id, element_code, period_detail, month, amount, note, recorded_at)
+            VALUES (@Id, @DepartmentId, @FiscalHalf, @Category, @ProjectId, @ElementCode, @PeriodDetail, @Month, @Amount, @Note, @RecordedAt)
             """, new
         {
             Id = entry.Id.Value,
@@ -69,6 +70,7 @@ public sealed class ActualEntryRepository : IActualEntryRepository
             Category = entry.Category.ToString(),
             ProjectId = entry.ProjectId?.Value.ToString("D") ?? "",
             ElementCode = entry.ElementCode?.Value ?? "",
+            PeriodDetail = entry.PeriodDetail ?? "",
             entry.Month,
             Amount = entry.Amount.Value,
             entry.Note,
@@ -88,5 +90,6 @@ public sealed class ActualEntryRepository : IActualEntryRepository
         ActualEntry.Restore(row.Id, row.DepartmentId, row.FiscalHalf, row.Category,
             row.ProjectId == "" ? null : Guid.Parse(row.ProjectId),
             row.ElementCode == "" ? null : row.ElementCode,
+            row.PeriodDetail == "" ? null : row.PeriodDetail,
             (int?)row.Month, row.Amount, row.Note, row.RecordedAt);
 }

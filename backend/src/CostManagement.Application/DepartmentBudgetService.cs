@@ -107,9 +107,9 @@ public sealed class DepartmentBudgetService
         {
             var elementCode = await RequireElementAsync(request.ElementCode, ct);
             if (monthly is not null)
-                budget.UpsertPeriodCostLineMonthly(elementCode, monthly);
+                budget.UpsertPeriodCostLineMonthly(elementCode, monthly, request.PeriodDetail);
             else
-                budget.UpsertPeriodCostLine(elementCode, new Money(request.Amount));
+                budget.UpsertPeriodCostLine(elementCode, new Money(request.Amount), request.PeriodDetail);
         }
 
         await _budgets.UpdateAsync(budget, ct);
@@ -118,7 +118,8 @@ public sealed class DepartmentBudgetService
 
     /// <summary>明細を削除する(区分に応じて案件別 or 費目別)。承認済み予算は編集不可。</summary>
     public async Task<BudgetDetailDto> RemoveLineAsync(Guid budgetId, string category,
-        Guid? projectId, string? elementCode, CancellationToken ct = default)
+        Guid? projectId, string? elementCode, string? periodDetail = null,
+        CancellationToken ct = default)
     {
         var budget = await RequireAsync(budgetId, ct);
         var parsed = ParseCategory(category);
@@ -133,7 +134,7 @@ public sealed class DepartmentBudgetService
         {
             if (string.IsNullOrWhiteSpace(elementCode))
                 throw new DomainException("期間費用の明細には費目を指定してください。");
-            budget.RemovePeriodCostLine(new CostElementCode(elementCode));
+            budget.RemovePeriodCostLine(new CostElementCode(elementCode), periodDetail);
         }
 
         await _budgets.UpdateAsync(budget, ct);
@@ -217,9 +218,10 @@ public sealed class DepartmentBudgetService
             b.Lines
                 .OrderBy(l => l.Category)
                 .ThenBy(l => l.ElementCode?.Value)
+                .ThenBy(l => l.PeriodDetail)
                 .ThenBy(l => l.ProjectId?.Value)
                 .Select(l => new BudgetLineDto(l.Id, l.Category.ToString(),
-                    l.ProjectId?.Value, l.ElementCode?.Value, l.Amount.Value,
+                    l.ProjectId?.Value, l.ElementCode?.Value, l.PeriodDetail, l.Amount.Value,
                     l.IsMonthly, l.MonthlyAmounts.ToDictionary(m => m.Key, m => m.Value.Value)))
                 .ToList());
 }

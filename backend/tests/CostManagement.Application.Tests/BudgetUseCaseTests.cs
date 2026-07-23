@@ -90,6 +90,51 @@ public class 課予算の策定と改定 : IDisposable
     }
 
     [Fact]
+    public async Task 期間費用を明細名で登録し実績を明細指定で計上すると差異が明細粒度で出る()
+    {
+        var dept = await _fx.部と課を作成();
+        var budget = await _fx.Budgets.CreateDraftAsync(dept.Id,
+            new CreateBudgetRequest("2026-H1", "当初予算"));
+        await _fx.Budgets.UpsertLineAsync(budget.Id, new UpsertBudgetLineRequest(
+            "PeriodCost", null, "LICENSE", 300_000m, PeriodDetail: "AWS"));
+        var updated = await _fx.Budgets.UpsertLineAsync(budget.Id, new UpsertBudgetLineRequest(
+            "PeriodCost", null, "LICENSE", 200_000m, PeriodDetail: "GitHub"));
+        Assert.Equal(500_000m, updated.PeriodCostTotal);
+        Assert.Equal(2, updated.Lines.Count);
+        Assert.Contains(updated.Lines, l => l.PeriodDetail == "AWS");
+
+        await _fx.Actuals.RecordAsync(dept.Id, new RecordActualRequest(
+            "2026-H1", "PeriodCost", null, "LICENSE", 320_000m, PeriodDetail: "AWS"));
+
+        var variance = await _fx.Analysis.AnalyzeVarianceAsync(dept.Id, "2026-H1", budget.Id);
+        var period = variance.Categories.Single(c => c.Category == "PeriodCost");
+        var aws = period.Lines.Single(l => l.PeriodDetail == "AWS");
+        Assert.Equal(300_000m, aws.PlannedAmount);
+        Assert.Equal(320_000m, aws.ActualAmount);
+        Assert.Equal(20_000m, aws.Variance);
+        Assert.Equal(0m, period.Lines.Single(l => l.PeriodDetail == "GitHub").ActualAmount);
+    }
+
+    [Fact]
+    public async Task 計画にない明細名の実績は予定外として差異に出る()
+    {
+        var dept = await _fx.部と課を作成();
+        var budget = await _fx.Budgets.CreateDraftAsync(dept.Id,
+            new CreateBudgetRequest("2026-H1", "当初予算"));
+        await _fx.Budgets.UpsertLineAsync(budget.Id, new UpsertBudgetLineRequest(
+            "PeriodCost", null, "LICENSE", 300_000m, PeriodDetail: "AWS"));
+
+        await _fx.Actuals.RecordAsync(dept.Id, new RecordActualRequest(
+            "2026-H1", "PeriodCost", null, "LICENSE", 50_000m, PeriodDetail: "Slack"));
+
+        var variance = await _fx.Analysis.AnalyzeVarianceAsync(dept.Id, "2026-H1", budget.Id);
+        var period = variance.Categories.Single(c => c.Category == "PeriodCost");
+        var slack = period.Lines.Single(l => l.PeriodDetail == "Slack");
+        Assert.True(slack.IsUnplanned);
+        Assert.Equal(50_000m, slack.ActualAmount);
+    }
+
+    [Fact]
     public async Task 策定中のドラフトがあると新しいドラフトは起票できない()
     {
         var dept = await _fx.部と課を作成();

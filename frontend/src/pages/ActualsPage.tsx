@@ -28,10 +28,13 @@ export default function ActualsPage() {
   const [category, setCategory] = useState<BudgetCategory>('Revenue')
   const [projectId, setProjectId] = useState('')
   const [elementCode, setElementCode] = useState('')
+  const [periodDetail, setPeriodDetail] = useState('') // 期間費用の明細名(任意。空 = 費目一括)
   const [month, setMonth] = useState('') // '' = 半期一括
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+  // 計画済みの期間費用明細名(費目コード → 明細名の一覧)。実績入力の候補に使う。
+  const [plannedDetails, setPlannedDetails] = useState<Record<string, string[]>>({})
 
   const months = halfMonths(half)
   const monthLabel = (m: number | null) =>
@@ -47,6 +50,28 @@ export default function ActualsPage() {
     api.listProjects(departmentId).then(setProjects).catch((e: Error) => setError(e.message))
     api.listCostElements().then(setElements).catch((e: Error) => setError(e.message))
   }, [departmentId])
+  // 計画済みの期間費用明細名を集める(承認済みがあれば優先、なければ最新版)。実績入力時の候補にする。
+  useEffect(() => {
+    if (!departmentId) return
+    api
+      .listBudgets(departmentId, half)
+      .then(async (list) => {
+        if (list.length === 0) {
+          setPlannedDetails({})
+          return
+        }
+        const chosen = list.find((b) => b.status === 'Approved') ?? list[0]
+        const detail = await api.getBudget(chosen.id)
+        const map: Record<string, string[]> = {}
+        for (const l of detail.lines) {
+          if (l.category === 'PeriodCost' && l.periodDetail && l.elementCode) {
+            ;(map[l.elementCode] ??= []).push(l.periodDetail)
+          }
+        }
+        setPlannedDetails(map)
+      })
+      .catch(() => setPlannedDetails({}))
+  }, [departmentId, half])
 
   if (!departmentId) return null
   const isProjectCategory = category !== 'PeriodCost'
@@ -64,6 +89,7 @@ export default function ActualsPage() {
         category,
         projectId: isProjectCategory ? projectId : null,
         elementCode: isProjectCategory ? null : elementCode,
+        periodDetail: isProjectCategory ? null : periodDetail || null,
         month: month ? Number(month) : null,
         amount: Number(amount),
         note: note || null,
@@ -129,17 +155,34 @@ export default function ActualsPage() {
               </select>
             </label>
           ) : (
-            <label>
-              費目
-              <select value={elementCode} onChange={(e) => setElementCode(e.target.value)} required>
-                <option value="">選択してください</option>
-                {elements.map((el) => (
-                  <option key={el.code} value={el.code}>
-                    {el.name}({el.code})
-                  </option>
-                ))}
-              </select>
-            </label>
+            <>
+              <label>
+                費目
+                <select value={elementCode} onChange={(e) => setElementCode(e.target.value)} required>
+                  <option value="">選択してください</option>
+                  {elements.map((el) => (
+                    <option key={el.code} value={el.code}>
+                      {el.name}({el.code})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                明細(任意)
+                <input
+                  aria-label="明細名"
+                  list={`planned-details-${elementCode}`}
+                  value={periodDetail}
+                  onChange={(e) => setPeriodDetail(e.target.value)}
+                  placeholder="費目一括はそのまま"
+                />
+                <datalist id={`planned-details-${elementCode}`}>
+                  {(plannedDetails[elementCode] ?? []).map((d) => (
+                    <option key={d} value={d} />
+                  ))}
+                </datalist>
+              </label>
+            </>
           )}
           <label>
             月
@@ -190,7 +233,7 @@ export default function ActualsPage() {
                   <td>{categoryLabel[e.category]}</td>
                   <td>
                     {e.category === 'PeriodCost'
-                      ? elementName(e.elementCode)
+                      ? elementName(e.elementCode) + (e.periodDetail ? ` / ${e.periodDetail}` : '')
                       : projectName(e.projectId)}
                   </td>
                   <td className="small muted">{monthLabel(e.month)}</td>

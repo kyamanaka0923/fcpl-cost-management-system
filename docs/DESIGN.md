@@ -266,6 +266,7 @@ classDiagram
         +BudgetCategory Category
         +ProjectId? ProjectId ※案件系区分で必須
         +CostElementCode? ElementCode ※期間費用で必須
+        +string? PeriodDetail ※費目内を細分する明細名。null=費目一括
         +Money Amount ※半期合計
         +IReadOnlyDictionary~int,Money~ MonthlyAmounts ※月次モードのみ
         +bool IsMonthly ※月別金額を持つ=月次
@@ -279,6 +280,7 @@ classDiagram
         +BudgetCategory Category
         +ProjectId? ProjectId ※案件系区分で必須
         +CostElementCode? ElementCode ※期間費用で必須
+        +string? PeriodDetail ※期間費用の明細名。計画にない名は予定外
         +int? Month ※計上月(1..6)。半期一括は null
         +Money Amount
         +string? Note
@@ -305,6 +307,7 @@ classDiagram
 | 〃 | 明細のない予算は承認不可 |
 | 〃 | 明細キー(区分 × 案件/期間費用 × 費目)は集約内で一意(同一キーは上書き) |
 | 〃 | 売上高・加工費・外注費の明細は案件必須(費目は指定不可)。期間費用の明細は費目必須(案件は指定不可) |
+| 〃 | 期間費用は費目内を明細名でさらに細分できる(自由入力)。1費目内で「費目一括(明細名なし)」と「明細(明細名あり)」は併用不可(二重計上の防止) |
 | 〃 | 改定版のバージョン番号は基となる版より大きい |
 | 〃 | 金額は0以上 |
 | 〃 | 区分合計はヘッダに持たず常に明細合計として導出(課レベルの直接入力は構造的に不可) |
@@ -449,9 +452,9 @@ classDiagram
 - 差異 = 実績金額 − 予算金額(符号付き)
   - コスト(加工費・外注費・期間費用): 正 = 予算超過 = **不利差異**(`IsAdverse`)
   - 売上高: 正 = 売上超過 = **有利差異**(`IsFavorable`)
-- 突き合わせ粒度: (区分, 案件) または (期間費用, 費目)。**分析・集計は半期粒度**
+- 突き合わせ粒度: (区分, 案件) または (期間費用, 費目, 明細名)。**分析・集計は半期粒度**
   (明細は月次入力もできるが半期合計に畳んで比較する。Issue #5)。
-  同一キーの実績は合算
+  同一キーの実績は合算。計画にない期間費用の明細名の実績は「予定外」(Issue #7)
 - 損益:
   - 課全体 = 売上高 −(加工費 + 外注費 + 期間費用)。利益率 = 損益 ÷ 売上高(売上高0は null)
   - 案件別 = 売上高 − 加工費 − 外注費(期間費用は課共通のため配賦しない)

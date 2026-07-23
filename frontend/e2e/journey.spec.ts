@@ -371,3 +371,42 @@ test('月次入力: 明細を月ごとに入力でき半期合計に反映され
   await expect(案件M行).toContainText('¥1,500,000')
   await expect(page.locator('.stat-tile', { hasText: '売上高' })).toContainText('¥1,500,000')
 })
+
+test('期間費用の明細: 費目内を明細名で細分でき費目合計は明細の合計になる', async ({ page }) => {
+  // 独立した部・課・ドラフトを用意
+  const s = `PD-${suffix}`
+  await page.goto('/')
+  await page.getByLabel('部コード').fill(`DIV${s}`)
+  await page.getByLabel('部名').fill(`明細検証部-${suffix}`)
+  await page.getByRole('button', { name: '登録' }).click()
+  await page.getByRole('link', { name: `明細検証部-${suffix}` }).click()
+
+  await page.getByLabel('課コード').fill(`DEV${s}`)
+  await page.getByLabel('課名').fill(`明細検証課-${suffix}`)
+  await page.getByRole('button', { name: '登録' }).click()
+  await page.getByRole('link', { name: `明細検証課-${suffix}` }).click()
+
+  const 予算カード = page.locator('.card', { hasText: '予算バージョン' })
+  await 予算カード.getByLabel('予算名').fill('当初予算')
+  await 予算カード.getByRole('button', { name: 'ドラフト作成' }).click()
+  await expect(page.getByRole('heading', { name: /当初予算/ })).toBeVisible()
+
+  // ライセンス費に明細 AWS(30万)・GitHub(20万)を追加する
+  const 明細を追加 = async (name: string, amount: string) => {
+    await page.getByLabel('ライセンス費 明細名').fill(name)
+    await page.getByLabel('ライセンス費 明細金額').fill(amount)
+    await page.getByRole('button', { name: 'ライセンス費 に明細を追加' }).click()
+    await expect(page.getByRole('cell', { name: `└ ${name}`, exact: true })).toBeVisible()
+  }
+  await 明細を追加('AWS', '300000')
+  await 明細を追加('GitHub', '200000')
+
+  // 費目小計 50万、上部サマリの期間費用も 50万(費目合計 = 明細の合計)
+  await expect(page.getByText('小計 ¥500,000')).toBeVisible()
+  await expect(page.locator('.stat-tile', { hasText: '期間費用' })).toContainText('¥500,000')
+
+  // 明細を1つ削除すると費目合計が減る
+  await page.getByRole('button', { name: 'ライセンス費 GitHub を削除' }).click()
+  await expect(page.getByRole('cell', { name: '└ GitHub', exact: true })).toHaveCount(0)
+  await expect(page.locator('.stat-tile', { hasText: '期間費用' })).toContainText('¥300,000')
+})

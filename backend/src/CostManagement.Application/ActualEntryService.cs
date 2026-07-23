@@ -65,7 +65,7 @@ public sealed class ActualEntryService
         }
 
         var entry = ActualEntry.Record(did, fiscalHalf, category, projectId, elementCode,
-            request.Month, new Money(request.Amount), request.Note, _clock.UtcNow);
+            request.Month, new Money(request.Amount), request.Note, _clock.UtcNow, request.PeriodDetail);
         await _actuals.AddAsync(entry, ct);
         return ToDto(entry);
     }
@@ -94,5 +94,6 @@ public sealed class ActualEntryService
     /// <summary>ドメインの実績を応答 DTO へ変換する。</summary>
     internal static ActualEntryDto ToDto(ActualEntry e) =>
         new(e.Id.Value, e.DepartmentId.Value, e.FiscalHalf.ToString(), e.Category.ToString(),
-            e.ProjectId?.Value, e.ElementCode?.Value, e.Month, e.Amount.Value, e.Note, e.RecordedAt);
+            e.ProjectId?.Value, e.ElementCode?.Value, e.PeriodDetail, e.Month, e.Amount.Value,
+            e.Note, e.RecordedAt);
 }

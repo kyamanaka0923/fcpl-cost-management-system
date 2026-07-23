@@ -19,7 +19,7 @@ type Tab = 'variance' | 'profit'
 
 const lineName = (l: VarianceLine): string =>
   l.category === 'PeriodCost'
-    ? (l.elementName ?? l.elementCode ?? '')
+    ? (l.elementName ?? l.elementCode ?? '') + (l.periodDetail ? ` / ${l.periodDetail}` : '')
     : (l.projectName ?? l.projectId ?? '')
 
 function VarianceTab({ departmentId, half }: { departmentId: string; half: string }) {

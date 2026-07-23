@@ -484,3 +484,140 @@ public class 実績の月列追加マイグレーション : IDisposable
         Assert.Equal(1, conn.ExecuteScalar<long>("SELECT COUNT(*) FROM actual_entries"));
     }
 }
+
+/// <summary>
+/// 期間費用の明細名 period_detail 列を追加するマイグレーションの検証(Issue #7)。
+/// department_budget_lines は UNIQUE 制約変更のためテーブルを作り直すが、
+/// 子テーブル(月別金額)と既存データが保持されること、actual_entries にも列が追加されることを確認する。
+/// </summary>
+public class 期間費用明細列追加マイグレーション : IDisposable
+{
+    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _factory;
+
+    public 期間費用明細列追加マイグレーション()
+    {
+        _dbPath = Path.Combine(Path.GetTempPath(), $"cm-perioddetail-{Guid.NewGuid():N}.db");
+        _factory = new SqliteConnectionFactory($"Data Source={_dbPath}");
+    }
+
+    public void Dispose()
+    {
+        if (File.Exists(_dbPath))
+            File.Delete(_dbPath);
+    }
+
+    /// <summary>period_detail 列を持たない現世代の予算明細・実績テーブルのDBを作る(月別金額の子行つき)。</summary>
+    private void 明細列なしのDBを作成()
+    {
+        using var conn = _factory.Create();
+        conn.Execute("""
+            CREATE TABLE divisions (
+                id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE TABLE departments (
+                id TEXT PRIMARY KEY, division_id TEXT NOT NULL, code TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE TABLE department_budgets (
+                id TEXT PRIMARY KEY, department_id TEXT NOT NULL, fiscal_half TEXT NOT NULL,
+                version INTEGER NOT NULL, label TEXT NOT NULL, status TEXT NOT NULL,
+                created_at TEXT NOT NULL, approved_at TEXT NULL,
+                UNIQUE (department_id, fiscal_half, version)
+            );
+            CREATE TABLE department_budget_lines (
+                id TEXT PRIMARY KEY,
+                budget_id TEXT NOT NULL REFERENCES department_budgets(id) ON DELETE CASCADE,
+                category TEXT NOT NULL, project_id TEXT NOT NULL DEFAULT '',
+                element_code TEXT NOT NULL DEFAULT '', amount TEXT NOT NULL,
+                UNIQUE (budget_id, category, project_id, element_code)
+            );
+            CREATE TABLE department_budget_line_months (
+                line_id TEXT NOT NULL REFERENCES department_budget_lines(id) ON DELETE CASCADE,
+                month INTEGER NOT NULL, amount TEXT NOT NULL, PRIMARY KEY (line_id, month)
+            );
+            CREATE TABLE actual_entries (
+                id TEXT PRIMARY KEY, department_id TEXT NOT NULL, fiscal_half TEXT NOT NULL,
+                category TEXT NOT NULL, project_id TEXT NOT NULL DEFAULT '', element_code TEXT NOT NULL DEFAULT '',
+                month INTEGER NULL, amount TEXT NOT NULL, note TEXT NULL, recorded_at TEXT NOT NULL
+            );
+            INSERT INTO divisions VALUES ('v1', 'SALES', '営業本部', '2026-04-01');
+            INSERT INTO departments VALUES ('d1', 'v1', 'DEV-1', '開発1課', '2026-04-01');
+            INSERT INTO department_budgets VALUES ('b1', 'd1', '2026-H1', 1, '当初予算', 'Draft', '2026-04-01', NULL);
+            INSERT INTO department_budget_lines (id, budget_id, category, project_id, element_code, amount)
+            VALUES ('l1', 'b1', 'PeriodCost', '', 'LICENSE', '250000');
+            INSERT INTO department_budget_line_months (line_id, month, amount) VALUES ('l1', 1, '250000');
+            INSERT INTO actual_entries (id, department_id, fiscal_half, category, project_id, element_code, month, amount, note, recorded_at)
+            VALUES ('a1', 'd1', '2026-H1', 'PeriodCost', '', 'LICENSE', NULL, '250000', '旧実績', '2026-05-01');
+            """);
+    }
+
+    private bool カラムが存在する(string table, string column)
+    {
+        using var conn = _factory.Create();
+        return conn.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM pragma_table_info(@Table) WHERE name = @Column",
+            new { Table = table, Column = column }) > 0;
+    }
+
+    [Fact]
+    public void 明細列が無いテーブルは列が追加され明細と月別金額が保持される()
+    {
+        明細列なしのDBを作成();
+        Assert.False(カラムが存在する("department_budget_lines", "period_detail"));
+        Assert.False(カラムが存在する("actual_entries", "period_detail"));
+
+        new DatabaseInitializer(_factory).Initialize();
+
+        Assert.True(カラムが存在する("department_budget_lines", "period_detail"));
+        Assert.True(カラムが存在する("actual_entries", "period_detail"));
+
+        using var conn = _factory.Create();
+        // 既存明細は保持され、period_detail は '' (費目一括)になる
+        Assert.Equal("", conn.ExecuteScalar<string>(
+            "SELECT period_detail FROM department_budget_lines WHERE id = 'l1'"));
+        Assert.Equal("250000", conn.ExecuteScalar<string>(
+            "SELECT amount FROM department_budget_lines WHERE id = 'l1'"));
+        // 子テーブル(月別金額)は作り直し後も保持される
+        Assert.Equal(1, conn.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM department_budget_line_months WHERE line_id = 'l1'"));
+        // 実績も保持され period_detail は '' になる
+        Assert.Equal("旧実績", conn.ExecuteScalar<string>("SELECT note FROM actual_entries WHERE id = 'a1'"));
+        Assert.Equal("", conn.ExecuteScalar<string>(
+            "SELECT period_detail FROM actual_entries WHERE id = 'a1'"));
+    }
+
+    [Fact]
+    public void 移行後は同一費目に別明細名の明細を登録できる()
+    {
+        明細列なしのDBを作成();
+        new DatabaseInitializer(_factory).Initialize();
+
+        using var conn = _factory.Create();
+        // 新しい UNIQUE (…, period_detail) により、同一費目でも明細名が異なれば複数登録できる
+        conn.Execute("""
+            INSERT INTO department_budget_lines (id, budget_id, category, project_id, element_code, period_detail, amount)
+            VALUES ('l2', 'b1', 'PeriodCost', '', 'LICENSE', 'AWS', '300000'),
+                   ('l3', 'b1', 'PeriodCost', '', 'LICENSE', 'GitHub', '200000');
+            """);
+        Assert.Equal(3, conn.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM department_budget_lines WHERE budget_id = 'b1'"));
+    }
+
+    [Fact]
+    public void 移行は冪等で2回実行しても壊れない()
+    {
+        明細列なしのDBを作成();
+
+        var initializer = new DatabaseInitializer(_factory);
+        initializer.Initialize();
+        initializer.Initialize(); // 2回目は period_detail 列があるため何もしない
+
+        Assert.True(カラムが存在する("department_budget_lines", "period_detail"));
+        using var conn = _factory.Create();
+        Assert.Equal(1, conn.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM department_budget_lines WHERE id = 'l1'"));
+        Assert.Equal(1, conn.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM department_budget_line_months WHERE line_id = 'l1'"));
+    }
+}

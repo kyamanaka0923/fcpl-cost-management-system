@@ -215,6 +215,40 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
     }
 
     [Fact]
+    public async Task 期間費用の明細名は保持したままラウンドトリップする()
+    {
+        var dept = await _fx.課を保存();
+        var repo = new DepartmentBudgetRepository(_fx.Factory);
+
+        var budget = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
+        budget.UpsertPeriodCostLine(new CostElementCode("LICENSE"), new Money(300_000m), "AWS");
+        budget.UpsertPeriodCostLine(new CostElementCode("LICENSE"), new Money(200_000m), "GitHub");
+        await repo.AddAsync(budget);
+
+        var restored = await repo.FindByIdAsync(budget.Id);
+
+        Assert.Equal(2, restored!.Lines.Count);
+        Assert.Equal(500_000m, restored.CategoryTotal(BudgetCategory.PeriodCost).Value);
+        var aws = restored.Lines.Single(l => l.PeriodDetail == "AWS");
+        Assert.Equal("LICENSE", aws.ElementCode!.Value.Value);
+        Assert.Equal(300_000m, aws.Amount.Value);
+    }
+
+    [Fact]
+    public async Task 実績は期間費用の明細名を保持したままラウンドトリップする()
+    {
+        var dept = await _fx.課を保存();
+        var repo = new ActualEntryRepository(_fx.Factory);
+
+        await repo.AddAsync(ActualEntry.Record(dept.Id, _fx.Half, BudgetCategory.PeriodCost,
+            null, new CostElementCode("LICENSE"), null, new Money(320_000m), null, _fx.Now,
+            periodDetail: "AWS"));
+
+        var restored = Assert.Single(await repo.ListAsync(dept.Id, _fx.Half));
+        Assert.Equal("AWS", restored.PeriodDetail);
+    }
+
+    [Fact]
     public async Task 課予算の更新は明細の洗い替えとして永続化される()
     {
         var dept = await _fx.課を保存();

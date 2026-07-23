@@ -41,6 +41,12 @@ public sealed class ActualEntry
     /// <summary>費目。期間費用の実績で必須。案件別区分では null。</summary>
     public CostElementCode? ElementCode { get; }
 
+    /// <summary>
+    /// 期間費用の明細名(計画明細に対応する実績のときに指定。費目一括や案件別区分では null)。
+    /// 計画にない明細名でも計上でき、分析では「予定外」として表示される。
+    /// </summary>
+    public string? PeriodDetail { get; }
+
     /// <summary>計上対象の月(半期内の 1..6)。半期一括で計上した場合は null。</summary>
     public int? Month { get; }
 
@@ -55,7 +61,7 @@ public sealed class ActualEntry
 
     private ActualEntry(ActualEntryId id, DepartmentId departmentId, FiscalHalf fiscalHalf,
         BudgetCategory category, ProjectId? projectId, CostElementCode? elementCode,
-        int? month, Money amount, string? note, DateTime recordedAt)
+        string? periodDetail, int? month, Money amount, string? note, DateTime recordedAt)
     {
         Id = id;
         DepartmentId = departmentId;
@@ -63,6 +69,7 @@ public sealed class ActualEntry
         Category = category;
         ProjectId = projectId;
         ElementCode = elementCode;
+        PeriodDetail = periodDetail;
         Month = month;
         Amount = amount;
         Note = note;
@@ -72,30 +79,34 @@ public sealed class ActualEntry
     /// <summary>
     /// 実績を計上する。区分と案件/費目の排他(<see cref="BudgetCategories.ValidateKey"/>)を検証し、
     /// 金額は0以上を要求する。month を指定すると特定月の計上(1..6)、null なら半期一括の計上。
+    /// periodDetail は期間費用の明細名(費目一括や案件別区分では null)。
     /// </summary>
     public static ActualEntry Record(DepartmentId departmentId, FiscalHalf fiscalHalf,
         BudgetCategory category, ProjectId? projectId, CostElementCode? elementCode,
-        int? month, Money amount, string? note, DateTime now)
+        int? month, Money amount, string? note, DateTime now, string? periodDetail = null)
     {
         BudgetCategories.ValidateKey(category, projectId, elementCode);
         if (month is { } m)
             HalfMonths.Validate(m);
         if (amount.IsNegative)
             throw new DomainException("金額は0以上で入力してください。");
+        var detail = BudgetLine.NormalizeDetail(periodDetail);
+        if (detail is not null && category != BudgetCategory.PeriodCost)
+            throw new DomainException("明細名は期間費用の実績にのみ指定できます。");
         var trimmedNote = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
         return new ActualEntry(ActualEntryId.New(), departmentId, fiscalHalf, category,
-            projectId, elementCode, month, amount, trimmedNote, now);
+            projectId, elementCode, detail, month, amount, trimmedNote, now);
     }
 
     /// <summary>永続化層からの復元用ファクトリ。</summary>
     public static ActualEntry Restore(Guid id, Guid departmentId, string fiscalHalf,
-        string category, Guid? projectId, string? elementCode, int? month, decimal amount,
-        string? note, DateTime recordedAt) =>
+        string category, Guid? projectId, string? elementCode, string? periodDetail, int? month,
+        decimal amount, string? note, DateTime recordedAt) =>
         new(new ActualEntryId(id), new DepartmentId(departmentId), FiscalHalf.Parse(fiscalHalf),
             Enum.Parse<BudgetCategory>(category),
             projectId is { } pid ? new ProjectId(pid) : null,
             elementCode is { } code ? new CostElementCode(code) : null,
-            month, new Money(amount), note, recordedAt);
+            BudgetLine.NormalizeDetail(periodDetail), month, new Money(amount), note, recordedAt);
 }
 
 /// <summary>実績の永続化ポート(実装はインフラ層)。</summary>

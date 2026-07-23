@@ -15,7 +15,7 @@ import {
 
 const lineName = (l: BudgetComparisonLine): string =>
   l.category === 'PeriodCost'
-    ? (l.elementName ?? l.elementCode ?? '')
+    ? (l.elementName ?? l.elementCode ?? '') + (l.periodDetail ? ` / ${l.periodDetail}` : '')
     : (l.projectName ?? l.projectId ?? '')
 
 export default function ComparisonPage() {
