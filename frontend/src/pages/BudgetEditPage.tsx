@@ -59,6 +59,8 @@ export default function BudgetEditPage() {
   const [detailName, setDetailName] = useState<Record<string, string>>({})
   const [detailAmount, setDetailAmount] = useState<Record<string, string>>({})
   const [addingDetail, setAddingDetail] = useState(false)
+  // 費目ごとの明細の折りたたみ状態(費目コード → 折りたたみ中か。既定は展開)
+  const [collapsedElements, setCollapsedElements] = useState<Record<string, boolean>>({})
 
   const loadBudget = useCallback(() => {
     if (!budgetId) return
@@ -176,6 +178,10 @@ export default function BudgetEditPage() {
         }),
       () => api.removeBudgetLine(budgetId, 'PeriodCost', null, code, detail),
     )
+
+  // 費目の明細の折りたたみを切り替える。
+  const toggleCollapse = (code: string) =>
+    setCollapsedElements((prev) => ({ ...prev, [code]: !(prev[code] ?? false) }))
 
   const removePeriodDetail = async (code: string, detail: string) => {
     setError(null)
@@ -623,6 +629,7 @@ export default function BudgetEditPage() {
               periodRows.map((el) => {
                 const details = periodDetailsFor(el.code)
                 const hasDetails = details.length > 0
+                const collapsed = hasDetails && (collapsedElements[el.code] ?? false)
                 const simpleAmt = periodAmount(el.code)
                 const simpleMonthly = findLine('PeriodCost', null, el.code)?.isMonthly ?? false
                 const simpleLabel = `${el.name} 金額`
@@ -630,9 +637,24 @@ export default function BudgetEditPage() {
                   <Fragment key={el.code}>
                     <tr>
                       <td>
+                        {hasDetails && (
+                          <button
+                            className="cell-monthly-btn"
+                            aria-label={
+                              collapsed ? `${el.name} の明細を展開` : `${el.name} の明細を折りたたむ`
+                            }
+                            aria-expanded={!collapsed}
+                            onClick={() => toggleCollapse(el.code)}
+                            style={{ marginRight: 6 }}
+                          >
+                            {collapsed ? '▸' : '▾'}
+                          </button>
+                        )}
                         {el.name}
                         <span className="muted small">({el.code})</span>
-                        {hasDetails && <span className="badge-monthly">明細</span>}
+                        {hasDetails && (
+                          <span className="badge-monthly">明細{details.length}件</span>
+                        )}
                       </td>
                       <td className="num">
                         {hasDetails ? (
@@ -668,7 +690,7 @@ export default function BudgetEditPage() {
                         )}
                       </td>
                     </tr>
-                    {details.map((d) => {
+                    {!collapsed && details.map((d) => {
                       const detail = d.periodDetail!
                       const detailLabel = `${el.name} ${detail} 金額`
                       return (
@@ -717,7 +739,7 @@ export default function BudgetEditPage() {
                         </tr>
                       )
                     })}
-                    {editable && (
+                    {editable && !collapsed && (
                       <tr>
                         <td style={{ paddingLeft: '2rem' }}>
                           <input

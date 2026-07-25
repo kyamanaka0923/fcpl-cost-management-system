@@ -405,6 +405,13 @@ test('期間費用の明細: 費目内を明細名で細分でき費目合計は
   await expect(page.getByText('小計 ¥500,000')).toBeVisible()
   await expect(page.locator('.stat-tile', { hasText: '期間費用' })).toContainText('¥500,000')
 
+  // 折りたたみ: 明細行を隠せる(小計は残る)/ 展開で戻る
+  await page.getByRole('button', { name: 'ライセンス費 の明細を折りたたむ' }).click()
+  await expect(page.getByRole('cell', { name: '└ AWS', exact: true })).toHaveCount(0)
+  await expect(page.getByText('小計 ¥500,000')).toBeVisible()
+  await page.getByRole('button', { name: 'ライセンス費 の明細を展開' }).click()
+  await expect(page.getByRole('cell', { name: '└ AWS', exact: true })).toBeVisible()
+
   // 明細を1つ削除すると費目合計が減る
   await page.getByRole('button', { name: 'ライセンス費 GitHub を削除' }).click()
   await expect(page.getByRole('cell', { name: '└ GitHub', exact: true })).toHaveCount(0)
