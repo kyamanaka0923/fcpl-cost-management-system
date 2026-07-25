@@ -39,7 +39,10 @@ model: claude-opus-4-8
   併用不可**(`DepartmentBudget.EnsurePeriodModeConsistent` が二重計上を防ぐ)。明細名は期間費用専用で、
   案件別区分に指定すると例外。費目合計 = 明細の合計(`CategoryTotal` は変更不要)。分析(差異・比較)の
   キーは (区分, 案件 or 費目, 明細名)。計画にない明細名の実績は「予定外」。マスタは作らず自由入力の文字列
-  (`BudgetLine.NormalizeDetail` で trim・空は null)。月次(Issue #5)は明細ごとに使える
+  (`BudgetLine.NormalizeDetail` で trim・空は null)。月次(Issue #5)は明細ごとに使える。
+  **明細名は後から変更可**(`DepartmentBudget.RenamePeriodCostDetail` / `BudgetLine.RenameDetail`。Issue #8)。
+  金額・月次・明細ID は保持し、同一費目内の重複名は拒否。実績は明細名で疎結合のため改名に追随しない
+  (旧名の実績は「予定外」になる)。空への改名は不可(費目一括へは切り替えない)
 - **課の区分合計 = 常に明細合計**(`CategoryTotal`)。ヘッダに金額を持たないことで
   課レベルの直接入力を構造的に不可にしている。この構造を崩さない
 - **案件(Project)は課に属するマスタ**(DepartmentId 参照)。予算策定単位ではなく明細の内訳次元。

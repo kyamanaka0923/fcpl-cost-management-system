@@ -328,6 +328,15 @@ export const api = {
     if (periodDetail) params.set('periodDetail', periodDetail)
     return request<BudgetDetail>(`/budgets/${budgetId}/lines?${params}`, { method: 'DELETE' })
   },
+  /** 期間費用の明細名を変更する(金額・月次は保持)。 */
+  renamePeriodDetail: (
+    budgetId: string,
+    body: { elementCode: string; oldDetail: string; newDetail: string },
+  ) =>
+    request<BudgetDetail>(`/budgets/${budgetId}/rename-period-detail`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   approveBudget: (budgetId: string) =>
     request<BudgetDetail>(`/budgets/${budgetId}/approve`, { method: 'POST' }),
 

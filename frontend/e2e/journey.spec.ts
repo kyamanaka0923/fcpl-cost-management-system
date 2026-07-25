@@ -418,6 +418,14 @@ test('期間費用の明細: 費目内を明細名で細分でき費目合計は
   await page.getByRole('button', { name: '明細をすべて展開' }).click()
   await expect(page.getByRole('cell', { name: '└ AWS', exact: true })).toBeVisible()
 
+  // 明細名を変更できる(金額は保持)
+  await page.getByRole('button', { name: 'ライセンス費 AWS の名称変更' }).click()
+  await page.getByLabel('ライセンス費 AWS の明細名').fill('AWS本番')
+  await page.getByRole('button', { name: '保存' }).click()
+  await expect(page.getByRole('cell', { name: '└ AWS本番', exact: true })).toBeVisible()
+  await expect(page.getByRole('cell', { name: '└ AWS', exact: true })).toHaveCount(0)
+  await expect(page.locator('.stat-tile', { hasText: '期間費用' })).toContainText('¥500,000')
+
   // 明細を1つ削除すると費目合計が減る
   await page.getByRole('button', { name: 'ライセンス費 GitHub を削除' }).click()
   await expect(page.getByRole('cell', { name: '└ GitHub', exact: true })).toHaveCount(0)

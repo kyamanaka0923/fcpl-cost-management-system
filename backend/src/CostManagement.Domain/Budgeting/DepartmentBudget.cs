@@ -116,7 +116,7 @@ public sealed class BudgetLine
     /// 期間費用を費目内でさらに細分する明細名(例: ライセンス費 → "AWS")。
     /// null = 費目一括(従来どおり)。期間費用以外では常に null。
     /// </summary>
-    public string? PeriodDetail { get; }
+    public string? PeriodDetail { get; private set; }
 
     /// <summary>半期合計の金額(月次モードでは月別金額の合計)。</summary>
     public Money Amount { get; private set; }
@@ -166,6 +166,19 @@ public sealed class BudgetLine
 
     /// <summary>月別金額で上書きする(月次モードにする)。半期合計は月次の合計になる。</summary>
     internal void UpdateMonthly(IReadOnlyDictionary<int, Money> monthly) => SetMonthly(monthly);
+
+    /// <summary>
+    /// 期間費用の明細名を変更する(金額・月次モードは保持)。期間費用の明細でのみ有効。
+    /// 新しい明細名は空にできない(費目一括へは切り替えられない)。
+    /// </summary>
+    internal void RenameDetail(string newDetail)
+    {
+        if (Category != BudgetCategory.PeriodCost || PeriodDetail is null)
+            throw new DomainException("明細名を変更できるのは期間費用の明細だけです。");
+        var normalized = NormalizeDetail(newDetail)
+            ?? throw new DomainException("明細名は必須です。");
+        PeriodDetail = normalized;
+    }
 
     private void SetMonthly(IReadOnlyDictionary<int, Money> monthly)
     {
@@ -401,6 +414,27 @@ public sealed class DepartmentBudget
             && l.ElementCode == elementCode && l.PeriodDetail == detail);
         if (removed == 0)
             throw new DomainException("指定された明細が存在しません。");
+    }
+
+    /// <summary>
+    /// 期間費用の明細名を変更する(金額・月次モードは保持)。
+    /// 対象の明細が無い、または同一費目内で新しい明細名が既に使われている場合は例外。
+    /// </summary>
+    public void RenamePeriodCostDetail(CostElementCode elementCode, string oldDetail, string newDetail)
+    {
+        EnsureDraft();
+        var from = BudgetLine.NormalizeDetail(oldDetail);
+        var to = BudgetLine.NormalizeDetail(newDetail)
+            ?? throw new DomainException("新しい明細名は必須です。");
+
+        var target = FindPeriodLine(elementCode, from)
+            ?? throw new DomainException("指定された明細が存在しません。");
+        if (to == from)
+            return; // 変更なし
+        if (FindPeriodLine(elementCode, to) is not null)
+            throw new DomainException("同じ費目に同じ明細名が既に存在します。");
+
+        target.RenameDetail(to);
     }
 
     /// <summary>予算を承認する。承認後は編集不可となる。</summary>

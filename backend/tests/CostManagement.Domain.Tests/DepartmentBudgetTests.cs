@@ -317,6 +317,52 @@ public class DepartmentBudgetTests
     }
 
     [Fact]
+    public void 期間費用の明細名を変更でき金額と月次は保持される()
+    {
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLineMonthly(License,
+            new Dictionary<int, Money> { [1] = new(100_000m), [2] = new(150_000m) }, "AWS");
+
+        budget.RenamePeriodCostDetail(License, "AWS", "AWS本番");
+
+        var line = Assert.Single(budget.Lines);
+        Assert.Equal("AWS本番", line.PeriodDetail);
+        Assert.True(line.IsMonthly);
+        Assert.Equal(250_000m, line.Amount.Value);
+    }
+
+    [Fact]
+    public void 同一費目に既にある明細名へは変更できない()
+    {
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLine(License, new Money(300_000m), "AWS");
+        budget.UpsertPeriodCostLine(License, new Money(200_000m), "GitHub");
+
+        Assert.Throws<DomainException>(() =>
+            budget.RenamePeriodCostDetail(License, "AWS", "GitHub"));
+    }
+
+    [Fact]
+    public void 存在しない明細名は変更できない()
+    {
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLine(License, new Money(300_000m), "AWS");
+
+        Assert.Throws<DomainException>(() =>
+            budget.RenamePeriodCostDetail(License, "GitHub", "GCP"));
+    }
+
+    [Fact]
+    public void 明細名を空へは変更できない()
+    {
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLine(License, new Money(300_000m), "AWS");
+
+        Assert.Throws<DomainException>(() =>
+            budget.RenamePeriodCostDetail(License, "AWS", " "));
+    }
+
+    [Fact]
     public void 改定版は期間費用の明細名を引き継ぐ()
     {
         var budget = NewDraft();

@@ -141,6 +141,22 @@ public sealed class DepartmentBudgetService
         return ToDetailDto(budget);
     }
 
+    /// <summary>
+    /// 期間費用の明細名を変更する(金額・月次モードは保持)。承認済み予算は編集不可。
+    /// 実績は明細名で疎結合のため改名の対象外(旧名の実績は分析で「予定外」になる)。
+    /// </summary>
+    public async Task<BudgetDetailDto> RenamePeriodDetailAsync(Guid budgetId,
+        RenamePeriodDetailRequest request, CancellationToken ct = default)
+    {
+        var budget = await RequireAsync(budgetId, ct);
+        if (string.IsNullOrWhiteSpace(request.ElementCode))
+            throw new DomainException("期間費用の明細には費目を指定してください。");
+        budget.RenamePeriodCostDetail(new CostElementCode(request.ElementCode),
+            request.OldDetail, request.NewDetail);
+        await _budgets.UpdateAsync(budget, ct);
+        return ToDetailDto(budget);
+    }
+
     /// <summary>予算を承認する。同一 (課, 半期) の承認済みバージョンは失効(Superseded)となる。</summary>
     public async Task<BudgetDetailDto> ApproveAsync(Guid budgetId, CancellationToken ct = default)
     {

@@ -116,6 +116,27 @@ public class 課予算の策定と改定 : IDisposable
     }
 
     [Fact]
+    public async Task 期間費用の明細名を変更でき金額は保持されDBにも反映される()
+    {
+        var dept = await _fx.部と課を作成();
+        var budget = await _fx.Budgets.CreateDraftAsync(dept.Id,
+            new CreateBudgetRequest("2026-H1", "当初予算"));
+        await _fx.Budgets.UpsertLineAsync(budget.Id, new UpsertBudgetLineRequest(
+            "PeriodCost", null, "LICENSE", 300_000m, PeriodDetail: "AWS"));
+
+        var updated = await _fx.Budgets.RenamePeriodDetailAsync(budget.Id,
+            new RenamePeriodDetailRequest("LICENSE", "AWS", "AWS本番"));
+
+        var line = Assert.Single(updated.Lines);
+        Assert.Equal("AWS本番", line.PeriodDetail);
+        Assert.Equal(300_000m, line.Amount);
+
+        // 取得し直しても改名が保持される
+        var reloaded = await _fx.Budgets.GetAsync(budget.Id);
+        Assert.Equal("AWS本番", Assert.Single(reloaded.Lines).PeriodDetail);
+    }
+
+    [Fact]
     public async Task 計画にない明細名の実績は予定外として差異に出る()
     {
         var dept = await _fx.部と課を作成();

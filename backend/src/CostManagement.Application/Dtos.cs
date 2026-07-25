@@ -260,6 +260,9 @@ public sealed record UpsertBudgetLineRequest(
     IReadOnlyDictionary<int, decimal>? MonthlyAmounts = null,
     string? PeriodDetail = null);
 
+/// <summary>期間費用の明細名の変更リクエスト(費目内の OldDetail を NewDetail へ改名。金額は保持)。</summary>
+public sealed record RenamePeriodDetailRequest(string ElementCode, string OldDetail, string NewDetail);
+
 /// <summary>
 /// 実績計上リクエスト(案件別は ProjectId、期間費用は ElementCode)。
 /// Month を指定すると特定月の計上(1..6)、未指定なら半期一括の計上。

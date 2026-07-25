@@ -61,6 +61,10 @@ export default function BudgetEditPage() {
   const [addingDetail, setAddingDetail] = useState(false)
   // 費目ごとの明細の折りたたみ状態(費目コード → 折りたたみ中か。既定は展開)
   const [collapsedElements, setCollapsedElements] = useState<Record<string, boolean>>({})
+  // 明細名のインライン変更(対象の費目コード・現在の明細名)
+  const [renamingDetail, setRenamingDetail] = useState<{ code: string; oldName: string } | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [savingRename, setSavingRename] = useState(false)
 
   const loadBudget = useCallback(() => {
     if (!budgetId) return
@@ -196,6 +200,42 @@ export default function BudgetEditPage() {
   // 明細のある全費目を折りたたむ。
   const collapseAllPeriod = () =>
     setCollapsedElements(Object.fromEntries(detailedElementCodes().map((code) => [code, true])))
+
+  // 明細名のインライン変更を開始/確定/取消する。
+  const startRenameDetail = (code: string, oldName: string) => {
+    setRenamingDetail({ code, oldName })
+    setRenameValue(oldName)
+    setError(null)
+  }
+  const cancelRenameDetail = () => setRenamingDetail(null)
+  const saveRenameDetail = async () => {
+    if (!renamingDetail) return
+    const newName = renameValue.trim()
+    if (newName === '') {
+      setError('明細名を入力してください。')
+      return
+    }
+    if (newName === renamingDetail.oldName) {
+      setRenamingDetail(null)
+      return
+    }
+    setSavingRename(true)
+    setError(null)
+    try {
+      setBudget(
+        await api.renamePeriodDetail(budgetId, {
+          elementCode: renamingDetail.code,
+          oldDetail: renamingDetail.oldName,
+          newDetail: newName,
+        }),
+      )
+      setRenamingDetail(null)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setSavingRename(false)
+    }
+  }
 
   const removePeriodDetail = async (code: string, detail: string) => {
     setError(null)
@@ -721,7 +761,29 @@ export default function BudgetEditPage() {
                       return (
                         <tr key={detail}>
                           <td className="muted small" style={{ paddingLeft: '2rem' }}>
-                            └ {detail}
+                            {renamingDetail?.code === el.code &&
+                            renamingDetail.oldName === detail ? (
+                              <span className="project-edit">
+                                <input
+                                  aria-label={`${el.name} ${detail} の明細名`}
+                                  value={renameValue}
+                                  onChange={(e) => setRenameValue(e.target.value)}
+                                  style={{ width: '9rem' }}
+                                />
+                                <button
+                                  className="primary"
+                                  onClick={saveRenameDetail}
+                                  disabled={savingRename}
+                                >
+                                  保存
+                                </button>
+                                <button onClick={cancelRenameDetail} disabled={savingRename}>
+                                  取消
+                                </button>
+                              </span>
+                            ) : (
+                              <>└ {detail}</>
+                            )}
                           </td>
                           <td className="num">
                             {editable && !d.isMonthly && (
@@ -750,6 +812,13 @@ export default function BudgetEditPage() {
                                   }
                                 >
                                   {d.isMonthly ? '月次編集' : '月次入力'}
+                                </button>
+                                <button
+                                  className="row-edit-link"
+                                  aria-label={`${el.name} ${detail} の名称変更`}
+                                  onClick={() => startRenameDetail(el.code, detail)}
+                                >
+                                  名称変更
                                 </button>
                                 <button
                                   className="row-edit-link"
