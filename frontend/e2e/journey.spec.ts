@@ -410,3 +410,35 @@ test('期間費用の明細: 費目内を明細名で細分でき費目合計は
   await expect(page.getByRole('cell', { name: '└ GitHub', exact: true })).toHaveCount(0)
   await expect(page.locator('.stat-tile', { hasText: '期間費用' })).toContainText('¥300,000')
 })
+
+test('期間費用の切り替え: 費目一括で入力した後でも明細に切り替えられる', async ({ page }) => {
+  // 独立した部・課・ドラフトを用意
+  const s = `SW-${suffix}`
+  await page.goto('/')
+  await page.getByLabel('部コード').fill(`DIV${s}`)
+  await page.getByLabel('部名').fill(`切替検証部-${suffix}`)
+  await page.getByRole('button', { name: '登録' }).click()
+  await page.getByRole('link', { name: `切替検証部-${suffix}` }).click()
+
+  await page.getByLabel('課コード').fill(`DEV${s}`)
+  await page.getByLabel('課名').fill(`切替検証課-${suffix}`)
+  await page.getByRole('button', { name: '登録' }).click()
+  await page.getByRole('link', { name: `切替検証課-${suffix}` }).click()
+
+  const 予算カード = page.locator('.card', { hasText: '予算バージョン' })
+  await 予算カード.getByLabel('予算名').fill('当初予算')
+  await 予算カード.getByRole('button', { name: 'ドラフト作成' }).click()
+  await expect(page.getByRole('heading', { name: /当初予算/ })).toBeVisible()
+
+  // まずライセンス費を費目一括で40万入力(セルを離れて自動保存)
+  await page.getByLabel('ライセンス費 金額').fill('400000')
+  await page.getByLabel('人件費 金額').click()
+  await expect(page.locator('.stat-tile', { hasText: '期間費用' })).toContainText('¥400,000')
+
+  // 費目一括のまま「明細を追加」すると明細モードに切り替わり、費目一括の金額は明細に置き換わる
+  await page.getByLabel('ライセンス費 明細名').fill('AWS')
+  await page.getByLabel('ライセンス費 明細金額').fill('250000')
+  await page.getByRole('button', { name: 'ライセンス費 に明細を追加' }).click()
+  await expect(page.getByRole('cell', { name: '└ AWS', exact: true })).toBeVisible()
+  await expect(page.locator('.stat-tile', { hasText: '期間費用' })).toContainText('¥250,000')
+})

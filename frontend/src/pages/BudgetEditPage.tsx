@@ -197,6 +197,11 @@ export default function BudgetEditPage() {
     setAddingDetail(true)
     setError(null)
     try {
+      // 費目一括の金額が入っている費目に明細を足す場合は、明細モードへ切り替えるため
+      // 先に費目一括の明細を削除する(費目一括と明細は同一費目内で併用できないため)。
+      if (findLine('PeriodCost', null, code, null)) {
+        await api.removeBudgetLine(budgetId, 'PeriodCost', null, code)
+      }
       const updated = await api.upsertBudgetLine(budgetId, {
         category: 'PeriodCost',
         elementCode: code,
@@ -594,7 +599,8 @@ export default function BudgetEditPage() {
           課共通の費用(人件費・ライセンス費など)を費目ごとに入力します(空欄・0 は明細なし)。
           {editable &&
             '費目一括の金額を入力するか、費目内を「明細」で細分できます(例: ライセンス費 → AWS / GitHub)。' +
-              '明細を追加した費目は費目一括の入力ができなくなり、費目合計は明細の合計になります。各明細は月次入力にも対応します。'}
+              '費目一括で金額を入れた後でも「明細を追加」すれば明細モードに切り替わります(費目一括の金額は明細に置き換わります)。' +
+              '明細のある費目は費目合計が明細の合計になり、明細をすべて削除すると費目一括に戻せます。各明細は月次入力にも対応します。'}
           費目はシステム共通のマスタで、「費目マスタ」画面で追加します。
         </p>
         <table>
@@ -711,7 +717,7 @@ export default function BudgetEditPage() {
                         </tr>
                       )
                     })}
-                    {editable && (hasDetails || simpleAmt === 0) && !simpleMonthly && (
+                    {editable && (
                       <tr>
                         <td style={{ paddingLeft: '2rem' }}>
                           <input
