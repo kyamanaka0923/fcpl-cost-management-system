@@ -183,6 +183,20 @@ export default function BudgetEditPage() {
   const toggleCollapse = (code: string) =>
     setCollapsedElements((prev) => ({ ...prev, [code]: !(prev[code] ?? false) }))
 
+  // 明細を持つ費目コードの一覧(すべて展開/折りたたみの対象)。
+  const detailedElementCodes = (): string[] => [
+    ...new Set(
+      (budget?.lines ?? [])
+        .filter((l) => l.category === 'PeriodCost' && l.periodDetail != null)
+        .map((l) => l.elementCode!),
+    ),
+  ]
+  // 明細のある全費目を展開する(折りたたみ状態をクリア)。
+  const expandAllPeriod = () => setCollapsedElements({})
+  // 明細のある全費目を折りたたむ。
+  const collapseAllPeriod = () =>
+    setCollapsedElements(Object.fromEntries(detailedElementCodes().map((code) => [code, true])))
+
   const removePeriodDetail = async (code: string, detail: string) => {
     setError(null)
     try {
@@ -609,6 +623,16 @@ export default function BudgetEditPage() {
               '明細のある費目は費目合計が明細の合計になり、明細をすべて削除すると費目一括に戻せます。各明細は月次入力にも対応します。'}
           費目はシステム共通のマスタで、「費目マスタ」画面で追加します。
         </p>
+        {detailedElementCodes().length > 0 && (
+          <div className="form-row" style={{ marginBottom: 8 }}>
+            <button aria-label="明細をすべて展開" onClick={expandAllPeriod}>
+              すべて展開
+            </button>
+            <button aria-label="明細をすべて折りたたむ" onClick={collapseAllPeriod}>
+              すべて折りたたむ
+            </button>
+          </div>
+        )}
         <table>
           <thead>
             <tr>
@@ -637,23 +661,24 @@ export default function BudgetEditPage() {
                   <Fragment key={el.code}>
                     <tr>
                       <td>
-                        {hasDetails && (
-                          <button
-                            className="cell-monthly-btn"
-                            aria-label={
-                              collapsed ? `${el.name} の明細を展開` : `${el.name} の明細を折りたたむ`
-                            }
-                            aria-expanded={!collapsed}
-                            onClick={() => toggleCollapse(el.code)}
-                            style={{ marginRight: 6 }}
-                          >
-                            {collapsed ? '▸' : '▾'}
-                          </button>
-                        )}
                         {el.name}
                         <span className="muted small">({el.code})</span>
                         {hasDetails && (
-                          <span className="badge-monthly">明細{details.length}件</span>
+                          <>
+                            <button
+                              className="cell-monthly-btn"
+                              aria-label={
+                                collapsed
+                                  ? `${el.name} の明細を展開`
+                                  : `${el.name} の明細を折りたたむ`
+                              }
+                              aria-expanded={!collapsed}
+                              onClick={() => toggleCollapse(el.code)}
+                            >
+                              {collapsed ? '▸' : '▾'}
+                            </button>
+                            <span className="badge-monthly">明細{details.length}件</span>
+                          </>
                         )}
                       </td>
                       <td className="num">

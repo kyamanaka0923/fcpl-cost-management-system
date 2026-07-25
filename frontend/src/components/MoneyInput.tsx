@@ -37,8 +37,11 @@ interface MoneyInputProps {
  * 金額入力ボックス。編集中から 3 桁カンマ区切りで表示する制御コンポーネント。
  * 値は生の数値文字列(カンマなし)でやり取りする。
  */
-export default function MoneyInput({ value, onChange, ...rest }: MoneyInputProps) {
+export default function MoneyInput({ value, onChange, className, ...rest }: MoneyInputProps) {
   const ref = useRef<HTMLInputElement>(null)
+  // フォーカス時に日本語入力(IME)を無効化して数字を直接打てるようにする。
+  // ime-mode は Firefox/旧 Edge で有効。inputMode="decimal" はモバイルのキーボード指定。
+  const mergedClassName = ['money-input', className].filter(Boolean).join(' ')
   // onChange 由来の再フォーマット時にキャレット位置を復元するための、
   // 「キャレットより前にある数字・小数点の個数」。外部要因の value 変更時は null。
   const caretDigits = useRef<number | null>(null)
@@ -68,6 +71,7 @@ export default function MoneyInput({ value, onChange, ...rest }: MoneyInputProps
       ref={ref}
       type="text"
       inputMode="decimal"
+      className={mergedClassName}
       value={formatWithCommas(value)}
       onChange={handleChange}
       {...rest}

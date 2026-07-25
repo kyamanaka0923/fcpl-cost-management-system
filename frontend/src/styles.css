@@ -309,6 +309,12 @@ select:focus {
   outline-offset: -1px;
 }
 
+/* 金額入力欄はフォーカス時に日本語入力(IME)を無効化し、数字を直接打てるようにする。
+   ime-mode は Firefox/旧 Edge で有効(Chrome は非対応)。 */
+.money-input {
+  ime-mode: disabled;
+}
+
 .form-row {
   display: flex;
   gap: 12px;

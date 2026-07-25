@@ -412,6 +412,12 @@ test('期間費用の明細: 費目内を明細名で細分でき費目合計は
   await page.getByRole('button', { name: 'ライセンス費 の明細を展開' }).click()
   await expect(page.getByRole('cell', { name: '└ AWS', exact: true })).toBeVisible()
 
+  // すべて折りたたむ / すべて展開
+  await page.getByRole('button', { name: '明細をすべて折りたたむ' }).click()
+  await expect(page.getByRole('cell', { name: '└ AWS', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '明細をすべて展開' }).click()
+  await expect(page.getByRole('cell', { name: '└ AWS', exact: true })).toBeVisible()
+
   // 明細を1つ削除すると費目合計が減る
   await page.getByRole('button', { name: 'ライセンス費 GitHub を削除' }).click()
   await expect(page.getByRole('cell', { name: '└ GitHub', exact: true })).toHaveCount(0)
