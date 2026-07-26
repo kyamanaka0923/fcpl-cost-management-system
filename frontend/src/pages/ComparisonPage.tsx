@@ -13,6 +13,7 @@ import {
   type BudgetSummary,
 } from '../api'
 
+// 期間費用は「費目 + (明細名があれば) 明細」、それ以外(売上高/加工費/外注費)は案件名で表示する
 const lineName = (l: BudgetComparisonLine): string =>
   l.category === 'PeriodCost'
     ? (l.elementName ?? l.elementCode ?? '') + (l.periodDetail ? ` / ${l.periodDetail}` : '')
@@ -44,6 +45,7 @@ export default function ComparisonPage() {
       .catch((e: Error) => setError(e.message))
   }, [departmentId, half])
 
+  // 基準/比較バージョンが選び直されるたびに差異レポートを取り直す
   const load = useCallback(() => {
     if (!departmentId || baseVersion === null || targetVersion === null) return
     setError(null)
@@ -108,10 +110,12 @@ export default function ComparisonPage() {
 
       {report && (
         <>
+          {/* 区分(売上高/加工費/外注費/期間費用)ごとの増減サマリー */}
           <div className="stat-row">
             {report.categories.map((c) => (
               <div className="stat-tile" key={c.category}>
                 <div className="label">{categoryLabel[c.category]} 増減</div>
+                {/* 増加(adverse)/減少(favorable)を色分け。0は無色 */}
                 <div
                   className={`value ${c.difference === 0 ? '' : c.difference > 0 ? 'adverse' : 'favorable'}`}
                 >
@@ -121,6 +125,7 @@ export default function ComparisonPage() {
             ))}
           </div>
 
+          {/* 区分ごとの明細比較テーブル */}
           {report.categories.map((c) => (
             <div className="card" key={c.category}>
               <h2>{categoryLabel[c.category]} の増減明細</h2>
