@@ -187,7 +187,7 @@ export default function BudgetEditPage() {
   const toggleCollapse = (code: string) =>
     setCollapsedElements((prev) => ({ ...prev, [code]: !(prev[code] ?? false) }))
 
-  // 明細を持つ費目コードの一覧(すべて展開/折りたたみの対象)。
+  // 明細を持つ費目コードの一覧。
   const detailedElementCodes = (): string[] => [
     ...new Set(
       (budget?.lines ?? [])
@@ -195,11 +195,15 @@ export default function BudgetEditPage() {
         .map((l) => l.elementCode!),
     ),
   ]
-  // 明細のある全費目を展開する(折りたたみ状態をクリア)。
+  // 折りたたみ対象の費目コード。編集中は全費目(明細追加行を畳めるように)、
+  // 閲覧時は明細のある費目のみ。
+  const collapsibleCodes = (): string[] =>
+    editable ? elements.map((e) => e.code) : detailedElementCodes()
+  // 全費目を展開する(折りたたみ状態をクリア)。
   const expandAllPeriod = () => setCollapsedElements({})
-  // 明細のある全費目を折りたたむ。
+  // 折りたたみ対象の全費目を折りたたむ。
   const collapseAllPeriod = () =>
-    setCollapsedElements(Object.fromEntries(detailedElementCodes().map((code) => [code, true])))
+    setCollapsedElements(Object.fromEntries(collapsibleCodes().map((code) => [code, true])))
 
   // 明細名のインライン変更を開始/確定/取消する。
   const startRenameDetail = (code: string, oldName: string) => {
@@ -663,7 +667,7 @@ export default function BudgetEditPage() {
               '明細のある費目は費目合計が明細の合計になり、明細をすべて削除すると費目一括に戻せます。各明細は月次入力にも対応します。'}
           費目はシステム共通のマスタで、「費目マスタ」画面で追加します。
         </p>
-        {detailedElementCodes().length > 0 && (
+        {collapsibleCodes().length > 0 && (
           <div className="form-row" style={{ marginBottom: 8 }}>
             <button aria-label="明細をすべて展開" onClick={expandAllPeriod}>
               すべて展開
@@ -693,7 +697,9 @@ export default function BudgetEditPage() {
               periodRows.map((el) => {
                 const details = periodDetailsFor(el.code)
                 const hasDetails = details.length > 0
-                const collapsed = hasDetails && (collapsedElements[el.code] ?? false)
+                // 編集中は明細追加行があるため全費目、閲覧時は明細のある費目のみ折りたためる。
+                const collapsible = editable || hasDetails
+                const collapsed = collapsible && (collapsedElements[el.code] ?? false)
                 const simpleAmt = periodAmount(el.code)
                 const simpleMonthly = findLine('PeriodCost', null, el.code)?.isMonthly ?? false
                 const simpleLabel = `${el.name} 金額`
@@ -703,23 +709,19 @@ export default function BudgetEditPage() {
                       <td>
                         {el.name}
                         <span className="muted small">({el.code})</span>
-                        {hasDetails && (
-                          <>
-                            <button
-                              className="cell-monthly-btn"
-                              aria-label={
-                                collapsed
-                                  ? `${el.name} の明細を展開`
-                                  : `${el.name} の明細を折りたたむ`
-                              }
-                              aria-expanded={!collapsed}
-                              onClick={() => toggleCollapse(el.code)}
-                            >
-                              {collapsed ? '▸' : '▾'}
-                            </button>
-                            <span className="badge-monthly">明細{details.length}件</span>
-                          </>
+                        {collapsible && (
+                          <button
+                            className="cell-monthly-btn"
+                            aria-label={
+                              collapsed ? `${el.name} の明細を展開` : `${el.name} の明細を折りたたむ`
+                            }
+                            aria-expanded={!collapsed}
+                            onClick={() => toggleCollapse(el.code)}
+                          >
+                            {collapsed ? '▸' : '▾'}
+                          </button>
                         )}
+                        {hasDetails && <span className="badge-monthly">明細{details.length}件</span>}
                       </td>
                       <td className="num">
                         {hasDetails ? (
@@ -782,7 +784,18 @@ export default function BudgetEditPage() {
                                 </button>
                               </span>
                             ) : (
-                              <>└ {detail}</>
+                              <>
+                                <span>└ {detail}</span>
+                                {editable && (
+                                  <button
+                                    className="row-edit-link"
+                                    aria-label={`${el.name} ${detail} の名称変更`}
+                                    onClick={() => startRenameDetail(el.code, detail)}
+                                  >
+                                    編集
+                                  </button>
+                                )}
+                              </>
                             )}
                           </td>
                           <td className="num">
@@ -812,13 +825,6 @@ export default function BudgetEditPage() {
                                   }
                                 >
                                   {d.isMonthly ? '月次編集' : '月次入力'}
-                                </button>
-                                <button
-                                  className="row-edit-link"
-                                  aria-label={`${el.name} ${detail} の名称変更`}
-                                  onClick={() => startRenameDetail(el.code, detail)}
-                                >
-                                  名称変更
                                 </button>
                                 <button
                                   className="row-edit-link"
