@@ -366,3 +366,174 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         Assert.Contains(elements, e => e.Code.Value == "LICENSE" && e.Name == "ライセンス費");
     }
 }
+
+/// <summary>
+/// 部集計用の一括取得: 配下課ぶんの (課, 区分) 別合計を、課ごとに問い合わせずまとめて引けること。
+/// 課数に比例してクエリが増える N+1 と、集計に不要な明細・月別金額の復元を避けるための経路。
+/// </summary>
+public class 複数課の区分別合計の一括取得 : IDisposable
+{
+    private readonly RepositoryFixture _fx = new();
+
+    public void Dispose() => _fx.Dispose();
+
+    /// <summary>指定額の売上明細を1件持つ承認済み予算を保存し、その課を返す。</summary>
+    private async Task<Department> 承認済み予算のある課を保存(string code, decimal 売上)
+    {
+        var dept = await _fx.課を保存(code);
+        var project = await _fx.案件を保存(dept.Id, $"PJ-{code}");
+        var budget = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
+        budget.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(売上));
+        budget.Approve(_fx.Now);
+        await new DepartmentBudgetRepository(_fx.Factory).AddAsync(budget);
+        return dept;
+    }
+
+    private static decimal 合計(IReadOnlyList<DepartmentCategoryAmount> amounts,
+        DepartmentId dept, BudgetCategory category) =>
+        amounts.SingleOrDefault(a => a.DepartmentId == dept && a.Category == category)
+            .Amount.Value;
+
+    [Fact]
+    public async Task 複数課の予算合計を区分別にまとめて取得できる()
+    {
+        var dept1 = await 承認済み予算のある課を保存("DEV-1", 1_000_000m);
+        var dept2 = await 承認済み予算のある課を保存("DEV-2", 2_000_000m);
+        var repo = new DepartmentBudgetRepository(_fx.Factory);
+
+        var totals = await repo.SumLatestApprovedByCategoryAsync([dept1.Id, dept2.Id], _fx.Half);
+
+        Assert.Equal(1_000_000m, 合計(totals, dept1.Id, BudgetCategory.Revenue));
+        Assert.Equal(2_000_000m, 合計(totals, dept2.Id, BudgetCategory.Revenue));
+        // 明細のない区分は結果に含まれない
+        Assert.DoesNotContain(totals, a => a.Category == BudgetCategory.Outsourcing);
+    }
+
+    [Fact]
+    public async Task 予算合計は同じ区分の明細をすべて足し合わせる()
+    {
+        var dept = await _fx.課を保存("DEV-1");
+        var pj1 = await _fx.案件を保存(dept.Id, "PJ-1");
+        var pj2 = await _fx.案件を保存(dept.Id, "PJ-2");
+        var repo = new DepartmentBudgetRepository(_fx.Factory);
+
+        var budget = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
+        budget.UpsertProjectLine(BudgetCategory.Revenue, pj1.Id, new Money(1_000_000m));
+        budget.UpsertProjectLine(BudgetCategory.Revenue, pj2.Id, new Money(1_500_000m));
+        // 月次入力の明細は半期合計(月別の合計)で数える
+        budget.UpsertProjectLineMonthly(BudgetCategory.Processing, pj1.Id,
+            new Dictionary<int, Money> { [1] = new(100_000m), [2] = new(200_000m) });
+        // 期間費用は明細名で細分できる
+        budget.UpsertPeriodCostLine(new CostElementCode("PERSONNEL"), new Money(400_000m), "正社員");
+        budget.UpsertPeriodCostLine(new CostElementCode("PERSONNEL"), new Money(150_000m), "派遣");
+        budget.Approve(_fx.Now);
+        await repo.AddAsync(budget);
+
+        var totals = await repo.SumLatestApprovedByCategoryAsync([dept.Id], _fx.Half);
+
+        Assert.Equal(2_500_000m, 合計(totals, dept.Id, BudgetCategory.Revenue));
+        Assert.Equal(300_000m, 合計(totals, dept.Id, BudgetCategory.Processing));
+        Assert.Equal(550_000m, 合計(totals, dept.Id, BudgetCategory.PeriodCost));
+    }
+
+    [Fact]
+    public async Task 承認済み予算のない課は予算合計に含まれない()
+    {
+        var 承認済み = await 承認済み予算のある課を保存("DEV-1", 1_000_000m);
+        var 下書きのみ = await _fx.課を保存("DEV-2");
+        var project = await _fx.案件を保存(下書きのみ.Id, "PJ-DRAFT");
+        var repo = new DepartmentBudgetRepository(_fx.Factory);
+
+        var draft = DepartmentBudget.CreateInitial(下書きのみ.Id, _fx.Half, "当初予算", _fx.Now);
+        draft.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(5_000_000m));
+        await repo.AddAsync(draft);
+        var 予算なし = await _fx.課を保存("DEV-3");
+
+        var totals = await repo.SumLatestApprovedByCategoryAsync(
+            [承認済み.Id, 下書きのみ.Id, 予算なし.Id], _fx.Half);
+
+        var only = Assert.Single(totals);
+        Assert.Equal(承認済み.Id, only.DepartmentId);
+    }
+
+    [Fact]
+    public async Task 予算合計は課ごとに最新の承認済みバージョンだけを使う()
+    {
+        var dept = await 承認済み予算のある課を保存("DEV-1", 1_000_000m);
+        var other = await 承認済み予算のある課を保存("DEV-2", 3_000_000m);
+        var repo = new DepartmentBudgetRepository(_fx.Factory);
+        var project = (await new ProjectRepository(_fx.Factory).ListByDepartmentAsync(dept.Id))
+            .Single();
+
+        var v1 = (await repo.ListAsync(dept.Id, _fx.Half)).Single();
+        var v2 = DepartmentBudget.ReviseFrom(v1, 2, "見直し", _fx.Now);
+        v2.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(4_000_000m));
+        v2.Approve(_fx.Now);
+        await repo.AddAsync(v2);
+        v1.Supersede();
+        await repo.UpdateAsync(v1);
+
+        var totals = await repo.SumLatestApprovedByCategoryAsync([dept.Id, other.Id], _fx.Half);
+
+        // 旧バージョンの100万は混ざらない
+        Assert.Equal(4_000_000m, 合計(totals, dept.Id, BudgetCategory.Revenue));
+        Assert.Equal(3_000_000m, 合計(totals, other.Id, BudgetCategory.Revenue));
+        // 別の半期は取得されない
+        Assert.Empty(await repo.SumLatestApprovedByCategoryAsync([dept.Id, other.Id],
+            new FiscalHalf(2026, HalfTerm.H2)));
+    }
+
+    [Fact]
+    public async Task 承認済み予算を持つ課のIDだけを取得できる()
+    {
+        var 承認済み = await 承認済み予算のある課を保存("DEV-1", 1_000_000m);
+        var 予算なし = await _fx.課を保存("DEV-2");
+        var repo = new DepartmentBudgetRepository(_fx.Factory);
+
+        var ids = await repo.ListDepartmentIdsWithApprovedAsync(
+            [承認済み.Id, 予算なし.Id], _fx.Half);
+
+        Assert.Equal([承認済み.Id], ids);
+        Assert.Empty(await repo.ListDepartmentIdsWithApprovedAsync(
+            [承認済み.Id, 予算なし.Id], new FiscalHalf(2026, HalfTerm.H2)));
+    }
+
+    [Fact]
+    public async Task 複数課の実績合計を区分別にまとめて取得できる()
+    {
+        var dept1 = await _fx.課を保存("DEV-1");
+        var dept2 = await _fx.課を保存("DEV-2");
+        var project1 = await _fx.案件を保存(dept1.Id, "PJ-1");
+        var project2 = await _fx.案件を保存(dept2.Id, "PJ-2");
+        var repo = new ActualEntryRepository(_fx.Factory);
+
+        // 同一区分に複数計上した実績は合算される
+        await repo.AddAsync(ActualEntry.Record(dept1.Id, _fx.Half, BudgetCategory.Revenue,
+            project1.Id, null, null, new Money(300_000m), null, _fx.Now));
+        await repo.AddAsync(ActualEntry.Record(dept1.Id, _fx.Half, BudgetCategory.Revenue,
+            project1.Id, null, null, new Money(200_000m), null, _fx.Now));
+        await repo.AddAsync(ActualEntry.Record(dept2.Id, _fx.Half, BudgetCategory.PeriodCost,
+            null, new CostElementCode("PERSONNEL"), null, new Money(120_000m), null, _fx.Now));
+        // 別半期の実績は混ざらない
+        await repo.AddAsync(ActualEntry.Record(dept1.Id, new FiscalHalf(2026, HalfTerm.H2),
+            BudgetCategory.Revenue, project1.Id, null, null, new Money(999_000m), null, _fx.Now));
+
+        var totals = await repo.SumByCategoryAsync([dept1.Id, dept2.Id], _fx.Half);
+
+        Assert.Equal(500_000m, 合計(totals, dept1.Id, BudgetCategory.Revenue));
+        Assert.Equal(120_000m, 合計(totals, dept2.Id, BudgetCategory.PeriodCost));
+        Assert.Equal(2, totals.Count);
+    }
+
+    [Fact]
+    public async Task 課を1件も指定しなければ空を返す()
+    {
+        var budgets = new DepartmentBudgetRepository(_fx.Factory);
+        var actuals = new ActualEntryRepository(_fx.Factory);
+
+        // IN () は SQL エラーになるため、DB に触れずに空を返すこと。
+        Assert.Empty(await budgets.SumLatestApprovedByCategoryAsync([], _fx.Half));
+        Assert.Empty(await budgets.ListDepartmentIdsWithApprovedAsync([], _fx.Half));
+        Assert.Empty(await actuals.SumByCategoryAsync([], _fx.Half));
+    }
+}

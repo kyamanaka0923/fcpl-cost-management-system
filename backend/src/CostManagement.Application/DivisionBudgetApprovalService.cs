@@ -43,13 +43,12 @@ public sealed class DivisionBudgetApprovalService
         if (departments.Count == 0)
             throw new DomainException("承認する課がありません。");
 
-        foreach (var dept in departments)
-        {
-            var approved = await _budgets.FindLatestApprovedAsync(dept.Id, half, ct);
-            if (approved is null)
-                throw new DomainException(
-                    "未承認の予算がある課があります。先に各課の予算を承認してください。");
-        }
+        // 承認済み予算を持つ課のIDだけを1クエリで引く(存在確認に金額・明細は要らない)。
+        var approved = await _budgets.ListDepartmentIdsWithApprovedAsync(
+            departments.Select(d => d.Id).ToList(), half, ct);
+        if (approved.Count < departments.Count)
+            throw new DomainException(
+                "未承認の予算がある課があります。先に各課の予算を承認してください。");
 
         // 既存承認があれば取り消して承認し直す(ApprovedAt を最新にする)。
         var existing = await _approvals.FindAsync(divId, half, ct);

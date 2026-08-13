@@ -139,38 +139,45 @@ public sealed class AnalysisService
         _ = await _divisions.FindByIdAsync(divId, ct)
             ?? throw new NotFoundException($"部が見つかりません: {divisionId}");
         var half = FiscalHalf.Parse(fiscalHalf);
-        var departments = (await _departments.ListByDivisionAsync(divId, ct))
-            .OrderBy(d => d.Code)
-            .ToList();
+        // ListByDivisionAsync が課コード順で返す。
+        var departments = await _departments.ListByDivisionAsync(divId, ct);
 
-        var inputs = new List<DepartmentVarianceInput>();
-        var reportByDepartment = new Dictionary<Guid, VarianceReport>();
-        foreach (var dept in departments)
+        // 部の合計に必要なのは (課 × 区分) の予算合計・実績合計だけなので、明細は読まずに
+        // 配下課ぶんの合計を一括で取得する(課ごとに予算集約を復元すると、課数 × 明細数に
+        // 比例したクエリとオブジェクト生成が発生する)。
+        var departmentIds = departments.Select(d => d.Id).ToList();
+        var approved = (await _budgets.ListDepartmentIdsWithApprovedAsync(departmentIds, half, ct))
+            .ToHashSet();
+        var plannedByDepartment = (await _budgets.SumLatestApprovedByCategoryAsync(
+            departmentIds, half, ct)).ToLookup(a => a.DepartmentId);
+        var actualByDepartment = (await _actuals.SumByCategoryAsync(departmentIds, half, ct))
+            .ToLookup(a => a.DepartmentId);
+
+        // 部合計には承認済み予算がある課だけを、課コード順で含める。
+        var totalsByDepartment = new Dictionary<Guid, DepartmentCategoryTotals>();
+        var inputs = new List<DepartmentCategoryTotals>();
+        foreach (var dept in departments.Where(d => approved.Contains(d.Id)))
         {
-            var budget = await _budgets.FindLatestApprovedAsync(dept.Id, half, ct);
-            if (budget is null)
-                continue;
-            var actuals = await _actuals.ListAsync(dept.Id, half, ct);
-            var report = _varianceAnalysis.Analyze(budget, actuals);
-            inputs.Add(new DepartmentVarianceInput(dept.Id, report));
-            reportByDepartment[dept.Id.Value] = report;
+            var totals = DepartmentCategoryTotals.FromCategoryAmounts(dept.Id,
+                plannedByDepartment[dept.Id], actualByDepartment[dept.Id]);
+            totalsByDepartment[dept.Id.Value] = totals;
+            inputs.Add(totals);
         }
-
         var summary = _divisionSummary.Summarize(inputs);
 
         var lines = departments
             .Select(d =>
             {
-                if (reportByDepartment.TryGetValue(d.Id.Value, out var r))
+                if (totalsByDepartment.TryGetValue(d.Id.Value, out var t))
                 {
-                    var plannedProfit = r.PlannedRevenue - r.PlannedCost;
-                    var actualProfit = r.ActualRevenue - r.ActualCost;
-                    var categories = r.Categories
+                    var plannedProfit = t.PlannedRevenue - t.PlannedCost;
+                    var actualProfit = t.ActualRevenue - t.ActualCost;
+                    var categories = t.Categories
                         .Select(c => new CategorySummaryDto(c.Category.ToString(),
                             c.PlannedAmount, c.ActualAmount, c.Variance))
                         .ToList();
                     return new DepartmentSummaryLineDto(d.Id.Value, d.Code, d.Name, true,
-                        r.PlannedRevenue, r.ActualRevenue, r.PlannedCost, r.ActualCost,
+                        t.PlannedRevenue, t.ActualRevenue, t.PlannedCost, t.ActualCost,
                         plannedProfit, actualProfit, actualProfit - plannedProfit, categories);
                 }
                 return new DepartmentSummaryLineDto(d.Id.Value, d.Code, d.Name, false,

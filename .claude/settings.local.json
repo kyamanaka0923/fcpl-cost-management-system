@@ -9,7 +9,9 @@
       "Bash(cat /workspace/frontend/playwright.config.ts | head -40; ls /opt/pw-browsers 2>/dev/null || echo \"no /opt/pw-browsers\")",
       "Read(//opt/**)",
       "Bash(npx playwright *)",
-      "Bash(gh auth *)"
+      "Bash(gh auth *)",
+      "Bash(python3 -)",
+      "Bash(npm install *)"
     ]
   }
 }

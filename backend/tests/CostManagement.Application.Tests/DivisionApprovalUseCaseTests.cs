@@ -54,6 +54,35 @@ public class 部の予算承認 : IDisposable
     }
 
     [Fact]
+    public async Task ドラフトのままの課があると部を承認できない()
+    {
+        var (divId, dept1, dept2) = await 課2つの部を準備();
+        await 課の承認済み予算を作成(dept1, "PJ-1");
+        // 課2 は明細まで入れたが承認していない。
+        var pj = await _fx.案件を作成(dept2, "PJ-2", "案件2");
+        var draft = await _fx.Budgets.CreateDraftAsync(dept2,
+            new CreateBudgetRequest("2026-H1", "当初予算"));
+        await _fx.Budgets.UpsertLineAsync(draft.Id,
+            new UpsertBudgetLineRequest("Revenue", pj.Id, null, 1_000_000m));
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() =>
+            _fx.DivisionApprovals.ApproveAsync(divId, "2026-H1"));
+        Assert.Contains("未承認の予算がある課", ex.Message);
+    }
+
+    [Fact]
+    public async Task 別の半期だけ承認済みの課があると部を承認できない()
+    {
+        var (divId, dept1, dept2) = await 課2つの部を準備();
+        await 課の承認済み予算を作成(dept1, "PJ-1");
+        var pj = await _fx.案件を作成(dept2, "PJ-2", "案件2");
+        await _fx.承認済み予算を作成(dept2, "2026-H2", ("Revenue", pj.Id, null, 1_000_000m));
+
+        await Assert.ThrowsAsync<DomainException>(() =>
+            _fx.DivisionApprovals.ApproveAsync(divId, "2026-H1"));
+    }
+
+    [Fact]
     public async Task 課がない部は承認できない()
     {
         var div = await _fx.部を作成();

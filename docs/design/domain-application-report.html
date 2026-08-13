@@ -1,0 +1,1379 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ドメイン層・アプリケーション層 詳細レポート | 総合原価管理システム</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --panel: #ffffff;
+    --panel-2: #f0f2f6;
+    --text: #1c2028;
+    --text-muted: #5b6474;
+    --border: #d8dde6;
+    --border-strong: #b9c1ce;
+    --accent: #2f5fd0;
+    --accent-soft: #e6edfb;
+    --domain: #2e7d5b;
+    --domain-soft: #e3f2ea;
+    --app: #8a5a1a;
+    --app-soft: #fbf0dd;
+    --vo: #6a4bab;
+    --vo-soft: #eee9fb;
+    --warn: #a33a3a;
+    --warn-soft: #fbe9e9;
+    --code-bg: #f2f4f8;
+    --shadow: 0 1px 2px rgba(20, 26, 38, .06), 0 4px 14px rgba(20, 26, 38, .05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171d;
+      --panel: #1b1f27;
+      --panel-2: #222732;
+      --text: #e6e9ef;
+      --text-muted: #a3acbd;
+      --border: #2e3542;
+      --border-strong: #3d4657;
+      --accent: #7ba3f5;
+      --accent-soft: #1e2b45;
+      --domain: #6fc79b;
+      --domain-soft: #163025;
+      --app: #e0b071;
+      --app-soft: #33270f;
+      --vo: #b39ce8;
+      --vo-soft: #262040;
+      --warn: #f08b8b;
+      --warn-soft: #3a1e1e;
+      --code-bg: #232833;
+      --shadow: none;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .layout { display: flex; align-items: flex-start; max-width: 1500px; margin: 0 auto; }
+
+  /* ---- サイドバー目次 ---- */
+  nav.toc {
+    position: sticky; top: 0;
+    flex: 0 0 288px;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 28px 18px 60px 24px;
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    font-size: 13px;
+  }
+  nav.toc .toc-title {
+    font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 14px; font-weight: 700;
+  }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; counter-reset: sec; }
+  nav.toc > ol > li { counter-increment: sec; margin-bottom: 4px; }
+  nav.toc > ol > li > a::before { content: counter(sec) ". "; color: var(--text-muted); }
+  nav.toc a { display: block; padding: 4px 8px; border-radius: 6px; color: var(--text); text-decoration: none; line-height: 1.5; }
+  nav.toc a:hover { background: var(--accent-soft); color: var(--accent); }
+  nav.toc ol ol { margin: 2px 0 8px 14px; font-size: 12.5px; }
+  nav.toc ol ol a { color: var(--text-muted); padding: 2px 8px; }
+
+  main { flex: 1 1 auto; min-width: 0; padding: 40px 44px 120px; }
+
+  /* ---- 見出し ---- */
+  header.doc-head { margin-bottom: 40px; padding-bottom: 26px; border-bottom: 2px solid var(--border-strong); }
+  header.doc-head h1 { font-size: 27px; line-height: 1.45; margin: 0 0 10px; letter-spacing: .01em; }
+  header.doc-head .sub { color: var(--text-muted); font-size: 14px; margin: 0; }
+  .meta-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 10px; margin-top: 22px;
+  }
+  .meta-grid div { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+  .meta-grid dt { font-size: 11.5px; color: var(--text-muted); letter-spacing: .06em; }
+  .meta-grid dd { margin: 2px 0 0; font-size: 13.5px; font-weight: 600; }
+
+  h2 {
+    font-size: 21px; margin: 56px 0 18px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-strong); letter-spacing: .01em; scroll-margin-top: 20px;
+  }
+  h3 { font-size: 17px; margin: 34px 0 12px; scroll-margin-top: 20px; }
+  h4 { font-size: 14.5px; margin: 22px 0 8px; color: var(--text-muted); letter-spacing: .04em; }
+  p { margin: 0 0 14px; }
+  ul, ol.body-list { margin: 0 0 16px; padding-left: 1.4em; }
+  li { margin-bottom: 5px; }
+
+  /* ---- パネル ---- */
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 22px; margin: 0 0 20px; box-shadow: var(--shadow);
+  }
+  .card > :last-child { margin-bottom: 0; }
+  .card-title {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px dashed var(--border);
+  }
+  .card-title .name { font-size: 16px; font-weight: 700; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+  .card-title .jp { font-size: 13.5px; color: var(--text-muted); }
+
+  .note, .caution {
+    border-left: 4px solid var(--accent); background: var(--accent-soft);
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 0 0 18px; font-size: 14px;
+  }
+  .caution { border-left-color: var(--warn); background: var(--warn-soft); }
+  .note > :last-child, .caution > :last-child { margin-bottom: 0; }
+
+  /* ---- バッジ ---- */
+  .badge {
+    display: inline-block; font-size: 11.5px; font-weight: 700; line-height: 1.6;
+    padding: 1px 9px; border-radius: 999px; white-space: nowrap; vertical-align: middle;
+  }
+  .b-agg   { background: var(--domain-soft); color: var(--domain); border: 1px solid var(--domain); }
+  .b-vo    { background: var(--vo-soft);     color: var(--vo);     border: 1px solid var(--vo); }
+  .b-svc   { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
+  .b-app   { background: var(--app-soft);    color: var(--app);    border: 1px solid var(--app); }
+  .b-port  { background: var(--panel-2);     color: var(--text-muted); border: 1px solid var(--border-strong); }
+
+  /* ---- テーブル ---- */
+  .table-wrap { overflow-x: auto; margin: 0 0 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 560px; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.7; }
+  thead th { background: var(--panel-2); font-size: 12.5px; letter-spacing: .04em; color: var(--text-muted); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--panel-2); }
+  td code, th code { white-space: nowrap; }
+  .nowrap { white-space: nowrap; }
+
+  /* ---- コード ---- */
+  code {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12.8px; background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; margin: 0 0 18px; line-height: 1.65;
+  }
+  pre code { background: none; padding: 0; font-size: 12.6px; }
+  .src {
+    font-size: 12px; color: var(--text-muted);
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  .src a { color: var(--text-muted); }
+  a { color: var(--accent); }
+
+  /* ---- レイヤ図 ---- */
+  .layers { display: grid; gap: 10px; margin: 0 0 10px; }
+  .layer {
+    border: 1px solid var(--border-strong); border-radius: 10px; padding: 14px 18px; background: var(--panel);
+  }
+  .layer.l-web { border-left: 6px solid var(--text-muted); }
+  .layer.l-app { border-left: 6px solid var(--app); background: var(--app-soft); }
+  .layer.l-dom { border-left: 6px solid var(--domain); background: var(--domain-soft); }
+  .layer.l-inf { border-left: 6px solid var(--text-muted); }
+  .layer h4 { margin: 0 0 4px; color: var(--text); font-size: 14px; }
+  .layer p { margin: 0; font-size: 13px; color: var(--text-muted); }
+  .arrow-down { text-align: center; color: var(--text-muted); font-size: 13px; margin: -4px 0; }
+
+  /* ---- 汎用グリッド ---- */
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+  .chip {
+    border: 1px solid var(--border-strong); border-radius: 8px; padding: 7px 12px;
+    background: var(--panel); font-size: 13px;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  /* ---- 状態遷移 ---- */
+  .states { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0 18px; }
+  .state {
+    border: 2px solid var(--border-strong); border-radius: 10px; padding: 8px 16px;
+    background: var(--panel); font-weight: 700; font-size: 13.5px; text-align: center;
+  }
+  .state.draft { border-color: var(--app); color: var(--app); }
+  .state.approved { border-color: var(--domain); color: var(--domain); }
+  .state.superseded { border-color: var(--text-muted); color: var(--text-muted); }
+  .trans { font-size: 12.5px; color: var(--text-muted); text-align: center; white-space: nowrap; }
+  .trans code { font-size: 12px; }
+
+  /* ---- フロー ---- */
+  ol.flow { list-style: none; counter-reset: step; padding: 0; margin: 0 0 20px; }
+  ol.flow li {
+    counter-increment: step; position: relative; padding: 10px 0 10px 44px;
+    border-bottom: 1px dashed var(--border);
+  }
+  ol.flow li:last-child { border-bottom: none; }
+  ol.flow li::before {
+    content: counter(step); position: absolute; left: 0; top: 12px;
+    width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft);
+    color: var(--accent); font-size: 12.5px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  @media (max-width: 980px) {
+    .layout { display: block; }
+    nav.toc { position: static; height: auto; width: auto; flex: none; border-right: none; border-bottom: 1px solid var(--border); }
+    main { padding: 28px 20px 80px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav class="toc">
+  <div class="toc-title">目次</div>
+  <ol>
+    <li><a href="#s1">このレポートについて</a></li>
+    <li><a href="#s2">レイヤと依存方向</a></li>
+    <li><a href="#s3">モジュール地図</a></li>
+    <li><a href="#s4">値オブジェクトと共有カーネル</a>
+      <ol>
+        <li><a href="#s4-1">Money</a></li>
+        <li><a href="#s4-2">FiscalHalf / HalfTerm</a></li>
+        <li><a href="#s4-3">型付きID</a></li>
+        <li><a href="#s4-4">CostElementCode</a></li>
+        <li><a href="#s4-5">列挙と仕様ヘルパ</a></li>
+        <li><a href="#s4-6">DomainException</a></li>
+      </ol>
+    </li>
+    <li><a href="#s5">集約とエンティティ</a>
+      <ol>
+        <li><a href="#s5-1">集約の一覧</a></li>
+        <li><a href="#s5-2">Division(部)</a></li>
+        <li><a href="#s5-3">Department(課)</a></li>
+        <li><a href="#s5-4">Project(案件)</a></li>
+        <li><a href="#s5-5">CostElement(費目)</a></li>
+        <li><a href="#s5-6">DepartmentBudget(課予算)</a></li>
+        <li><a href="#s5-7">ActualEntry(実績)</a></li>
+        <li><a href="#s5-8">DivisionBudgetApproval(部承認)</a></li>
+      </ol>
+    </li>
+    <li><a href="#s6">ドメインサービス</a>
+      <ol>
+        <li><a href="#s6-1">BudgetVarianceAnalysisService</a></li>
+        <li><a href="#s6-2">BudgetComparisonService</a></li>
+        <li><a href="#s6-3">ProfitAnalysisService</a></li>
+        <li><a href="#s6-4">DivisionBudgetSummaryService</a></li>
+      </ol>
+    </li>
+    <li><a href="#s7">ポート(リポジトリ)</a></li>
+    <li><a href="#s8">アプリケーション層</a>
+      <ol>
+        <li><a href="#s8-1">共通の構造</a></li>
+        <li><a href="#s8-2">ユースケース一覧</a></li>
+        <li><a href="#s8-3">DTO カタログ</a></li>
+      </ol>
+    </li>
+    <li><a href="#s9">責務分担(ドメイン / アプリケーション)</a></li>
+    <li><a href="#s10">不変条件の一覧</a></li>
+    <li><a href="#s11">主要シナリオの流れ</a></li>
+    <li><a href="#s12">レビュー時の着眼点</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<header class="doc-head">
+  <h1>ドメイン層・アプリケーション層 詳細レポート<br>総合原価管理システム(予実管理)</h1>
+  <p class="sub">対象: <code>backend/src/CostManagement.Domain</code> / <code>backend/src/CostManagement.Application</code></p>
+  <div class="meta-grid">
+    <div><dt>作成日</dt><dd>2026-08-08 (JST, UTC+9)</dd></div>
+    <div><dt>対象ブランチ</dt><dd>claude/cost-management-system-qvc368</dd></div>
+    <div><dt>対象規模</dt><dd>ドメイン 13 ファイル / アプリケーション 10 ファイル(計 約 2,700 行)</dd></div>
+    <div><dt>アーキテクチャ</dt><dd>ヘキサゴナル + DDD (.NET 10 / C#)</dd></div>
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<h2 id="s1">1. このレポートについて</h2>
+
+<p>
+本書は、総合原価管理システムのバックエンドのうち <strong>ドメイン層</strong> と <strong>アプリケーション層</strong> の
+ソースコードを、レビュー担当者が上から順に読めるようまとめたものです。
+クラスを機械的に列挙するのではなく、ドメイン駆動設計の戦術パターン
+(<strong>値オブジェクト / 集約・エンティティ / ドメインサービス / ポート / アプリケーションサービス</strong>)ごとに整理し、
+それぞれが担う不変条件と、どこで検証されているかを明示しています。
+</p>
+
+<div class="note">
+  <p><strong>この業務ドメインの前提(先に押さえると読みやすい)</strong></p>
+  <ul>
+    <li>組織は <strong>部(Division)&gt; 課(Department)</strong> の 2 階層。予算・実績を持つのは<strong>課</strong>だけで、部は配下課の合計を見る集計ビュー。</li>
+    <li>管理単位は <strong>課 × 半期</strong>(<code>yyyy-H1</code> / <code>yyyy-H2</code>)。この 1 組に対して予算がバージョン管理される。</li>
+    <li>予算は <strong>売上高・加工費・外注費・期間費用</strong> の 4 区分を <strong>1 つの集約でまとめて承認</strong>する。</li>
+    <li>明細は<strong>金額のみ</strong>(数量×単価は扱わない)。金額は「半期一括」または「月次(半期内 1〜6 月目)」で入力する。</li>
+    <li>売上高・加工費・外注費は<strong>案件別</strong>、期間費用は<strong>費目別</strong>(さらに費目内を自由入力の明細名で細分できる)。</li>
+  </ul>
+</div>
+
+<h4>本書での記号</h4>
+<div class="chip-row">
+  <span class="chip"><span class="badge b-agg">集約ルート</span> 一貫性の境界。外部からは ID で参照する</span>
+  <span class="chip"><span class="badge b-vo">値オブジェクト</span> <code>readonly record struct</code>。等価性は値で決まる</span>
+  <span class="chip"><span class="badge b-svc">ドメインサービス</span> ステートレス。集約に属さない計算</span>
+  <span class="chip"><span class="badge b-port">ポート</span> ドメイン層に置いた interface。実装はインフラ層</span>
+  <span class="chip"><span class="badge b-app">アプリケーションサービス</span> ユースケースの調停役</span>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2">2. レイヤと依存方向</h2>
+
+<p>
+依存は常に外側から内側(ドメイン)へ向きます。ドメイン層は <code>.csproj</code> の時点で
+<strong>他プロジェクトへの参照を 1 つも持ちません</strong>。アプリケーション層はドメイン層だけを参照します。
+インフラ層と Web API 層はどちらも内側を参照する側にあり、内側からは見えません。
+</p>
+
+<div class="layers">
+  <div class="layer l-web">
+    <h4>CostManagement.WebApi(入力アダプタ)</h4>
+    <p>Minimal API のエンドポイント。例外変換: <code>DomainException → 400</code> / <code>NotFoundException → 404</code>。</p>
+  </div>
+  <div class="arrow-down">▼ 呼び出す</div>
+  <div class="layer l-app">
+    <h4>CostManagement.Application(ユースケース = 入力ポート)</h4>
+    <p>8 つのアプリケーションサービス + DTO 群 + <code>ISystemClock</code> / <code>NotFoundException</code>。
+       トランザクション的な手順、複数集約にまたがる検証、名称解決、DTO 変換を担う。</p>
+  </div>
+  <div class="arrow-down">▼ 参照する(ProjectReference は Domain のみ)</div>
+  <div class="layer l-dom">
+    <h4>CostManagement.Domain(モデルの中心)</h4>
+    <p>7 集約 + 4 ドメインサービス + 値オブジェクト + 7 つの永続化ポート。<strong>外部参照ゼロ</strong>。</p>
+  </div>
+  <div class="arrow-down">▲ ポートを実装する(出力アダプタ)</div>
+  <div class="layer l-inf">
+    <h4>CostManagement.Infrastructure(出力アダプタ)</h4>
+    <p>SQLite + Dapper のリポジトリ実装、<code>SystemClock</code>、DI 登録(<code>AddCostManagement</code>)。</p>
+  </div>
+</div>
+
+<p>
+DI 登録はインフラ層の <code>DependencyInjection.AddCostManagement</code> に集約されており、
+リポジトリ 7 種・<code>ISystemClock</code>・ドメインサービス 4 種・アプリケーションサービス 8 種を
+すべて <code>Singleton</code> として登録します。ドメインサービスとアプリケーションサービスがいずれも
+状態を持たない(フィールドは依存だけ)ため、Singleton で安全です。
+</p>
+
+<!-- ============================================================ -->
+<h2 id="s3">3. モジュール地図</h2>
+
+<p>ドメイン層は名前空間 = 集約(または関心事)で分割されています。1 ファイルに「値オブジェクト・集約ルート・ポート」がまとまって置かれるのが本プロジェクトの流儀です。</p>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr><th>名前空間 / ファイル</th><th>行数</th><th>含まれるもの</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>Shared/Money.cs</code></td><td class="nowrap">26</td><td><span class="badge b-vo">VO</span> <code>Money</code></td></tr>
+    <tr><td><code>Shared/FiscalHalf.cs</code></td><td class="nowrap">66</td><td><span class="badge b-vo">VO</span> <code>FiscalHalf</code>、列挙 <code>HalfTerm</code></td></tr>
+    <tr><td><code>Shared/DomainException.cs</code></td><td class="nowrap">10</td><td>例外 <code>DomainException</code></td></tr>
+    <tr><td><code>Divisions/Division.cs</code></td><td class="nowrap">78</td><td><code>DivisionId</code> / <span class="badge b-agg">集約</span> <code>Division</code> / <span class="badge b-port">ポート</span> <code>IDivisionRepository</code></td></tr>
+    <tr><td><code>Divisions/DivisionBudgetApproval.cs</code></td><td class="nowrap">67</td><td><code>DivisionBudgetApprovalId</code> / <span class="badge b-agg">集約</span> <code>DivisionBudgetApproval</code> / <span class="badge b-port">ポート</span></td></tr>
+    <tr><td><code>Departments/Department.cs</code></td><td class="nowrap">85</td><td><code>DepartmentId</code> / <span class="badge b-agg">集約</span> <code>Department</code> / <span class="badge b-port">ポート</span></td></tr>
+    <tr><td><code>Projects/Project.cs</code></td><td class="nowrap">100</td><td><code>ProjectId</code> / <span class="badge b-agg">集約</span> <code>Project</code> / <span class="badge b-port">ポート</span></td></tr>
+    <tr><td><code>CostElements/CostElement.cs</code></td><td class="nowrap">62</td><td><span class="badge b-vo">VO</span> <code>CostElementCode</code> / <span class="badge b-agg">集約</span> <code>CostElement</code> / <span class="badge b-port">ポート</span></td></tr>
+    <tr><td><code>Budgeting/DepartmentBudget.cs</code></td><td class="nowrap">528</td><td>本システムの中核。<code>DepartmentBudgetId</code>、列挙 <code>BudgetStatus</code> / <code>BudgetCategory</code>、仕様ヘルパ <code>BudgetCategories</code> / <code>HalfMonths</code>、エンティティ <code>BudgetLine</code>、<span class="badge b-agg">集約</span> <code>DepartmentBudget</code>、<span class="badge b-port">ポート</span></td></tr>
+    <tr><td><code>Actuals/ActualEntry.cs</code></td><td class="nowrap">127</td><td><code>ActualEntryId</code> / <span class="badge b-agg">集約</span> <code>ActualEntry</code> / <span class="badge b-port">ポート</span></td></tr>
+    <tr><td><code>Analysis/BudgetVarianceAnalysisService.cs</code></td><td class="nowrap">183</td><td><span class="badge b-svc">ドメインサービス</span> 差異分析 + バージョン比較、レポート record 群</td></tr>
+    <tr><td><code>Analysis/ProfitAnalysisService.cs</code></td><td class="nowrap">86</td><td><span class="badge b-svc">ドメインサービス</span> 損益分析、レポート record</td></tr>
+    <tr><td><code>Analysis/DivisionBudgetSummaryService.cs</code></td><td class="nowrap">97</td><td><span class="badge b-svc">ドメインサービス</span> 部集計、レポート record</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>アプリケーション層は「1 ユースケース群 = 1 サービスクラス」で、DTO はすべて <code>Dtos.cs</code> に集約されています。</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>ファイル</th><th>行数</th><th>担当するユースケース</th></tr></thead>
+  <tbody>
+    <tr><td><code>Common/Ports.cs</code></td><td class="nowrap">17</td><td><code>ISystemClock</code>(時刻ポート)、<code>NotFoundException</code></td></tr>
+    <tr><td><code>Dtos.cs</code></td><td class="nowrap">279</td><td>応答 DTO 20 種 + リクエスト DTO 8 種</td></tr>
+    <tr><td><code>DivisionService.cs</code></td><td class="nowrap">50</td><td>部の登録・一覧・取得</td></tr>
+    <tr><td><code>DepartmentService.cs</code></td><td class="nowrap">61</td><td>課の登録・部配下一覧・取得</td></tr>
+    <tr><td><code>ProjectService.cs</code></td><td class="nowrap">82</td><td>案件の登録・一覧・取得・<strong>コード/名称の更新</strong></td></tr>
+    <tr><td><code>CostElementService.cs</code></td><td class="nowrap">39</td><td>費目マスタの一覧・登録</td></tr>
+    <tr><td><code>DepartmentBudgetService.cs</code></td><td class="nowrap">243</td><td>予算の起票・改定・明細の追加/更新/削除/改名・承認</td></tr>
+    <tr><td><code>ActualEntryService.cs</code></td><td class="nowrap">99</td><td>実績の計上・一覧・削除</td></tr>
+    <tr><td><code>DivisionBudgetApprovalService.cs</code></td><td class="nowrap">69</td><td>部予算の承認・取り消し</td></tr>
+    <tr><td><code>AnalysisService.cs</code></td><td class="nowrap">243</td><td>差異分析・バージョン比較・損益サマリ・部サマリ</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4">4. 値オブジェクトと共有カーネル</h2>
+
+<p>
+<code>Domain/Shared</code> は全集約が共有する<strong>共有カーネル</strong>です。
+値オブジェクトはすべて <code>readonly record struct</code> で定義され、
+不変・値等価・コンストラクタでの検証という 3 点が揃っています(この規約はアーキテクチャテストで強制されています)。
+</p>
+
+<h3 id="s4-1">4.1 Money — 金額</h3>
+<div class="card">
+  <div class="card-title"><span class="name">readonly record struct Money(decimal Value)</span><span class="jp">金額(円)</span></div>
+  <p>
+    金額計算を <code>decimal</code> の裸の値ではなく型で包むだけの薄い値オブジェクトです。
+    演算子 <code>+</code> / <code>-</code> / <code>*</code>(スカラー倍)と <code>IComparable&lt;Money&gt;</code> を実装し、
+    <code>Zero</code> を集計の初期値として公開します。<code>IsNegative</code> は「金額は 0 以上」という
+    入力検証の共通述語として、集約側から繰り返し使われます。
+  </p>
+  <pre><code>public static Money operator +(Money a, Money b) =&gt; new(a.Value + b.Value);
+public bool IsNegative =&gt; Value &lt; 0m;
+public override string ToString() =&gt; Value.ToString("#,0.##");   // 3桁区切り</code></pre>
+  <p class="src">出典: <a href="../../backend/src/CostManagement.Domain/Shared/Money.cs">Domain/Shared/Money.cs</a></p>
+  <p>
+    <strong>読みどころ:</strong> 通貨単位や丸めのルールは持っていません(円・端数なしの前提)。
+    また分析サービスのレポートは <code>Money</code> ではなく素の <code>decimal</code> を返す設計で、
+    <em>集約の内部は <code>Money</code>、レポート/DTO 境界からは <code>decimal</code></em> という線引きになっています。
+  </p>
+</div>
+
+<h3 id="s4-2">4.2 FiscalHalf / HalfTerm — 会計半期</h3>
+<div class="card">
+  <div class="card-title"><span class="name">readonly record struct FiscalHalf</span><span class="jp">年度 + 上期/下期</span></div>
+  <p>
+    本システムの時間軸そのものです。<code>Year</code>(2000〜2100)と <code>HalfTerm</code>(H1 = 4〜9 月 / H2 = 10〜3 月)を持ち、
+    <code>"yyyy-H1"</code> / <code>"yyyy-H2"</code> の文字列と相互変換します。
+    DB 保存も API 表現もこの文字列形式で統一されており、境界を越えるときは必ず <code>Parse</code> / <code>ToString</code> を通ります。
+  </p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>メンバ</th><th>役割</th><th>不正時</th></tr></thead>
+    <tbody>
+      <tr><td><code>FiscalHalf(int, HalfTerm)</code></td><td>年度と区分から生成</td><td>年度が 2000〜2100 外 / 区分が H1・H2 以外 → <code>DomainException</code></td></tr>
+      <tr><td><code>Parse(string)</code></td><td>文字列から復元(境界の入口)</td><td>形式不正 → <code>DomainException</code>「半期の形式が不正です」</td></tr>
+      <tr><td><code>CompareTo</code> と <code>&lt; &lt;= &gt; &gt;=</code></td><td><code>Year * 2 + (int)Half</code> による時系列順の比較</td><td>—</td></tr>
+      <tr><td><code>ToString()</code></td><td><code>$"{Year:D4}-H{(int)Half}"</code></td><td>—</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">出典: <a href="../../backend/src/CostManagement.Domain/Shared/FiscalHalf.cs">Domain/Shared/FiscalHalf.cs</a></p>
+</div>
+
+<h3 id="s4-3">4.3 型付きID — 集約間参照の唯一の手段</h3>
+<p>
+集約は互いにオブジェクト参照を持たず、必ず型付き ID で参照します(例: <code>Department</code> は <code>Division</code> ではなく <code>DivisionId</code> を持つ)。
+5 つの ID はいずれも同じ形をしており、<code>New()</code> で GUID を採番し、<code>ToString()</code> で GUID 文字列を返します。
+<code>Guid</code> の生値を使わないことで、引数の取り違え(課 ID を案件 ID に渡す等)がコンパイル時に落ちます。
+</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>型</th><th>指すもの</th><th>参照している側</th></tr></thead>
+  <tbody>
+    <tr><td><code>DivisionId</code></td><td>部</td><td><code>Department</code>、<code>DivisionBudgetApproval</code></td></tr>
+    <tr><td><code>DepartmentId</code></td><td>課</td><td><code>Project</code>、<code>DepartmentBudget</code>、<code>ActualEntry</code></td></tr>
+    <tr><td><code>ProjectId</code></td><td>案件</td><td><code>BudgetLine</code>、<code>ActualEntry</code></td></tr>
+    <tr><td><code>DepartmentBudgetId</code></td><td>課予算(バージョン単位)</td><td>—(外部から指定されるのみ)</td></tr>
+    <tr><td><code>ActualEntryId</code></td><td>実績 1 件</td><td>—</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="note">
+  <p>
+    <strong>設計判断:</strong> 案件は <strong>コードではなく <code>ProjectId</code>(GUID)で参照</strong>されます。
+    これにより案件コードを後から変更しても予算明細・実績の参照が壊れません(<a href="#s5-4">5.4</a> 参照)。
+    一方、費目は <code>CostElementCode</code>(文字列)で参照されており、こちらはコード自体が同一性を担います。
+  </p>
+</div>
+
+<h3 id="s4-4">4.4 CostElementCode — 費目コード</h3>
+<div class="card">
+  <div class="card-title"><span class="name">readonly record struct CostElementCode</span><span class="jp">期間費用の費目コード</span></div>
+  <p>
+    型付き ID と違い、<strong>コンストラクタで正規化(trim + 大文字化)まで行う</strong>のが特徴です。
+    <code>"license"</code> と <code>" LICENSE "</code> は同じ値になり、<code>record struct</code> の値等価によって
+    辞書キー・比較にそのまま使えます。空文字は <code>DomainException</code>(「費目コードは必須です。」)。
+  </p>
+  <pre><code>public CostElementCode(string value)
+{
+    if (string.IsNullOrWhiteSpace(value))
+        throw new DomainException("費目コードは必須です。");
+    Value = value.Trim().ToUpperInvariant();
+}</code></pre>
+  <p class="src">出典: <a href="../../backend/src/CostManagement.Domain/CostElements/CostElement.cs">Domain/CostElements/CostElement.cs</a></p>
+</div>
+
+<h3 id="s4-5">4.5 列挙と仕様ヘルパ</h3>
+
+<p>
+<code>Budgeting/DepartmentBudget.cs</code> の冒頭には、集約本体の前に「この業務の語彙」が定義されています。
+とくに <code>BudgetCategories.ValidateKey</code> は<strong>予算明細と実績の両方から呼ばれる唯一の仕様</strong>であり、
+明細キーの整合性がモデル全体で一貫する要になっています。
+</p>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title"><span class="name">enum BudgetStatus</span><span class="jp">予算の状態</span></div>
+    <ul>
+      <li><code>Draft</code> — 策定中。明細を編集できる唯一の状態</li>
+      <li><code>Approved</code> — 承認済み。予実比較の基準になる</li>
+      <li><code>Superseded</code> — 後続版の承認で失効。履歴として残る</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="name">enum BudgetCategory</span><span class="jp">4 区分</span></div>
+    <ul>
+      <li><code>Revenue</code> 売上高(案件別)</li>
+      <li><code>Processing</code> 加工費(案件別)</li>
+      <li><code>Outsourcing</code> 外注費(案件別)</li>
+      <li><code>PeriodCost</code> 期間費用(費目別・課共通)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title"><span class="name">static class BudgetCategories</span><span class="jp">区分と明細キーの仕様</span></div>
+  <p><code>IsProjectBased()</code> は「案件別に明細を持つ区分か」を判定する拡張メソッドで、区分の分岐がコード中に散らばるのを防いでいます。<code>ValidateKey</code> は次の排他を強制します。</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>区分</th><th><code>ProjectId</code></th><th><code>ElementCode</code></th><th>違反時のメッセージ</th></tr></thead>
+    <tbody>
+      <tr><td>Revenue / Processing / Outsourcing</td><td><strong>必須</strong></td><td><strong>指定不可</strong></td><td>「売上高・加工費・外注費の明細には案件を指定してください。」ほか</td></tr>
+      <tr><td>PeriodCost</td><td><strong>指定不可</strong></td><td><strong>必須</strong></td><td>「期間費用の明細には費目を指定してください。」ほか</td></tr>
+      <tr><td>上記以外(将来の追加漏れ)</td><td colspan="2">—</td><td>「予算区分が不正です: {category}」</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>
+    最後の <code>else</code> 節がある点が重要です。区分を増やしたのに分類を決め忘れた場合、
+    暗黙に通過せず即座に例外になります。
+  </p>
+</div>
+
+<div class="card">
+  <div class="card-title"><span class="name">static class HalfMonths</span><span class="jp">半期内の月インデックス</span></div>
+  <p>
+    <code>Count = 6</code> と <code>Validate(int month)</code> のみ。月は暦月ではなく<strong>半期内の 1〜6 番目</strong>で表され、
+    H1 の 1 は 4 月、H2 の 1 は 10 月に相当します。<code>BudgetLine</code>(月次入力)と <code>ActualEntry</code>(計上月)の両方から使われます。
+  </p>
+</div>
+
+<h3 id="s4-6">4.6 DomainException</h3>
+<p>
+不変条件違反を表す唯一の例外型です(<code>sealed</code>)。メッセージは<strong>そのまま利用者に見せられる日本語</strong>で書く規約で、
+Web API 層がこれを HTTP 400 に変換します。一方「対象が見つからない」はドメインの不変条件ではないため、
+アプリケーション層の <code>NotFoundException</code>(→ 404)と明確に役割が分かれています。
+</p>
+
+<!-- ============================================================ -->
+<h2 id="s5">5. 集約とエンティティ</h2>
+
+<h3 id="s5-1">5.1 集約の一覧</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>集約ルート</th><th>同一性</th><th>内部エンティティ</th><th>この集約が守る中心的な不変条件</th></tr></thead>
+  <tbody>
+    <tr><td><code>Division</code></td><td><code>DivisionId</code></td><td>—</td><td>コード・名称が空でない</td></tr>
+    <tr><td><code>Department</code></td><td><code>DepartmentId</code></td><td>—</td><td>必ず 1 つの部に属する / コード・名称が空でない</td></tr>
+    <tr><td><code>Project</code></td><td><code>ProjectId</code></td><td>—</td><td>必ず 1 つの課に属する / コード・名称が空でない</td></tr>
+    <tr><td><code>CostElement</code></td><td><code>CostElementCode</code></td><td>—</td><td>コード(正規化済み)と名称が空でない</td></tr>
+    <tr><td><code>DepartmentBudget</code></td><td><code>DepartmentBudgetId</code></td><td><code>BudgetLine</code></td><td>承認済みは編集不可 / 区分合計 = 明細合計 / 明細キーの一意性と排他 / 費目内のモード一貫性</td></tr>
+    <tr><td><code>ActualEntry</code></td><td><code>ActualEntryId</code></td><td>—</td><td>明細キーの排他 / 金額 ≧ 0 / 月は 1〜6</td></tr>
+    <tr><td><code>DivisionBudgetApproval</code></td><td><code>DivisionBudgetApprovalId</code></td><td>—</td><td>(部, 半期)に 1 件。<strong>存在 = 承認済み</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <p><strong>全集約に共通する 4 つの書き方の約束</strong></p>
+  <ol class="body-list">
+    <li>クラスは <code>sealed</code>、<code>private</code> コンストラクタ。</li>
+    <li>生成は静的ファクトリ(<code>Create</code> / <code>Record</code> / <code>CreateInitial</code> …)。<strong>ここで検証する。</strong></li>
+    <li>永続化からの復元は <code>Restore(...)</code>。<strong>検証をスキップして状態を再構築する</strong>(DB にある = 過去に検証済み、という前提)。</li>
+    <li>公開セッターを置かない。状態変更はドメインメソッド(<code>Rename</code> / <code>Approve</code> / <code>Upsert…</code>)だけ。</li>
+  </ol>
+</div>
+
+<h3 id="s5-2">5.2 Division(部) <span class="badge b-agg">集約ルート</span></h3>
+<div class="card">
+  <p>課の上位組織。<strong>予算を策定しません</strong>。持つのは <code>Id</code> / <code>Code</code> / <code>Name</code> / <code>CreatedAt</code> のみで、配下課への参照も持ちません(参照は <code>Department</code> 側から <code>DivisionId</code> で張られます)。</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>メンバ</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td><code>Create(code, name, now)</code></td><td>コード・名称必須。両方 <code>Trim()</code> して保持</td></tr>
+      <tr><td><code>Rename(name)</code></td><td>部名の変更。空名称は <code>DomainException</code></td></tr>
+      <tr><td><code>Restore(...)</code></td><td>DB からの復元(検証なし)</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">出典: <a href="../../backend/src/CostManagement.Domain/Divisions/Division.cs">Domain/Divisions/Division.cs</a></p>
+</div>
+
+<h3 id="s5-3">5.3 Department(課) <span class="badge b-agg">集約ルート</span></h3>
+<div class="card">
+  <p>
+    予算策定の管理単位そのもの。<code>DivisionId</code> を<strong>読み取り専用で</strong>持ち、生成後に所属部を変える手段はありません
+    (部の異動は現時点でモデル化されていない)。構造は <code>Division</code> とほぼ同型です。
+  </p>
+  <p class="src">出典: <a href="../../backend/src/CostManagement.Domain/Departments/Department.cs">Domain/Departments/Department.cs</a></p>
+</div>
+
+<h3 id="s5-4">5.4 Project(案件) <span class="badge b-agg">集約ルート</span></h3>
+<div class="card">
+  <p>
+    課に属するマスタで、<strong>予算策定の単位ではなく明細の内訳次元</strong>です。
+    ライフサイクル状態(進行中/終了など)は意図的に持ちません — 明細が確定するのは予算承認の側だからです。
+  </p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>メンバ</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td><code>Code</code> <span class="badge b-vo">可変</span></td><td>案件コード。<strong>課ごとに一意</strong>(別の課では同じコードを使える)。一意性の検証はアプリケーション層</td></tr>
+      <tr><td><code>Create(departmentId, code, name, now)</code></td><td>コード・名称必須</td></tr>
+      <tr><td><code>Rename(name)</code></td><td>名称のみ変更</td></tr>
+      <tr><td><code>Edit(code, name)</code></td><td>コードと名称をまとめて変更。<strong>コードを変えても他集約の参照は壊れない</strong>(参照は <code>Id</code>)</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">出典: <a href="../../backend/src/CostManagement.Domain/Projects/Project.cs">Domain/Projects/Project.cs</a></p>
+  <p>
+    <strong>読みどころ:</strong> 「コードは業務上の識別子だが、同一性はサロゲート ID が担う」という古典的な分離が
+    明示的にコメントされています。これが成立しているおかげで <code>ProjectService.UpdateAsync</code> は
+    予算明細・実績を一切触らずに済んでいます。
+  </p>
+</div>
+
+<h3 id="s5-5">5.5 CostElement(費目) <span class="badge b-agg">集約ルート</span></h3>
+<div class="card">
+  <p>
+    期間費用の内訳マスタ(人件費 <code>PERSONNEL</code>、ライセンス費 <code>LICENSE</code> をシード)。
+    <strong>課ごとの設定ではなくシステム全体で共通</strong>で、同一性は <code>CostElementCode</code> が担うため GUID の ID を持ちません。
+    現状のドメインメソッドは <code>Create</code> と <code>Restore</code> のみで、<code>Name</code> は <code>private set</code> ながら変更手段が公開されていません(費目名の改名は未提供)。
+  </p>
+  <p class="src">出典: <a href="../../backend/src/CostManagement.Domain/CostElements/CostElement.cs">Domain/CostElements/CostElement.cs</a></p>
+</div>
+
+<!-- --------------------------------- -->
+<h3 id="s5-6">5.6 DepartmentBudget(課予算) <span class="badge b-agg">集約ルート</span> — 中核</h3>
+
+<p>
+本システムでもっとも情報量の多い集約です。<strong>(課, 半期) ごとにバージョン管理された 1 つの予算</strong>で、
+4 区分すべての明細を内部に抱え、まとめて 1 回で承認されます。以下、5 つの観点に分けて読み解きます。
+</p>
+
+<h4>(a) ヘッダの構造とバージョン</h4>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>プロパティ</th><th>型</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td><code>Id</code></td><td><code>DepartmentBudgetId</code></td><td>バージョン 1 つにつき 1 ID(改定版は別 ID)</td></tr>
+    <tr><td><code>DepartmentId</code> / <code>FiscalHalf</code></td><td>VO</td><td>管理単位。生成後は不変</td></tr>
+    <tr><td><code>Version</code></td><td><code>int</code></td><td>同一 (課, 半期) 内で単調増加。1 = 当初予算</td></tr>
+    <tr><td><code>Label</code></td><td><code>string</code></td><td>「当初予算」「下期見直し」など。空文字は不可</td></tr>
+    <tr><td><code>Status</code></td><td><code>BudgetStatus</code></td><td>Draft / Approved / Superseded</td></tr>
+    <tr><td><code>CreatedAt</code> / <code>ApprovedAt</code></td><td><code>DateTime</code> / <code>DateTime?</code></td><td>いずれも UTC。承認前は <code>ApprovedAt = null</code></td></tr>
+    <tr><td><code>Lines</code></td><td><code>IReadOnlyList&lt;BudgetLine&gt;</code></td><td><code>AsReadOnly()</code> で外部からの変更を遮断</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><strong>ヘッダに金額フィールドが 1 つも無い</strong>ことが設計の要です。区分合計は常に明細から導出されます。</p>
+<pre><code>public Money CategoryTotal(BudgetCategory category) =&gt;
+    _lines.Where(l =&gt; l.Category == category)
+          .Aggregate(Money.Zero, (sum, l) =&gt; sum + l.Amount);
+
+public Money TotalCost =&gt; CategoryTotal(Processing) + CategoryTotal(Outsourcing) + CategoryTotal(PeriodCost);
+public Money PlannedProfit =&gt; CategoryTotal(Revenue) - TotalCost;</code></pre>
+<p>
+この形により「課レベルで合計だけ直接入力する」という運用が<strong>構造的に不可能</strong>になっており、
+合計と内訳がずれる余地がありません。レビュー時にはこの構造を崩す変更(合計のキャッシュ列の追加など)が入っていないかを確認する価値があります。
+</p>
+
+<h4>(b) 状態遷移</h4>
+<div class="states">
+  <div class="state draft">Draft<br><span style="font-weight:400;font-size:12px">編集可</span></div>
+  <div class="trans">— <code>Approve(now)</code> →<br>明細 0 件は不可</div>
+  <div class="state approved">Approved<br><span style="font-weight:400;font-size:12px">編集不可</span></div>
+  <div class="trans">— <code>Supersede()</code> →<br>後続版の承認時</div>
+  <div class="state superseded">Superseded<br><span style="font-weight:400;font-size:12px">履歴</span></div>
+</div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>メソッド</th><th>事前条件</th><th>効果 / 違反時</th></tr></thead>
+  <tbody>
+    <tr><td><code>Approve(now)</code></td><td><code>Status == Draft</code> かつ明細 ≧ 1 件</td><td><code>Approved</code> + <code>ApprovedAt = now</code> / 「ドラフト状態の予算のみ承認できます。」「明細のない予算は承認できません。」</td></tr>
+    <tr><td><code>Supersede()</code></td><td><code>Status == Approved</code></td><td><code>Superseded</code> / 「承認済みの予算のみ失効にできます。」</td></tr>
+    <tr><td>全編集メソッド</td><td><code>EnsureDraft()</code></td><td>「承認済み・失効済みの予算は編集できません。改定版を作成してください。」</td></tr>
+  </tbody>
+</table>
+</div>
+<p>
+生成側は 2 つ。<code>CreateInitial</code> は明細ゼロの v1 ドラフト、<code>ReviseFrom(baseBudget, nextVersion, …)</code> は
+基準版の<strong>明細を新 ID で複製した</strong>改定版ドラフトです(<code>BudgetLine.Copy()</code> が月次モードと明細名も引き継ぐ)。
+<code>nextVersion &lt;= baseBudget.Version</code> は拒否されます。ただし「同一 (課, 半期) にドラフトは 1 件」という制約や、
+承認時に旧承認版を <code>Supersede()</code> する手順は<strong>集約の外(アプリケーション層)</strong>の責務です — 複数集約インスタンスにまたがるためです。
+</p>
+
+<h4>(c) BudgetLine — 明細エンティティ</h4>
+<div class="card">
+  <p>
+    集約内エンティティ。<code>internal</code> コンストラクタなので<strong>集約経由でしか生成できません</strong>。
+    生成時に <code>BudgetCategories.ValidateKey</code> と「明細名は期間費用専用」の 2 つを検証します。
+    この検証は <code>Restore</code> 経由の復元でも通ります(集約側の <code>Restore</code> が同じ <code>internal</code> コンストラクタを呼ぶため)。
+  </p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>プロパティ</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td><code>Id</code></td><td>集約内で一意な GUID</td></tr>
+      <tr><td><code>Category</code></td><td>4 区分。生成後不変</td></tr>
+      <tr><td><code>ProjectId?</code> / <code>ElementCode?</code></td><td>区分により排他(片方のみ非 null)。生成後不変</td></tr>
+      <tr><td><code>PeriodDetail</code> <span class="badge b-vo">可変</span></td><td>期間費用の明細名。<code>null</code> = 費目一括。<code>RenameDetail</code> でのみ変更</td></tr>
+      <tr><td><code>Amount</code></td><td><strong>常に半期合計</strong>。月次モードでは月別の合計に一致する</td></tr>
+      <tr><td><code>MonthlyAmounts</code></td><td>月インデックス 1〜6 → 金額。<strong>0 円の月は保持しない</strong></td></tr>
+      <tr><td><code>IsMonthly</code></td><td><code>_monthly.Count &gt; 0</code>。フラグを別途持たず<strong>データの有無で状態を表す</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><strong>入力モードの切り替え</strong>は次の 2 メソッドで、どちらも「上書き」の意味論です。</p>
+  <pre><code>internal void UpdateHalf(Money amount)   { _monthly.Clear(); Amount = amount; }  // 月次モードを解除
+internal void UpdateMonthly(IReadOnlyDictionary&lt;int, Money&gt; monthly) =&gt; SetMonthly(monthly);
+
+private void SetMonthly(...) {
+    // 各月: HalfMonths.Validate(month) → 負値なら DomainException → 0 円の月は捨てる
+    // 最後に Amount = 月別金額の総和
+}</code></pre>
+  <div class="note">
+    <p>
+      <strong>不変条件:</strong> 「月次モードなら <code>Amount</code> = <code>MonthlyAmounts</code> の合計」は
+      <code>SetMonthly</code> が計算して代入する形で<strong>構造的に保証</strong>されています
+      (外から <code>Amount</code> を書ける経路が存在しない)。
+    </p>
+  </div>
+  <p class="src">出典: <a href="../../backend/src/CostManagement.Domain/Budgeting/DepartmentBudget.cs">Domain/Budgeting/DepartmentBudget.cs</a>(BudgetLine 部)</p>
+</div>
+
+<h4>(d) 明細キーと期間費用の「モード一貫性」</h4>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>区分</th><th>明細の一意キー</th><th>操作メソッド</th></tr></thead>
+  <tbody>
+    <tr><td>売上高 / 加工費 / 外注費</td><td>(区分, <code>ProjectId</code>)</td><td><code>UpsertProjectLine</code> / <code>UpsertProjectLineMonthly</code> / <code>RemoveProjectLine</code></td></tr>
+    <tr><td>期間費用</td><td>(期間費用, <code>ElementCode</code>, <code>PeriodDetail</code>)</td><td><code>UpsertPeriodCostLine</code> / <code>UpsertPeriodCostLineMonthly</code> / <code>RemovePeriodCostLine</code> / <code>RenamePeriodCostDetail</code></td></tr>
+  </tbody>
+</table>
+</div>
+<p>
+すべて <strong>Upsert(同一キーなら上書き、無ければ追加)</strong>で、同じキーの明細が 2 行できることはありません。
+期間費用にはさらに 1 段の制約があります。<code>EnsurePeriodModeConsistent</code> は、
+同じ費目の中で「費目一括(明細名なし)」と「明細(明細名あり)」が混ざることを禁じます。
+</p>
+<pre><code>if (detail is null &amp;&amp; elementLines.Any(l =&gt; l.PeriodDetail is not null))
+    throw new DomainException("この費目には明細があります。費目一括の金額ではなく明細で入力してください。");
+if (detail is not null &amp;&amp; elementLines.Any(l =&gt; l.PeriodDetail is null))
+    throw new DomainException("この費目は費目一括で入力されています。明細を使うには先に費目一括の金額を削除してください。");</code></pre>
+<p>
+理由は<strong>二重計上の防止</strong>です。「ライセンス費 500 万」と「ライセンス費 / AWS 300 万」が併存すると、
+<code>CategoryTotal</code> は単純合計なので 800 万になってしまいます。混在を禁じることで
+「費目合計 = 明細の合計」がそのまま成り立ちます。
+</p>
+
+<h4>(e) 明細名の改名 と 復元</h4>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>メソッド</th><th>ふるまい</th></tr></thead>
+  <tbody>
+    <tr><td><code>RenamePeriodCostDetail(elementCode, oldDetail, newDetail)</code></td>
+        <td>ドラフトのみ。対象が無ければ例外。新旧が同じなら何もせず return。同一費目内に同名があれば「同じ費目に同じ明細名が既に存在します。」。空への改名は不可(= 費目一括へは戻せない)。<strong>金額・月次・明細 ID は保持</strong>される</td></tr>
+    <tr><td><code>Restore(id, departmentId, fiscalHalf, version, label, status, createdAt, approvedAt, lines)</code></td>
+        <td>タプル列から明細を再構成。<code>Monthly</code> が空なら半期一括、非空なら月次として復元。区分・費目コードは文字列からパースされ、<strong>キーの排他検証はここでも走る</strong></td></tr>
+  </tbody>
+</table>
+</div>
+<div class="caution">
+  <p>
+    <strong>意図された非対称:</strong> 改名は<strong>予算側だけ</strong>に効きます。実績(<code>ActualEntry</code>)は明細名を
+    文字列で疎結合に持つため追随せず、旧名で計上済みの実績は分析上「予定外(<code>IsUnplanned</code>)」として現れます。
+    これは仕様として文書化された挙動で、レビュー時に「バグに見えるが仕様」と認識しておくべき箇所です。
+  </p>
+</div>
+
+<!-- --------------------------------- -->
+<h3 id="s5-7">5.7 ActualEntry(実績) <span class="badge b-agg">集約ルート</span></h3>
+<div class="card">
+  <p>
+    予算明細と<strong>同じ軸</strong>((課, 半期, 区分, 案件 or 費目 × 明細名))で計上される実績 1 件。
+    予算と違い、<strong>同一キーに何件でも計上でき</strong>、分析時に合算されます(月次の実績を 6 回に分けて入れる、都度計上する、といった運用に対応)。
+    生成後は完全にイミュータブルで、更新手段はありません(訂正は削除 + 再計上)。
+  </p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>プロパティ</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td><code>DepartmentId</code> / <code>FiscalHalf</code> / <code>Category</code></td><td>計上先の管理単位と区分</td></tr>
+      <tr><td><code>ProjectId?</code> / <code>ElementCode?</code></td><td>予算明細と同じ排他ルール</td></tr>
+      <tr><td><code>PeriodDetail</code></td><td>期間費用の明細名(任意)。<strong>計画に無い名前でも計上できる</strong></td></tr>
+      <tr><td><code>Month</code></td><td>半期内の 1〜6。<code>null</code> = 半期一括の計上</td></tr>
+      <tr><td><code>Amount</code> / <code>Note</code> / <code>RecordedAt</code></td><td>金額(0 以上)/ 備考(trim、空なら null)/ 計上日時(UTC)</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><code>Record(...)</code> が行う検証は 4 つです。</p>
+  <ol class="body-list">
+    <li><code>BudgetCategories.ValidateKey</code> — 予算明細とまったく同じ仕様を共有</li>
+    <li><code>HalfMonths.Validate</code> — 月を指定した場合のみ</li>
+    <li>金額 ≧ 0</li>
+    <li>明細名は期間費用のときだけ(<code>BudgetLine.NormalizeDetail</code> で正規化してから判定)</li>
+  </ol>
+  <p class="src">出典: <a href="../../backend/src/CostManagement.Domain/Actuals/ActualEntry.cs">Domain/Actuals/ActualEntry.cs</a></p>
+  <div class="note">
+    <p>
+      <strong>注目点:</strong> 実績は「対応する予算明細が存在するか」を<strong>検証しません</strong>。
+      予算と実績を疎結合に保ち、計画外の支出もそのまま記録できるようにする設計で、
+      その差は分析時に <code>IsUnplanned</code> フラグとして表面化します。
+      また <code>Month</code> は入力の粒度にすぎず、集計・差異分析はすべて半期粒度で行われます。
+    </p>
+  </div>
+</div>
+
+<h3 id="s5-8">5.8 DivisionBudgetApproval(部予算承認) <span class="badge b-agg">集約ルート</span></h3>
+<div class="card">
+  <p>
+    (部, 半期) ごとに 1 件だけ存在しうる承認レコードで、<strong>レコードの存在そのものが「承認済み」を意味します</strong>
+    (状態フラグを持たない)。取り消しは削除です。
+    課の承認フロー(<code>DepartmentBudget.Approve</code>)とは<strong>完全に独立</strong>しており、
+    部承認後に課が予算を改定しても部承認は残ります。
+  </p>
+  <p>
+    集約自身は「承認してよいか」を判断しません — <code>Approve(divisionId, fiscalHalf, now)</code> は
+    ただレコードを作るだけです。「配下の全課が承認済み予算を持つか」という条件は複数集約の横断的な問い合わせが必要なため、
+    <code>DivisionBudgetApprovalService</code>(アプリケーション層)の責務として明示的に切り出されています。
+  </p>
+  <p class="src">出典: <a href="../../backend/src/CostManagement.Domain/Divisions/DivisionBudgetApproval.cs">Domain/Divisions/DivisionBudgetApproval.cs</a></p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6">6. ドメインサービス</h2>
+
+<p>
+分析ロジックはどの集約にも属さない(複数集約を入力に取る)ため、4 つの<strong>ステートレスなドメインサービス</strong>に切り出されています。
+いずれも依存フィールドを持たず、入力を受け取って<strong>イミュータブルな record のレポート</strong>を返すだけの純関数的な構造です
+(だから DI で Singleton にできる)。レポートは <code>Money</code> ではなく <code>decimal</code> を公開します。
+</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>サービス</th><th>入力</th><th>出力</th><th>役割</th></tr></thead>
+  <tbody>
+    <tr><td><code>BudgetVarianceAnalysisService</code></td><td><code>DepartmentBudget</code> + <code>ActualEntry</code> 群</td><td><code>VarianceReport</code></td><td>予実差異</td></tr>
+    <tr><td><code>BudgetComparisonService</code></td><td><code>DepartmentBudget</code> × 2</td><td><code>BudgetComparisonReport</code></td><td>バージョン間比較</td></tr>
+    <tr><td><code>ProfitAnalysisService</code></td><td><code>VarianceReport</code></td><td><code>ProfitReport</code></td><td>案件別・全体の損益</td></tr>
+    <tr><td><code>DivisionBudgetSummaryService</code></td><td><code>DepartmentVarianceInput</code> 群</td><td><code>DivisionSummaryReport</code></td><td>部の合計</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+4 つは<strong>直列に積み上がる</strong>関係です:
+<code>差異分析 → (損益分析 | 部集計)</code>。損益も部集計も、生の実績ではなく差異分析の結果を入力に取るため、
+「どの階層で見ても数字が一致する」ことが構造的に保証されます。
+</p>
+
+<h3 id="s6-1">6.1 BudgetVarianceAnalysisService — 予実差異分析</h3>
+<div class="card">
+  <p>アルゴリズムは 4 ステップです。</p>
+  <ol class="flow">
+    <li><strong>予算を辞書化</strong>: キー = <code>(Category, ProjectId?, ElementCode?, PeriodDetail)</code> → 金額。集約側の一意性保証があるため <code>ToDictionary</code> で衝突しません。</li>
+    <li><strong>実績を同じキーで <code>GroupBy</code> して合算</strong>。同一キーの複数計上がここで 1 行にまとまります。</li>
+    <li><strong>両者のキーの和集合</strong>を取り、区分 → 費目 → 明細名 → 案件 の順に整列。予算にしか無いキーは実績 0、実績にしか無いキーは <code>IsUnplanned = true</code>。</li>
+    <li><strong>4 区分ぶんのサブトータル</strong>を作り(明細が 0 件の区分も必ず 1 要素として現れる)、売上高と「それ以外の合計 = コスト」に畳んで <code>VarianceReport</code> を返す。</li>
+  </ol>
+  <h4>差異の符号</h4>
+  <p>差異は一貫して <strong>実績 − 予算</strong> です。有利/不利の解釈だけが区分で反転します。</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th><code>Variance &gt; 0</code>(実績超過)</th><th><code>Variance &lt; 0</code>(実績未達)</th></tr></thead>
+    <tbody>
+      <tr><td>売上高</td><td><span class="badge b-agg">有利</span> <code>IsFavorable</code></td><td><span class="badge b-app">不利</span> <code>IsAdverse</code></td></tr>
+      <tr><td>加工費 / 外注費 / 期間費用</td><td><span class="badge b-app">不利</span> <code>IsAdverse</code></td><td><span class="badge b-agg">有利</span> <code>IsFavorable</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>
+    差異が 0 のときは <code>IsFavorable</code> / <code>IsAdverse</code> がともに <code>false</code> になります(排他かつ全域ではない、3 値の表現)。
+    なお<strong>価格差異・数量差異への分解は存在しません</strong> — 明細が金額のみだからです。
+  </p>
+  <p class="src">出典: <a href="../../backend/src/CostManagement.Domain/Analysis/BudgetVarianceAnalysisService.cs">Domain/Analysis/BudgetVarianceAnalysisService.cs</a></p>
+</div>
+
+<h3 id="s6-2">6.2 BudgetComparisonService — バージョン間比較</h3>
+<div class="card">
+  <p>
+    同じファイルに同居する 2 つ目のサービス。差異分析とほぼ同型のアルゴリズムで、
+    「実績 vs 予算」の代わりに「基準版 vs 対象版」を突き合わせ、<code>Difference = Target − Base</code> を出します。
+    冒頭で<strong>比較対象が同一の課・半期であること</strong>を検証し、違えば
+    「同一の課・半期の予算同士のみ比較できます。」で弾きます — このサービス唯一のガードです。
+  </p>
+  <p>片方にしか無いキーは、もう一方が 0 として扱われます(新規追加された明細 / 削除された明細がそのまま増減として表れる)。</p>
+</div>
+
+<h3 id="s6-3">6.3 ProfitAnalysisService — 損益分析</h3>
+<div class="card">
+  <p>
+    <code>VarianceReport</code> を入力に、案件別と課全体の 2 つの損益を出します。ここは<strong>定義が 2 種類あるので読み違えやすい</strong>箇所です。
+  </p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>粒度</th><th>損益の定義</th><th>期間費用の扱い</th></tr></thead>
+    <tbody>
+      <tr><td>案件別 <code>ProjectProfitLine</code></td><td>売上高 − 加工費 − 外注費</td><td><strong>含めない</strong>(課共通のため案件に配賦しない)</td></tr>
+      <tr><td>課全体 <code>ProfitReport</code></td><td>売上高 −(加工費 + 外注費 + 期間費用)</td><td>含める</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>
+    したがって <strong>「案件別損益の合計 − 期間費用 = 全体の損益」</strong> が成り立ちます(この整合性はテストで担保されています)。
+    案件別は <code>IsProjectBased()</code> の区分の明細だけを <code>ProjectId</code> で <code>GroupBy</code> して構成します
+    (期間費用の明細は <code>ProjectId</code> が null なので、この時点で自然に除外される)。
+  </p>
+  <p>
+    粗利率は <code>損益 ÷ 売上高</code> で、<strong>売上高が 0 のときは <code>null</code></strong>(0 除算を避け、「率が定義できない」ことを型で表現)。
+  </p>
+  <p class="src">出典: <a href="../../backend/src/CostManagement.Domain/Analysis/ProfitAnalysisService.cs">Domain/Analysis/ProfitAnalysisService.cs</a></p>
+</div>
+
+<h3 id="s6-4">6.4 DivisionBudgetSummaryService — 部集計</h3>
+<div class="card">
+  <p>
+    課ごとの <code>VarianceReport</code> のリスト(<code>DepartmentVarianceInput</code>)を受け取り、単純に足し合わせます。
+    出力は「区分別の部合計」「部全体の売上・コスト・損益の予実」「課別内訳」の 3 点セットで、
+    <strong>「部合計 = 課別内訳の合計」</strong>が定義上必ず成立します(同じ入力から両方を作っているため)。
+  </p>
+  <p>
+    このサービス自体はリポジトリを知らないため、<strong>「承認済み予算がある課だけを入力に含める」判断は呼び出し側</strong>
+    (<code>AnalysisService</code>)が行います。未策定の課を 0 として混ぜてしまうか、そもそも入力から外すかで
+    部の数字の意味が変わるため、ここは責務の切れ目として意識して読む価値があります。
+  </p>
+  <p class="src">出典: <a href="../../backend/src/CostManagement.Domain/Analysis/DivisionBudgetSummaryService.cs">Domain/Analysis/DivisionBudgetSummaryService.cs</a></p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7">7. ポート(リポジトリ)</h2>
+
+<p>
+永続化の抽象は<strong>ドメイン層に interface として置かれ</strong>(依存性逆転)、実装はインフラ層にのみ存在します。
+現在 7 つで、この数はアーキテクチャテストに固定値で書かれており、集約を増減したら同時に更新する運用です。
+全メソッドが <code>CancellationToken ct = default</code> を受け、命名は <code>Find…</code>(見つからなければ <code>null</code>)/
+<code>List…</code> / <code>Add</code> / <code>Update</code> / <code>Delete</code> に統一されています。
+</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>ポート</th><th>主なメソッド</th><th>特記事項</th></tr></thead>
+  <tbody>
+    <tr><td><code>IDivisionRepository</code></td><td><code>FindById</code> / <code>FindByCode</code> / <code>List</code> / <code>Add</code> / <code>Update</code></td><td>部コードは全体で一意</td></tr>
+    <tr><td><code>IDepartmentRepository</code></td><td><code>FindById</code> / <code>FindByCode</code> / <code>ListByDivision</code> / <code>Add</code> / <code>Update</code></td><td><code>FindByCode</code> が部でスコープされていない(= 課コードは全社一意の扱い)</td></tr>
+    <tr><td><code>IProjectRepository</code></td><td><code>FindById</code> / <code><strong>FindByCode(departmentId, code)</strong></code> / <code>ListByDepartment</code> / <code>Add</code> / <code>Update</code></td><td>コード検索が<strong>課でスコープ</strong>される。DB 側も <code>UNIQUE (department_id, code)</code></td></tr>
+    <tr><td><code>ICostElementRepository</code></td><td><code>FindByCode</code> / <code>List</code> / <code>Add</code></td><td>更新・削除は未提供</td></tr>
+    <tr><td><code>IDepartmentBudgetRepository</code></td><td><code>FindById</code> / <code>List(dept, half)</code> / <code>FindLatestApproved</code> / <code>GetMaxVersion</code> / <code>Add</code> / <code>Update</code></td><td><code>Update</code> は「ヘッダ更新 + 明細の洗い替え」。<code>GetMaxVersion</code> は改定版の採番用(無ければ 0)</td></tr>
+    <tr><td><code>IActualEntryRepository</code></td><td><code>FindById</code> / <code>List(dept, half)</code> / <code>Add</code> / <code>Delete</code></td><td>更新は無い(訂正は削除 + 再計上)</td></tr>
+    <tr><td><code>IDivisionBudgetApprovalRepository</code></td><td><code>Find(div, half)</code> / <code>Add</code> / <code>Delete(div, half)</code></td><td>承認状態 = レコードの有無</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <p>
+    <strong>ポートの粒度について:</strong> クエリはすべて「集約を返す」形に閉じており、
+    プロジェクション用の読み取り専用クエリ(CQRS の Read Model)は存在しません。
+    そのぶん <code>AnalysisService</code> は集約をメモリに読み込んでから集計します。
+    現在のデータ規模では素直で追いやすい選択ですが、部配下の課が増えると
+    <a href="#s12">12 章</a>で触れる N+1 の形が効いてきます。
+  </p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8">8. アプリケーション層</h2>
+
+<h3 id="s8-1">8.1 共通の構造</h3>
+<p>
+アプリケーションサービスは<strong>薄い調停役</strong>に徹しています。8 クラスすべてが同じ骨格です。
+</p>
+<ol class="flow">
+  <li><strong>依存はコンストラクタ注入のみ</strong>。<code>readonly</code> フィールドで保持し、状態は持たない。</li>
+  <li><strong>入口で生値を VO へ変換</strong>: <code>new DepartmentId(guid)</code>、<code>FiscalHalf.Parse(str)</code>、<code>ParseCategory(str)</code>。ここで形式不正は <code>DomainException</code> になる。</li>
+  <li><strong>存在確認</strong>: <code>Find…Async(...) ?? throw new NotFoundException(...)</code> のパターン。<code>RequireAsync</code> という private ヘルパに畳まれていることが多い。</li>
+  <li><strong>複数集約にまたがる検証</strong>: コード重複、案件の課所属、部配下の全課が承認済みか、など。</li>
+  <li><strong>集約のドメインメソッドを呼ぶ</strong>。ここでドメイン固有の不変条件が守られる。</li>
+  <li><strong>リポジトリに保存し、DTO へ変換して返す</strong>(<code>internal static ToDto</code> / <code>ToDetailDto</code>)。</li>
+</ol>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title"><span class="name">ISystemClock</span><span class="jp">時刻ポート</span></div>
+    <p>
+      <code>UtcNow</code> だけを持つインターフェース。集約のファクトリは <code>DateTime now</code> を<strong>引数で受け取る</strong>設計なので、
+      「今」を知っているのはアプリケーション層だけです。ドメインは時刻の取得手段に依存せず、テストでは固定時刻を注入できます。
+      本番実装 <code>SystemClock</code> はインフラ層にあります。
+    </p>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="name">NotFoundException</span><span class="jp">未検出</span></div>
+    <p>
+      「不変条件違反(<code>DomainException</code> → 400)」と「対象が無い(<code>NotFoundException</code> → 404)」を
+      層で分けています。<strong>ドメイン層はこの例外を知りません</strong> — 存在確認はアプリケーション層の仕事だからです。
+    </p>
+  </div>
+</div>
+
+<h3 id="s8-2">8.2 ユースケース一覧</h3>
+
+<h4>マスタ系: DivisionService / DepartmentService / ProjectService / CostElementService</h4>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>メソッド</th><th>ふるまい</th><th>層が追加する検証</th></tr></thead>
+  <tbody>
+    <tr><td><code>DivisionService.CreateAsync</code></td><td>部を登録</td><td>部コードの重複 → 「部コードが重複しています: …」</td></tr>
+    <tr><td><code>DivisionService.ListAsync / GetAsync</code></td><td>コード順の一覧 / ID 取得</td><td>未検出 → 404</td></tr>
+    <tr><td><code>DepartmentService.CreateAsync</code></td><td>指定した部に課を登録</td><td>部の存在(404)+ 課コードの重複(<strong>全社一意</strong>)</td></tr>
+    <tr><td><code>DepartmentService.ListByDivisionAsync</code></td><td>部配下の課をコード順で</td><td>—</td></tr>
+    <tr><td><code>ProjectService.CreateAsync</code></td><td>指定した課に案件を登録</td><td>課の存在(404)+ <strong>同一課内での</strong>コード重複</td></tr>
+    <tr><td><code>ProjectService.UpdateAsync</code></td><td>案件のコード・名称を更新</td><td>案件の存在(404)+ 同一課内の重複(<strong>自分自身は除外</strong>)。予算明細・実績は触らない</td></tr>
+    <tr><td><code>CostElementService.CreateAsync</code></td><td>費目を登録</td><td><code>CostElement.Create</code> で正規化してから重複判定(<code>"license"</code> と <code>"LICENSE"</code> を同一視できる)</td></tr>
+    <tr><td><code>CostElementService.ListAsync</code></td><td>コード順の一覧</td><td>—</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h4>DepartmentBudgetService — 予算のライフサイクル</h4>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>メソッド</th><th>手順とこの層でしか書けない判断</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>CreateDraftAsync</code></td>
+      <td>
+        ① 課の存在確認 →
+        ② (課, 半期) の全バージョンを取得し <strong>ドラフトが既にあれば拒否</strong>(「策定中のドラフトが既に存在します。…」) →
+        ③ 1 件も無ければ <code>CreateInitial</code>、あれば改定版:
+        <code>BaseBudgetId</code> 指定時はその版、未指定なら<strong>ドラフト以外で最大バージョン</strong>を基準にする →
+        ④ <code>GetMaxVersionAsync + 1</code> で採番して <code>ReviseFrom</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>UpsertLineAsync</code></td>
+      <td>
+        区分で分岐。案件別なら <code>RequireProjectInDepartmentAsync</code> が
+        <strong>案件の存在 + その案件が当該課に属すること</strong>を検証(「指定された案件はこの課に属していません。」)。
+        期間費用なら費目マスタの存在を検証。<br>
+        <code>MonthlyAmounts</code> が来ていれば月次 Upsert、無ければ半期一括 Upsert に振り分ける
+        (<strong>この分岐がモード切替の唯一の入口</strong>)
+      </td>
+    </tr>
+    <tr><td><code>RemoveLineAsync</code></td><td>区分に応じて案件 ID / 費目コード(+ 明細名)の指定を要求し、集約の削除メソッドを呼ぶ</td></tr>
+    <tr><td><code>RenamePeriodDetailAsync</code></td><td>費目コード必須を確認して <code>RenamePeriodCostDetail</code> を呼ぶだけの薄いラッパ</td></tr>
+    <tr>
+      <td><code>ApproveAsync</code></td>
+      <td>
+        ① 対象を <code>Approve(now)</code>(ドラフト判定・明細 0 件判定は集約側) →
+        ② 同一 (課, 半期) の<strong>他の承認済みバージョンを走査して <code>Supersede()</code></strong> し、それぞれ保存 →
+        ③ 対象を保存。<strong>「1 つの (課, 半期) に承認済みは 1 つだけ」という集約をまたぐ不変条件をここで実現している</strong>
+      </td>
+    </tr>
+    <tr><td><code>ToSummaryDto</code> / <code>ToDetailDto</code></td><td>区分合計 4 種と計画損益を <code>CategoryTotal</code> / <code>PlannedProfit</code> から詰める。明細は 区分 → 費目 → 明細名 → 案件 の順に整列(分析側の並び順と一致)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h4>ActualEntryService — 実績</h4>
+<p>
+<code>RecordAsync</code> は予算の <code>UpsertLineAsync</code> とほぼ同じ検証(課の存在、区分ごとの案件 or 費目、案件の課所属)を行ってから
+<code>ActualEntry.Record</code> を呼びます。<code>ListAsync</code> は<strong>計上日時の新しい順</strong>、
+<code>DeleteAsync</code> は存在確認してから削除します。区分文字列のパースは
+<code>DepartmentBudgetService.ParseCategory</code>(<code>internal static</code>)を共用しています。
+</p>
+
+<h4>DivisionBudgetApprovalService — 部承認</h4>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>メソッド</th><th>手順</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>ApproveAsync</code></td>
+      <td>
+        ① 部の存在確認 → ② 配下課が 0 件なら「承認する課がありません。」 →
+        ③ <strong>全課について最新承認済み予算の存在をループで確認</strong>(1 つでも無ければ
+        「未承認の予算がある課があります。…」)→
+        ④ 既存の承認レコードがあれば削除してから新規追加(<code>ApprovedAt</code> を最新に更新する意図)
+      </td>
+    </tr>
+    <tr><td><code>RevokeAsync</code></td><td>部の存在だけ確認して承認レコードを削除。<strong>冪等</strong>(未承認でもエラーにしない)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h4>AnalysisService — 参照系の集大成</h4>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>メソッド</th><th>組み立て方</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>AnalyzeVarianceAsync</code></td>
+      <td>
+        <code>ResolveBudgetAsync</code> で基準予算を決定 → 実績を取得 → <code>BudgetVarianceAnalysisService.Analyze</code> →
+        <code>LoadNamesAsync</code> で案件名・費目名を解決して DTO 化。<strong>ドメインのレポートは ID しか持たず、表示名の付与はこの層</strong>
+      </td>
+    </tr>
+    <tr><td><code>CompareBudgetsAsync</code></td><td>(課, 半期) の全バージョンからバージョン番号で 2 件を引き当て(無ければ 404)、<code>BudgetComparisonService.Compare</code> に渡す</td></tr>
+    <tr><td><code>GetProfitSummaryAsync</code></td><td><code>_profitAnalysis.Analyze(_varianceAnalysis.Analyze(budget, actuals))</code> と<strong>2 つのドメインサービスを合成</strong>して呼ぶ</td></tr>
+    <tr>
+      <td><code>GetDivisionBudgetSummaryAsync</code></td>
+      <td>
+        部の存在確認 → 配下課をコード順に取得 → <strong>課ごとに</strong>最新承認済み予算と実績を取得して差異分析
+        (<strong>承認済み予算が無い課は入力から除外</strong>)→ <code>Summarize</code> →
+        課別内訳では除外した課も <code>HasApprovedBudget = false</code> の 0 行として表示 →
+        承認レコードの有無と <code>CanApprove</code>(課 ≧ 1 かつ全課が承認済み予算を持つ)を添えて返す
+      </td>
+    </tr>
+    <tr>
+      <td><code>ResolveBudgetAsync</code>(private)</td>
+      <td><code>budgetId</code> 指定時はその予算を取得し<strong>課・半期の一致を検証</strong>(不一致は <code>DomainException</code>)。未指定なら最新承認済み、無ければ「承認済みの予算が存在しません。先に予算を承認してください。」</td>
+    </tr>
+    <tr><td><code>NameLookup</code>(private record)</td><td>案件 ID → (コード, 名称) と費目コード → 名称の辞書。案件名は無ければ <code>null</code>、案件コードは無ければ空文字を返す<strong>非対称な既定値</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3 id="s8-3">8.3 DTO カタログ</h3>
+<p>
+すべて <code>sealed record</code> の位置パラメータ形式で、<code>Dtos.cs</code> に集約されています。
+<strong>ドメインの型(<code>Money</code> / <code>FiscalHalf</code> / <code>BudgetCategory</code> / 型付き ID)は境界を越えません</strong> —
+それぞれ <code>decimal</code> / <code>string</code> / <code>string</code> / <code>Guid</code> に平坦化されます。
+</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>グループ</th><th>DTO</th><th>備考</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="2">マスタ</td><td><code>DivisionDto</code> / <code>DepartmentDto</code> / <code>ProjectDto</code></td><td>親の ID(<code>DivisionId</code> / <code>DepartmentId</code>)を含む</td></tr>
+    <tr><td><code>CostElementDto</code></td><td>コードと名称のみ</td></tr>
+    <tr><td rowspan="3">予算</td><td><code>BudgetLineDto</code></td><td><code>IsMonthly</code> と <code>MonthlyAmounts</code>(1〜6 → 金額)を持つ。<code>Amount</code> は常に半期合計</td></tr>
+    <tr><td><code>BudgetSummaryDto</code></td><td>一覧用。区分合計 4 種 + <code>PlannedProfit</code></td></tr>
+    <tr><td><code>BudgetDetailDto</code></td><td>サマリ + 明細一覧</td></tr>
+    <tr><td>実績</td><td><code>ActualEntryDto</code></td><td><code>Month</code>(1〜6 / null)、<code>PeriodDetail</code>、<code>Note</code></td></tr>
+    <tr><td rowspan="3">差異・比較</td><td><code>VarianceLineDto</code> / <code>CategoryVarianceDto</code> / <code>VarianceReportDto</code></td><td>ドメインの record に<strong>表示名(<code>ProjectName</code> / <code>ElementName</code>)と <code>IsFavorable</code> / <code>IsAdverse</code> を展開</strong>して追加</td></tr>
+    <tr><td><code>BudgetComparisonLineDto</code> / <code>CategoryComparisonDto</code> / <code>BudgetComparisonDto</code></td><td>同上</td></tr>
+    <tr><td><code>ProjectProfitLineDto</code> / <code>ProfitSummaryDto</code></td><td>案件コード・名称つき。粗利率は <code>decimal?</code></td></tr>
+    <tr><td>部集計</td><td><code>CategorySummaryDto</code> / <code>DepartmentSummaryLineDto</code> / <code>DivisionBudgetSummaryDto</code></td><td><code>HasApprovedBudget</code>(未策定の課)、<code>IsApproved</code> / <code>ApprovedAt</code> / <code>CanApprove</code>(部承認の状態)</td></tr>
+    <tr><td>リクエスト</td><td><code>CreateDivisionRequest</code> / <code>CreateDepartmentRequest</code> / <code>CreateProjectRequest</code> / <code>UpdateProjectRequest</code> / <code>CreateCostElementRequest</code> / <code>CreateBudgetRequest</code> / <code>UpsertBudgetLineRequest</code> / <code>RenamePeriodDetailRequest</code> / <code>RecordActualRequest</code></td><td>省略可能なパラメータは既定値つき(<code>MonthlyAmounts = null</code>、<code>Month = null</code>、<code>PeriodDetail = null</code> など)</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="note">
+  <p>
+    <strong>読みどころ:</strong> <code>UpsertBudgetLineRequest</code> の <code>MonthlyAmounts</code> は
+    <strong><code>null</code> か否かで入力モードが切り替わる</strong>スイッチです(空辞書を渡した場合は「月次モードで全月 0 円」= 合計 0 として扱われる)。
+    リクエストの見た目以上に意味を持つフィールドなので、API を触るときは意識が要ります。
+  </p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9">9. 責務分担(ドメイン / アプリケーション)</h2>
+
+<p>「なぜこの検証がここにあるのか」を一望できるようにまとめます。判断基準は明快で、<strong>1 つの集約の内部で完結する規則はドメイン、複数の集約やリポジトリの問い合わせを要する規則はアプリケーション</strong>です。</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>規則</th><th>置き場所</th><th>実装</th></tr></thead>
+  <tbody>
+    <tr><td>区分と案件/費目の排他</td><td><span class="badge b-agg">ドメイン</span></td><td><code>BudgetCategories.ValidateKey</code>(予算・実績で共用)</td></tr>
+    <tr><td>金額 ≧ 0 / 月は 1〜6</td><td><span class="badge b-agg">ドメイン</span></td><td><code>Money.IsNegative</code> / <code>HalfMonths.Validate</code></td></tr>
+    <tr><td>承認済み予算は編集不可</td><td><span class="badge b-agg">ドメイン</span></td><td><code>DepartmentBudget.EnsureDraft</code></td></tr>
+    <tr><td>明細 0 件の予算は承認不可</td><td><span class="badge b-agg">ドメイン</span></td><td><code>DepartmentBudget.Approve</code></td></tr>
+    <tr><td>費目内で「費目一括」と「明細」の混在不可</td><td><span class="badge b-agg">ドメイン</span></td><td><code>EnsurePeriodModeConsistent</code></td></tr>
+    <tr><td>区分合計 = 明細合計</td><td><span class="badge b-agg">ドメイン</span></td><td><code>CategoryTotal</code>(そもそも合計を保持しない構造)</td></tr>
+    <tr><td>同一 (課, 半期) にドラフトは 1 件</td><td><span class="badge b-app">アプリケーション</span></td><td><code>DepartmentBudgetService.CreateDraftAsync</code>(既存バージョン全件が必要)</td></tr>
+    <tr><td>承認済みは (課, 半期) に 1 つ(旧版の失効)</td><td><span class="badge b-app">アプリケーション</span></td><td><code>DepartmentBudgetService.ApproveAsync</code>(兄弟集約の走査が必要)</td></tr>
+    <tr><td>改定版のバージョン採番</td><td>両方</td><td>採番は <code>GetMaxVersionAsync</code>(アプリ)/ 大小関係の検証は <code>ReviseFrom</code>(ドメイン)</td></tr>
+    <tr><td>明細の案件が同一課に属する</td><td><span class="badge b-app">アプリケーション</span></td><td><code>RequireProjectInDepartmentAsync</code> ほか(<code>Project</code> 集約の参照が必要)</td></tr>
+    <tr><td>費目がマスタに存在する</td><td><span class="badge b-app">アプリケーション</span></td><td><code>RequireElementAsync</code></td></tr>
+    <tr><td>コードの一意性(部 / 課 / 案件 / 費目)</td><td><span class="badge b-app">アプリケーション</span></td><td>各 <code>CreateAsync</code> / <code>UpdateAsync</code>(リポジトリ照会が必要)</td></tr>
+    <tr><td>部承認の可否(配下全課が承認済み)</td><td><span class="badge b-app">アプリケーション</span></td><td><code>DivisionBudgetApprovalService.ApproveAsync</code> / 表示用は <code>AnalysisService</code> の <code>CanApprove</code></td></tr>
+    <tr><td>部集計に含める課の選別</td><td><span class="badge b-app">アプリケーション</span></td><td><code>GetDivisionBudgetSummaryAsync</code>(承認済み予算が無い課を入力から除外)</td></tr>
+    <tr><td>現在時刻の取得</td><td><span class="badge b-app">アプリケーション</span></td><td><code>ISystemClock</code>。ドメインは <code>DateTime now</code> を引数で受けるだけ</td></tr>
+    <tr><td>表示名の解決(案件名・費目名)</td><td><span class="badge b-app">アプリケーション</span></td><td><code>AnalysisService.NameLookup</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s10">10. 不変条件の一覧</h2>
+
+<p>レビュー時のチェックリストとして、モデルが守ると宣言している性質を集めます。</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>#</th><th>不変条件</th><th>守り方</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>課は必ず 1 つの部に属する</td><td><code>Department.DivisionId</code> が必須・変更不可</td></tr>
+    <tr><td>2</td><td>案件は必ず 1 つの課に属する</td><td><code>Project.DepartmentId</code> が必須・変更不可</td></tr>
+    <tr><td>3</td><td>予算・実績を持つのは課だけ</td><td>部の集約に金額が一切存在しない</td></tr>
+    <tr><td>4</td><td>区分合計 = 明細の合計</td><td>ヘッダに合計フィールドを置かず <code>CategoryTotal</code> で導出</td></tr>
+    <tr><td>5</td><td>月次モードの明細は 半期合計 = 月別金額の合計</td><td><code>SetMonthly</code> が総和を <code>Amount</code> に代入(外部から書けない)</td></tr>
+    <tr><td>6</td><td>明細キーは (区分, 案件) / (期間費用, 費目, 明細名) で一意</td><td>すべての追加が Upsert(同一キーは上書き)</td></tr>
+    <tr><td>7</td><td>案件別区分に費目は付かない / 期間費用に案件は付かない</td><td><code>ValidateKey</code>(生成・復元の両方で通過)</td></tr>
+    <tr><td>8</td><td>明細名は期間費用専用</td><td><code>BudgetLine</code> コンストラクタ / <code>ActualEntry.Record</code></td></tr>
+    <tr><td>9</td><td>1 費目は「費目一括」か「明細」のどちらか一方</td><td><code>EnsurePeriodModeConsistent</code></td></tr>
+    <tr><td>10</td><td>同一費目内で明細名は重複しない</td><td><code>RenamePeriodCostDetail</code> の重複判定 + Upsert のキー一致</td></tr>
+    <tr><td>11</td><td>金額は 0 以上</td><td><code>ValidateAmount</code> / <code>SetMonthly</code> / <code>ActualEntry.Record</code></td></tr>
+    <tr><td>12</td><td>月は 1〜6</td><td><code>HalfMonths.Validate</code></td></tr>
+    <tr><td>13</td><td>承認済み・失効済みの予算は編集できない</td><td><code>EnsureDraft</code>(全編集メソッドの先頭)</td></tr>
+    <tr><td>14</td><td>明細のない予算は承認できない</td><td><code>Approve</code></td></tr>
+    <tr><td>15</td><td>改定版のバージョンは基準版より大きい</td><td><code>ReviseFrom</code></td></tr>
+    <tr><td>16</td><td>同一 (課, 半期) にドラフトは 1 件、承認済みは 1 件</td><td>アプリケーション層(<code>CreateDraftAsync</code> / <code>ApproveAsync</code>)</td></tr>
+    <tr><td>17</td><td>差異 = 実績 − 予算(有利/不利の向きだけ区分で反転)</td><td><code>VarianceLine.IsFavorable</code> / <code>IsAdverse</code></td></tr>
+    <tr><td>18</td><td>案件別損益の合計 − 期間費用 = 課全体の損益</td><td><code>ProfitAnalysisService</code> の 2 つの定義 + テスト</td></tr>
+    <tr><td>19</td><td>部合計 = 課別内訳の合計</td><td><code>DivisionBudgetSummaryService</code> が同じ入力から両方を生成</td></tr>
+    <tr><td>20</td><td>比較できるのは同一 (課, 半期) の予算同士だけ</td><td><code>BudgetComparisonService.Compare</code></td></tr>
+    <tr><td>21</td><td>分析の基準予算は当該課・半期のものに限る</td><td><code>AnalysisService.ResolveBudgetAsync</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s11">11. 主要シナリオの流れ</h2>
+
+<h3>11.1 予算の策定 → 承認 → 改定</h3>
+<ol class="flow">
+  <li><code>DepartmentBudgetService.CreateDraftAsync</code>: 課と半期を指定してドラフト起票。初回は <code>CreateInitial</code> で v1、明細ゼロ。</li>
+  <li><code>UpsertLineAsync</code> を明細の数だけ呼ぶ。案件別は案件の課所属を、期間費用は費目マスタの存在を検証してから集約に反映し、その都度 <code>UpdateAsync</code>(ヘッダ + 明細の洗い替え)で保存。</li>
+  <li><code>ApproveAsync</code>: 集約が <code>Draft</code> かつ明細 ≧ 1 件を確認して <code>Approved</code> に。続いて同一 (課, 半期) の旧承認版を <code>Supersede()</code> して保存。</li>
+  <li>期中に見直しが必要になったら <code>CreateDraftAsync</code>(<code>BaseBudgetId</code> 省略なら最新の非ドラフト版が基準)。明細が新しい ID で複製された v2 ドラフトができる。</li>
+  <li>v2 を承認すると v1 が <code>Superseded</code> になり、履歴として残る。<code>CompareBudgetsAsync(1, 2)</code> で増減を明細単位に見られる。</li>
+</ol>
+
+<h3>11.2 実績計上 → 差異分析 → 損益</h3>
+<ol class="flow">
+  <li><code>ActualEntryService.RecordAsync</code>: (課, 半期, 区分, 案件 or 費目 [, 明細名] [, 月]) と金額で計上。<strong>予算明細との突合はしない</strong>。</li>
+  <li><code>AnalysisService.AnalyzeVarianceAsync</code>: 基準予算(既定は最新承認済み)と当該半期の実績を全件取得。</li>
+  <li><code>BudgetVarianceAnalysisService.Analyze</code>: 実績を同一キーで合算し、予算キーとの和集合で明細ごとの差異を算出。予算に無いキーは <code>IsUnplanned</code>。</li>
+  <li>アプリケーション層が案件名・費目名を解決し、<code>IsFavorable</code> / <code>IsAdverse</code> を展開して <code>VarianceReportDto</code> に。</li>
+  <li><code>GetProfitSummaryAsync</code> は同じ <code>VarianceReport</code> を <code>ProfitAnalysisService</code> に流し、案件別損益(期間費用を除く)と課全体の損益・粗利率を得る。</li>
+</ol>
+
+<h3>11.3 部の集計と部承認</h3>
+<ol class="flow">
+  <li><code>AnalysisService.GetDivisionBudgetSummaryAsync</code>: 配下課をコード順に列挙し、課ごとに最新承認済み予算 + 実績で差異分析。</li>
+  <li>承認済み予算が無い課は<strong>合計から除外</strong>し、課別内訳にだけ <code>HasApprovedBudget = false</code> の行として残す。</li>
+  <li><code>DivisionBudgetSummaryService.Summarize</code> が区分別・全体・課別内訳を合計する。</li>
+  <li>同じ応答に部承認の状態(<code>IsApproved</code> / <code>ApprovedAt</code>)と <code>CanApprove</code> を載せる。</li>
+  <li><code>DivisionBudgetApprovalService.ApproveAsync</code> は全課の承認済み予算を再確認したうえで承認レコードを作る。取り消しは <code>RevokeAsync</code>(冪等)。</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="s12">12. レビュー時の着眼点</h2>
+
+<p>
+以下はコードを読んで気づいた点の整理です。<strong>不具合の指摘ではなく</strong>、仕様として意図されているかを
+確認したい箇所、および将来の変更時に影響が出やすい箇所です。
+</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>#</th><th>箇所</th><th>観察</th><th>確認したいこと</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><code>DepartmentService.CreateAsync</code></td>
+      <td>課コードの重複判定が <code>FindByCodeAsync(code)</code> で、部でスコープされていない(= 全社一意)。案件コードは課ごとに一意という非対称がある</td>
+      <td>課コードは全社一意で正しいか(部が違えば同じ課コードを使いたい運用が無いか)</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><code>DepartmentBudgetService.ApproveAsync</code></td>
+      <td>承認 → 旧版の失効 → 保存 が複数回のリポジトリ呼び出しに分かれており、トランザクション境界が無い。途中で失敗すると「承認済みが 2 つ」の状態が残りうる</td>
+      <td>単一プロセス・SQLite の前提で許容する判断か。将来 Unit of Work を導入する余地</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><code>AnalysisService.GetDivisionBudgetSummaryAsync</code></td>
+      <td>配下課の数だけ「最新承認済み予算」「実績一覧」を順次取得する(N+1)。課が増えるほど線形に遅くなる</td>
+      <td>想定される課の規模。必要なら一括取得のポート追加を検討</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><code>Division.Rename</code> / <code>Department.Rename</code></td>
+      <td>ドメインメソッドとリポジトリの <code>UpdateAsync</code> は用意されているが、アプリケーション層から呼ぶユースケースが存在しない(案件だけ <code>UpdateAsync</code> がある)</td>
+      <td>部名・課名の変更は今後提供する予定か。当面不要なら未使用であることを認識しておく</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><code>DepartmentBudgetService.ParseCategory</code></td>
+      <td><code>Enum.TryParse(..., ignoreCase: false, ...)</code> のため、区分文字列は <code>"Revenue"</code> のような<strong>大文字小文字完全一致</strong>が必要</td>
+      <td>API のクライアント側と表記が揃っているか(意図的な厳格さと読める)</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td><code>DivisionBudgetApprovalService.ApproveAsync</code></td>
+      <td>再承認時に「削除 → 追加」で <code>ApprovedAt</code> を更新している。承認 ID は毎回変わる</td>
+      <td>承認履歴を残す要件が将来出てこないか(現状は最新 1 件のみ)</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td><code>BudgetLine.RemovePeriodCostLine</code></td>
+      <td>明細名を省略すると<strong>「費目一括の行」だけ</strong>が削除対象になる(その費目の明細を一括削除する操作ではない)</td>
+      <td>UI 側の「費目ごと削除」操作がある場合、明細を 1 件ずつ削除する実装になっているか</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td><code>UpsertBudgetLineRequest.MonthlyAmounts</code></td>
+      <td>空の辞書は <code>null</code> ではないため月次側の分岐に入るが、<code>SetMonthly</code> が保持する月別金額を 0 件にするため、結果は<strong>金額 0 円の半期一括明細</strong>(<code>IsMonthly = false</code>)になる。<code>Amount</code> に何を入れて送っても無視される</td>
+      <td>「明細を残したまま金額を空にする」意図の入力がここに流れ込まないか(金額 0 の明細が残る)</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td><code>ProfitAnalysisService</code></td>
+      <td><code>GroupBy(l =&gt; l.ProjectId!.Value)</code> と null 免除演算子を使っている。案件別区分の明細は必ず案件 ID を持つ、という <code>ValidateKey</code> の保証に依存している</td>
+      <td>区分を追加する際は <code>IsProjectBased</code> と <code>ValidateKey</code> の整合を必ず同時に見直す</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td><code>NameLookup.ProjectCode</code> / <code>ProjectName</code></td>
+      <td>見つからないときの既定値が空文字と <code>null</code> で非対称</td>
+      <td>フロント側の表示要件に合わせた意図的な差か</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>集約の <code>Restore</code></td>
+      <td>基本は検証をスキップするが、<code>BudgetLine</code> だけは <code>internal</code> コンストラクタ経由で <code>ValidateKey</code> が走る。DB に不整合レコードがあると読み出し時に <code>DomainException</code> になる</td>
+      <td>スキーマ移行時のデータ整合(意図的な安全弁と読める)</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>ドメインサービス 4 種の <code>AllCategories</code></td>
+      <td>4 区分の配列が 3 ファイルに重複定義されている</td>
+      <td>区分を追加・削除するときの更新漏れに注意(共通化の余地)</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>まとめ</h3>
+<p>
+このコードベースの読みやすさは、<strong>「不変条件を検証で守る」より「壊せない構造にする」を優先している</strong>点に由来します。
+区分合計をフィールドとして持たない、月次合計を代入でしか作らせない、明細の生成経路を <code>internal</code> に閉じる、
+承認済みなら編集メソッドが全部その場で止まる — いずれも「間違った状態を作れる経路自体を消す」設計です。
+一方で、<strong>複数集約にまたがる規則は意図的にアプリケーション層へ追い出されており</strong>
+(ドラフト 1 件・承認済み 1 件・部承認の可否・コード一意性)、
+レビューではこの境界線を意識して、どちらの層を読むべきかを切り分けるのが近道です。
+</p>
+
+<p class="src" style="margin-top:40px; padding-top:16px; border-top:1px solid var(--border);">
+  本レポートは <code>backend/src/CostManagement.Domain</code> および <code>backend/src/CostManagement.Application</code> の全ソース(計 23 ファイル)を読んで作成しました。
+  関連文書: <a href="../DESIGN.md">docs/DESIGN.md</a>(クラス図・コンテキストマップ)、<a href="../adr/">docs/adr/</a>(設計判断の経緯)。
+</p>
+
+</main>
+</div>
+</body>
+</html>

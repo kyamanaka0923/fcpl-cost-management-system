@@ -126,6 +126,10 @@ public sealed class DatabaseInitializer
             CREATE INDEX IF NOT EXISTS ix_projects_department ON projects(department_id);
             CREATE INDEX IF NOT EXISTS ix_budgets_dept_half
                 ON department_budgets(department_id, fiscal_half);
+            -- 「(課, 半期)の最新の承認済みバージョン」を絞り込むためのインデックス。
+            -- 部集計は配下課ぶんをまとめて引くため、status での絞り込みと version の降順を効かせる。
+            CREATE INDEX IF NOT EXISTS ix_budgets_dept_half_status_version
+                ON department_budgets(department_id, fiscal_half, status, version DESC);
             CREATE INDEX IF NOT EXISTS ix_budget_lines_budget ON department_budget_lines(budget_id);
             CREATE INDEX IF NOT EXISTS ix_budget_line_months_line
                 ON department_budget_line_months(line_id);

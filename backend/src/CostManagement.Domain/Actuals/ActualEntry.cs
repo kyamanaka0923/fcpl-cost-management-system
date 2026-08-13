@@ -119,6 +119,16 @@ public interface IActualEntryRepository
     Task<IReadOnlyList<ActualEntry>> ListAsync(DepartmentId departmentId, FiscalHalf fiscalHalf,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// 複数課の実績を、(課, 区分) ごとの合計として一括取得する(部集計用)。
+    /// 課ごとに <see cref="ListAsync(DepartmentId, FiscalHalf, CancellationToken)"/> を繰り返すと
+    /// 課数に比例してクエリが増えるうえ、部の集計に明細は要らないため、こちらを使う。
+    /// 実績が1件もない区分は結果に含まれない。
+    /// </summary>
+    Task<IReadOnlyList<DepartmentCategoryAmount>> SumByCategoryAsync(
+        IReadOnlyCollection<DepartmentId> departmentIds, FiscalHalf fiscalHalf,
+        CancellationToken ct = default);
+
     /// <summary>実績を1件追加する。</summary>
     Task AddAsync(ActualEntry entry, CancellationToken ct = default);
 

@@ -516,6 +516,24 @@ public interface IDepartmentBudgetRepository
     Task<DepartmentBudget?> FindLatestApprovedAsync(DepartmentId departmentId, FiscalHalf fiscalHalf,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// 複数課の最新の承認済み予算を、(課, 区分) ごとの合計として一括取得する(部集計用)。
+    /// 課ごとに <see cref="FindLatestApprovedAsync"/> を繰り返すと課数に比例してクエリが増え、
+    /// さらに集計には不要な明細・月別金額まで復元することになるため、部の集計はこちらを使う。
+    /// 明細が1件もない区分は結果に含まれない。
+    /// </summary>
+    Task<IReadOnlyList<DepartmentCategoryAmount>> SumLatestApprovedByCategoryAsync(
+        IReadOnlyCollection<DepartmentId> departmentIds, FiscalHalf fiscalHalf,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// 指定した課のうち、その半期の承認済み予算を持つ課のIDだけを返す(存在確認用)。
+    /// 明細を読まないため、承認可否の判定のように金額が不要な場面で使う。
+    /// </summary>
+    Task<IReadOnlyList<DepartmentId>> ListDepartmentIdsWithApprovedAsync(
+        IReadOnlyCollection<DepartmentId> departmentIds, FiscalHalf fiscalHalf,
+        CancellationToken ct = default);
+
     /// <summary>(課, 半期)の最大バージョン番号を取得する(改定版の採番に使う。無ければ0)。</summary>
     Task<int> GetMaxVersionAsync(DepartmentId departmentId, FiscalHalf fiscalHalf,
         CancellationToken ct = default);

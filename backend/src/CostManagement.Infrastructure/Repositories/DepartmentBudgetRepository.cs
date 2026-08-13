@@ -4,6 +4,7 @@ using CostManagement.Domain.Shared;
 using CostManagement.Infrastructure.Persistence;
 using Dapper;
 using Microsoft.Data.Sqlite;
+using static CostManagement.Infrastructure.Persistence.SqlIdChunks;
 
 namespace CostManagement.Infrastructure.Repositories;
 
@@ -105,6 +106,58 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
             $"{SelectLineSql} WHERE budget_id = @Id", new { Id = budget.Id });
         var months = await MonthsByLineAsync(conn, budget.Id);
         return ToEntity(budget, lines, months);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<DepartmentCategoryAmount>> SumLatestApprovedByCategoryAsync(
+        IReadOnlyCollection<DepartmentId> departmentIds, FiscalHalf fiscalHalf,
+        CancellationToken ct = default)
+    {
+        if (departmentIds.Count == 0)
+            return [];
+
+        using var conn = _factory.Create();
+        var rows = new List<CategoryAmountRows.Row>();
+        foreach (var chunk in Chunked(departmentIds.Select(d => d.Value)))
+        {
+            // 課ごとの最新承認版をウィンドウ関数で絞り込み、その明細金額だけを読む。
+            // 集約は復元しない(月別金額も読まない)ので、明細が増えても行を流すコストで済む。
+            rows.AddRange(await conn.QueryAsync<CategoryAmountRows.Row>(new CommandDefinition("""
+                SELECT latest.department_id AS DepartmentId, l.category AS Category,
+                       l.amount AS Amount
+                FROM department_budget_lines l
+                JOIN (SELECT id, department_id
+                      FROM (SELECT b.id, b.department_id,
+                                   ROW_NUMBER() OVER (PARTITION BY b.department_id
+                                                      ORDER BY b.version DESC) AS rn
+                            FROM department_budgets b
+                            WHERE b.department_id IN @Dids AND b.fiscal_half = @Half
+                              AND b.status = 'Approved')
+                      WHERE rn = 1) latest ON latest.id = l.budget_id
+                """, new { Dids = chunk, Half = fiscalHalf.ToString() }, cancellationToken: ct)));
+        }
+        return CategoryAmountRows.Aggregate(rows);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<DepartmentId>> ListDepartmentIdsWithApprovedAsync(
+        IReadOnlyCollection<DepartmentId> departmentIds, FiscalHalf fiscalHalf,
+        CancellationToken ct = default)
+    {
+        if (departmentIds.Count == 0)
+            return [];
+
+        using var conn = _factory.Create();
+        var found = new List<Guid>();
+        foreach (var chunk in Chunked(departmentIds.Select(d => d.Value)))
+        {
+            found.AddRange(await conn.QueryAsync<Guid>(new CommandDefinition("""
+                SELECT DISTINCT department_id
+                FROM department_budgets
+                WHERE department_id IN @Dids AND fiscal_half = @Half AND status = 'Approved'
+                """, new { Dids = chunk, Half = fiscalHalf.ToString() }, cancellationToken: ct)));
+        }
+        return found.Select(id => new DepartmentId(id)).ToList();
     }
 
     /// <inheritdoc />
