@@ -92,6 +92,26 @@ public class DepartmentBudgetTests
     }
 
     [Fact]
+    public void 不正な月次金額での上書きが拒否されても既存明細の金額と月次は変わらない()
+    {
+        // プロパティベーステストで検出: 検証前に月別金額を書き換えていたため、
+        // 例外後に「半期合計 = 月次の合計」が崩れた明細が残っていた。
+        var budget = NewDraft();
+        budget.UpsertPeriodCostLine(License, new Money(300_000m), "AWS");
+
+        Assert.Throws<DomainException>(() =>
+            budget.UpsertPeriodCostLineMonthly(License,
+                new Dictionary<int, Money> { [1] = new(100_000m), [7] = new(50_000m) }, "AWS"));
+        Assert.Throws<DomainException>(() =>
+            budget.UpsertPeriodCostLineMonthly(License,
+                new Dictionary<int, Money> { [1] = new(100_000m), [2] = new(-1m) }, "AWS"));
+
+        var line = Assert.Single(budget.Lines);
+        Assert.Equal(300_000m, line.Amount.Value);
+        Assert.False(line.IsMonthly);
+    }
+
+    [Fact]
     public void 同一費目の期間費用明細は上書きされる()
     {
         var budget = NewDraft();

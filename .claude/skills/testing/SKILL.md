@@ -48,6 +48,29 @@ model: claude-sonnet-5
   クリアされる画面なら `await expect(欄).toHaveValue('')` で完了を待ってから次へ進む
   (`reuseExistingServer` で残ったサーバを掴むと結果がぶれるので、E2E前に 5173/5100 を掃除する)
 
+## プロパティベーステスト(CsCheck)
+
+例示テストに加えて、ドメインとユースケースの**不変条件**は CsCheck で任意の入力に対して検証する
+(C# ネイティブ・縮小付き。Domain.Tests / Application.Tests が参照)。`[Fact]` の中で
+`gen.Sample(...)` / `gen.SampleAsync(...)` を呼ぶだけでよい。
+
+| 置き場所 | クラス | 検証する性質 |
+|---|---|---|
+| Domain.Tests/PropertyBased/ValueObjectPropertyTests.cs | `値オブジェクトの性質` | Money の加減算の法則、FiscalHalf の文字列往復と全順序、費目コードの正規化、月 1..6 |
+| 〃 DepartmentBudgetPropertyTests.cs | `課予算の性質` | **モデルベース**: 任意の編集操作列を集約と単純モデルに適用し成否・状態が一致、拒否された操作は無副作用、不変条件(区分合計=明細合計・月次合計・混在禁止)。承認後の編集拒否、改定の引き継ぎ、Restore 往復 |
+| 〃 ActualEntryPropertyTests.cs | `実績計上の性質` | 計上可否の規則、明細名・備考の正規化、Restore 往復 |
+| 〃 AnalysisServicePropertyTests.cs | `分析サービスの性質` | 差異=実績−予算、区分合計=明細合計、予定外判定、入力順非依存、比較の反対称性、「案件別損益−期間費用=全体損益」、「部合計=課別内訳の合計」 |
+| Application.Tests/UseCasePropertyTests.cs | `ユースケースの性質` | SQLite 往復後も応答どおり読み戻せる、改定を繰り返しても承認版は常に1件、実績合計の反映、部合計は承認済み課のみ |
+
+- 生成器は `PropertyBased/DomainGenerators.cs`(`ドメイン生成器`)。案件・費目・明細名は**小さなプール**から選び、
+  上書き・衝突・混在が頻繁に起きるようにする。金額は1円単位の整数(decimal の和を厳密比較するため)
+- 失敗時は `Set seed: "..."` が出る。`CsCheck_Seed=<seed> dotnet test --filter ...` で再現。
+  反復回数は `CsCheck_Iter=2000` 等で一時的に増やせる(既定 100。Application は DB を作るため `iter: 25`)
+- 反例表示のため、Dictionary を持つ操作 record は `ToString` を上書きする(既定では中身が出ない)
+- **落とし穴**: SQLite 往復した decimal は値が同じでも scale が変わる(`100` → `100.0`)。文字列比較時は正規化する
+- PBT で `BudgetLine.SetMonthly` が検証前に月別金額を書き換えていた不具合を検出・修正済み
+  (回帰テスト `不正な月次金額での上書きが拒否されても既存明細の金額と月次は変わらない`)
+
 ## 実行方法
 
 ```bash
