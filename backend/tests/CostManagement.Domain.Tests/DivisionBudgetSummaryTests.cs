@@ -14,31 +14,63 @@ public class DivisionBudgetSummaryTests
     private static readonly FiscalHalf Half = new(2026, HalfTerm.H1);
     private static readonly CostElementCode Personnel = new("PERSONNEL");
 
-    private static readonly BudgetVarianceAnalysisService VarianceService = new();
     private static readonly DivisionBudgetSummaryService Service = new();
 
-    // 課の予実差異分析結果を、売上高・加工費・期間費用の予算/実績から組み立てるヘルパ。
-    private static DepartmentVarianceInput 課の予実(
+    // 課の区分別合計を、売上高・加工費・期間費用の予算/実績から組み立てるヘルパ。
+    private static DepartmentCategoryTotals 課の予実(
         decimal 売上予算, decimal 売上実績,
         decimal 加工費予算, decimal 加工費実績,
         decimal 期間費用予算, decimal 期間費用実績)
     {
         var dept = DepartmentId.New();
-        var project = ProjectId.New();
-        var budget = DepartmentBudget.CreateInitial(dept, Half, "当初予算", Now);
-        budget.UpsertProjectLine(BudgetCategory.Revenue, project, new Money(売上予算));
-        budget.UpsertProjectLine(BudgetCategory.Processing, project, new Money(加工費予算));
-        budget.UpsertPeriodCostLine(Personnel, new Money(期間費用予算));
-        budget.Approve(Now);
+        return DepartmentCategoryTotals.FromCategoryAmounts(dept,
+            [
+                new(dept, BudgetCategory.Revenue, new Money(売上予算)),
+                new(dept, BudgetCategory.Processing, new Money(加工費予算)),
+                new(dept, BudgetCategory.PeriodCost, new Money(期間費用予算)),
+            ],
+            [
+                new(dept, BudgetCategory.Revenue, new Money(売上実績)),
+                new(dept, BudgetCategory.Processing, new Money(加工費実績)),
+                new(dept, BudgetCategory.PeriodCost, new Money(期間費用実績)),
+            ]);
+    }
 
-        var actuals = new[]
-        {
-            ActualEntry.Record(dept, Half, BudgetCategory.Revenue, project, null, null, new Money(売上実績), null, Now),
-            ActualEntry.Record(dept, Half, BudgetCategory.Processing, project, null, null, new Money(加工費実績), null, Now),
-            ActualEntry.Record(dept, Half, BudgetCategory.PeriodCost, null, Personnel, null, new Money(期間費用実績), null, Now),
-        };
+    [Fact]
+    public void 課の集計は外注費のように金額のない区分も0で埋める()
+    {
+        var dept = DepartmentId.New();
 
-        return new DepartmentVarianceInput(dept, VarianceService.Analyze(budget, actuals));
+        var totals = DepartmentCategoryTotals.FromCategoryAmounts(dept,
+            [new(dept, BudgetCategory.Revenue, new Money(3_000_000m))],
+            []);
+
+        Assert.Equal(4, totals.Categories.Count);
+        var outsourcing = totals.Categories.Single(c => c.Category == BudgetCategory.Outsourcing);
+        Assert.Equal(0m, outsourcing.PlannedAmount);
+        Assert.Equal(0m, outsourcing.ActualAmount);
+        Assert.Equal(3_000_000m, totals.PlannedRevenue);
+        Assert.Equal(0m, totals.ActualRevenue);
+        Assert.Equal(0m, totals.PlannedCost);
+    }
+
+    [Fact]
+    public void 課のコストは売上高以外の3区分の合計になる()
+    {
+        var dept = DepartmentId.New();
+
+        var totals = DepartmentCategoryTotals.FromCategoryAmounts(dept,
+            [
+                new(dept, BudgetCategory.Revenue, new Money(5_000_000m)),
+                new(dept, BudgetCategory.Processing, new Money(1_000_000m)),
+                new(dept, BudgetCategory.Outsourcing, new Money(800_000m)),
+                new(dept, BudgetCategory.PeriodCost, new Money(200_000m)),
+            ],
+            [new(dept, BudgetCategory.Outsourcing, new Money(900_000m))]);
+
+        Assert.Equal(2_000_000m, totals.PlannedCost);  // 100 + 80 + 20 万
+        Assert.Equal(900_000m, totals.ActualCost);     // 予定外でなく実績のみの区分も含む
+        Assert.Equal(5_000_000m, totals.PlannedRevenue);
     }
 
     [Fact]

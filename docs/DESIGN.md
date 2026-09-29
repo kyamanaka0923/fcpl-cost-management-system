@@ -361,6 +361,8 @@ classDiagram
         +FindByIdAsync(DepartmentBudgetId) DepartmentBudget?
         +ListAsync(DepartmentId, FiscalHalf) IReadOnlyList~DepartmentBudget~
         +FindLatestApprovedAsync(DepartmentId, FiscalHalf) DepartmentBudget?
+        +SumLatestApprovedByCategoryAsync(IReadOnlyCollection~DepartmentId~, FiscalHalf) IReadOnlyList~DepartmentCategoryAmount~
+        +ListDepartmentIdsWithApprovedAsync(IReadOnlyCollection~DepartmentId~, FiscalHalf) IReadOnlyList~DepartmentId~
         +GetMaxVersionAsync(DepartmentId, FiscalHalf) int
         +AddAsync(DepartmentBudget)
         +UpdateAsync(DepartmentBudget)
@@ -369,6 +371,7 @@ classDiagram
         <<interface>>
         +FindByIdAsync(ActualEntryId) ActualEntry?
         +ListAsync(DepartmentId, FiscalHalf) IReadOnlyList~ActualEntry~
+        +SumByCategoryAsync(IReadOnlyCollection~DepartmentId~, FiscalHalf) IReadOnlyList~DepartmentCategoryAmount~
         +AddAsync(ActualEntry)
         +DeleteAsync(ActualEntryId)
     }
@@ -395,7 +398,13 @@ classDiagram
     }
     class DivisionBudgetSummaryService {
         <<Domain Service>>
-        +Summarize(課別VarianceReportの一覧) DivisionSummaryReport
+        +Summarize(課別DepartmentCategoryTotalsの一覧) DivisionSummaryReport
+    }
+    class DepartmentCategoryTotals {
+        <<record>>
+        +List~CategorySummary~ Categories
+        +売上高とコストの予実の合計
+        ※ 課かつ区分ごとの合計から組み立てる。明細は持たない
     }
 
     class VarianceReport {
@@ -445,6 +454,7 @@ classDiagram
     ProfitAnalysisService ..> ProfitReport : 生成
     ProfitAnalysisService ..> VarianceReport : 入力
     ProfitReport *-- ProjectProfitLine
+    DivisionBudgetSummaryService ..> DepartmentCategoryTotals : 入力
 ```
 
 **分析の計算規則**
@@ -459,7 +469,12 @@ classDiagram
   - 課全体 = 売上高 −(加工費 + 外注費 + 期間費用)。利益率 = 損益 ÷ 売上高(売上高0は null)
   - 案件別 = 売上高 − 加工費 − 外注費(期間費用は課共通のため配賦しない)
   - **案件別損益の合計 − 期間費用 = 課全体の損益**(整合性はテストで担保)
-- 部集計(DivisionBudgetSummaryService): 配下課の VarianceReport を区分別・損益で合計する。
+- 部集計(DivisionBudgetSummaryService): 配下課の区分別合計(DepartmentCategoryTotals)を
+  区分別・損益で合計する。部サマリは**明細を読まない**: 課ごとに予算集約を復元すると
+  課数 × 明細数に比例したクエリとオブジェクト生成が発生するため、リポジトリの
+  `SumLatestApprovedByCategoryAsync` / `SumByCategoryAsync` で配下課ぶんの
+  (課, 区分) 別合計だけを一括取得する(金額カラムは TEXT 保存で SQL の SUM() が使えないため、
+  合計は decimal のままインフラ層で畳み込む。REAL へのキャストは丸め誤差が出るので採用しない)。
   承認済み予算のない課は合計から除外し未策定として課別内訳に表示する。「部合計 = 課別内訳の合計」。
   課別内訳(DepartmentSummaryLineDto)は課ごとの区分別内訳(Categories)も持ち、
   フロントの「予算(計画)」タブで課ごとの予算比較グリッド(粗利率つき)として表示する

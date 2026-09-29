@@ -1,8 +1,10 @@
 using CostManagement.Domain.Actuals;
+using CostManagement.Domain.Budgeting;
 using CostManagement.Domain.Departments;
 using CostManagement.Domain.Shared;
 using CostManagement.Infrastructure.Persistence;
 using Dapper;
+using static CostManagement.Infrastructure.Persistence.SqlIdChunks;
 
 namespace CostManagement.Infrastructure.Repositories;
 
@@ -52,6 +54,28 @@ public sealed class ActualEntryRepository : IActualEntryRepository
             $"{SelectSql} WHERE department_id = @Did AND fiscal_half = @Half ORDER BY recorded_at",
             new { Did = departmentId.Value, Half = fiscalHalf.ToString() });
         return rows.Select(ToEntity).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<DepartmentCategoryAmount>> SumByCategoryAsync(
+        IReadOnlyCollection<DepartmentId> departmentIds, FiscalHalf fiscalHalf,
+        CancellationToken ct = default)
+    {
+        if (departmentIds.Count == 0)
+            return [];
+
+        using var conn = _factory.Create();
+        var rows = new List<CategoryAmountRows.Row>();
+        // 部集計に必要なのは区分ごとの合計だけなので、案件・費目・計上月・備考は読まない。
+        foreach (var chunk in Chunked(departmentIds.Select(d => d.Value)))
+        {
+            rows.AddRange(await conn.QueryAsync<CategoryAmountRows.Row>(new CommandDefinition("""
+                SELECT department_id AS DepartmentId, category AS Category, amount AS Amount
+                FROM actual_entries
+                WHERE department_id IN @Dids AND fiscal_half = @Half
+                """, new { Dids = chunk, Half = fiscalHalf.ToString() }, cancellationToken: ct)));
+        }
+        return CategoryAmountRows.Aggregate(rows);
     }
 
     /// <inheritdoc />

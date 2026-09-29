@@ -1,12 +1,12 @@
 ---
 name: issue-response
 description: GitHub Issue を確認し、未対応のものを対応する手順。Issue の取得・「未対応」の判定・種類別スキルへの振り分け・実装〜検証〜プッシュ〜CI確認〜Issueコメントまでの一連の運用。「Issueを確認して対応」「未対応のIssueをやって」等の依頼、および定期チェック(/loop)で必ず読む。
-model: claude-opus-4-8
+model: claude-opus-5
 ---
 
 # Issue 対応スキル
 
-**利用モデル**: 曖昧な日本語 Issue の解釈・ドメイン設計判断を含むため `claude-opus-4-8` を推奨。
+**利用モデル**: 曖昧な日本語 Issue の解釈・ドメイン設計判断を含むため `claude-opus-5` を推奨。
 スコープが明確な機械的変更だけなら `claude-sonnet-5` で可。
 
 対象リポジトリ: **`kyamanaka0923/fcpl-cost-management-system`**(private)。

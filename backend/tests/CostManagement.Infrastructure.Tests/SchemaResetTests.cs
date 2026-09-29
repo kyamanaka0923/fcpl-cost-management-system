@@ -88,6 +88,14 @@ public class スキーマの作り直し : IDisposable
             new { Table = table, Column = column }) > 0;
     }
 
+    private bool インデックスが存在する(string name)
+    {
+        using var conn = _factory.Create();
+        return conn.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = @Name",
+            new { Name = name }) > 0;
+    }
+
     [Fact]
     public void 旧スキーマのDBは旧テーブルが破棄され新スキーマになる()
     {
@@ -137,6 +145,7 @@ public class スキーマの作り直し : IDisposable
 
         Assert.Equal(1, テーブル数("departments"));
         Assert.True(カラムが存在する("projects", "department_id"));
+        Assert.True(インデックスが存在する("ix_budgets_dept_half_status_version"));
     }
 
     [Fact]
@@ -150,6 +159,8 @@ public class スキーマの作り直し : IDisposable
         Assert.Equal(1, テーブル数("department_budgets"));
         Assert.True(カラムが存在する("departments", "division_id"));
         Assert.True(カラムが存在する("projects", "department_id"));
+        // 部集計が「(課, 半期)の最新の承認済みバージョン」を絞り込むためのインデックス
+        Assert.True(インデックスが存在する("ix_budgets_dept_half_status_version"));
     }
 
     [Fact]
