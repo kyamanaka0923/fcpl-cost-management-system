@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Amazon.Lambda.AspNetCoreServer.Hosting;
 using CostManagement.Application;
 using CostManagement.Application.Common;
@@ -26,6 +27,13 @@ if (!builder.Environment.IsDevelopment())
 }
 
 var auth = builder.AddCostManagementAuth();
+// OpenAPI document of the API (served at /openapi/v1.json in Development; the committed copy
+// docs/api/openapi.json is the source for the generated frontend types).
+builder.Services.AddOpenApi();
+// Numbers must be JSON numbers (the web default also accepts numeric strings, which would make
+// every amount "number | string" in the OpenAPI document and in the generated frontend types).
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.NumberHandling = JsonNumberHandling.Strict);
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
     policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
@@ -61,17 +69,25 @@ app.Use(async (context, next) =>
     {
         RequestLogging.BusinessRuleRejected(errorLogger, ex.Message);
         context.Response.StatusCode = StatusCodes.Status400BadRequest;
-        await context.Response.WriteAsJsonAsync(new { error = ex.Message });
+        await context.Response.WriteAsJsonAsync(new ErrorResponse(ex.Message));
     }
     catch (NotFoundException ex)
     {
         RequestLogging.ResourceNotFound(errorLogger, ex.Message);
         context.Response.StatusCode = StatusCodes.Status404NotFound;
-        await context.Response.WriteAsJsonAsync(new { error = ex.Message });
+        await context.Response.WriteAsJsonAsync(new ErrorResponse(ex.Message));
     }
 });
 
-var api = app.MapGroup("/api");
+if (app.Environment.IsDevelopment())
+    app.MapOpenApi();
+
+var api = app.MapGroup("/api")
+    // Error responses produced by the exception middleware above ({ "error": "..." }).
+    .WithMetadata(new ProducesResponseTypeMetadata(StatusCodes.Status400BadRequest, typeof(ErrorResponse),
+        ["application/json"]))
+    .WithMetadata(new ProducesResponseTypeMetadata(StatusCodes.Status404NotFound, typeof(ErrorResponse),
+        ["application/json"]));
 // With authentication configured, every API endpoint requires a valid access token (401 otherwise).
 if (auth.Enabled)
     api.RequireAuthorization();
@@ -82,7 +98,8 @@ api.MapGet("/divisions/{id:guid}", (Guid id, DivisionService svc, CancellationTo
     svc.GetAsync(id, ct));
 api.MapPost("/divisions",
     async (CreateDivisionRequest req, DivisionService svc, CancellationToken ct) =>
-        Results.Created((string?)null, await svc.CreateAsync(req, ct)));
+        Results.Created((string?)null, await svc.CreateAsync(req, ct)))
+    .Produces<DivisionDto>(StatusCodes.Status201Created);
 api.MapGet("/divisions/{id:guid}/budget-summary",
     (Guid id, string fiscalHalf, AnalysisService svc, CancellationToken ct) =>
         svc.GetDivisionBudgetSummaryAsync(id, fiscalHalf, ct));
@@ -91,20 +108,23 @@ api.MapPost("/divisions/{id:guid}/budget-approval",
     {
         await svc.ApproveAsync(id, fiscalHalf, ct);
         return Results.NoContent();
-    });
+    })
+    .Produces(StatusCodes.Status204NoContent);
 api.MapDelete("/divisions/{id:guid}/budget-approval",
     async (Guid id, string fiscalHalf, DivisionBudgetApprovalService svc, CancellationToken ct) =>
     {
         await svc.RevokeAsync(id, fiscalHalf, ct);
         return Results.NoContent();
-    });
+    })
+    .Produces(StatusCodes.Status204NoContent);
 
 // ---- 課(部に属する) ----
 api.MapGet("/divisions/{id:guid}/departments",
     (Guid id, DepartmentService svc, CancellationToken ct) => svc.ListByDivisionAsync(id, ct));
 api.MapPost("/divisions/{id:guid}/departments",
     async (Guid id, CreateDepartmentRequest req, DepartmentService svc, CancellationToken ct) =>
-        Results.Created((string?)null, await svc.CreateAsync(id, req, ct)));
+        Results.Created((string?)null, await svc.CreateAsync(id, req, ct)))
+    .Produces<DepartmentDto>(StatusCodes.Status201Created);
 api.MapGet("/departments/{id:guid}", (Guid id, DepartmentService svc, CancellationToken ct) =>
     svc.GetAsync(id, ct));
 
@@ -113,7 +133,8 @@ api.MapGet("/departments/{id:guid}/projects",
     (Guid id, ProjectService svc, CancellationToken ct) => svc.ListByDepartmentAsync(id, ct));
 api.MapPost("/departments/{id:guid}/projects",
     async (Guid id, CreateProjectRequest req, ProjectService svc, CancellationToken ct) =>
-        Results.Created((string?)null, await svc.CreateAsync(id, req, ct)));
+        Results.Created((string?)null, await svc.CreateAsync(id, req, ct)))
+    .Produces<ProjectDto>(StatusCodes.Status201Created);
 api.MapGet("/projects/{id:guid}", (Guid id, ProjectService svc, CancellationToken ct) =>
     svc.GetAsync(id, ct));
 api.MapPut("/projects/{id:guid}",
@@ -124,7 +145,8 @@ api.MapPut("/projects/{id:guid}",
 api.MapGet("/cost-elements", (CostElementService svc, CancellationToken ct) => svc.ListAsync(ct));
 api.MapPost("/cost-elements",
     async (CreateCostElementRequest req, CostElementService svc, CancellationToken ct) =>
-        Results.Created((string?)null, await svc.CreateAsync(req, ct)));
+        Results.Created((string?)null, await svc.CreateAsync(req, ct)))
+    .Produces<CostElementDto>(StatusCodes.Status201Created);
 
 // ---- 課予算(半期単位・バージョン管理・改定) ----
 api.MapGet("/departments/{id:guid}/budgets",
@@ -132,7 +154,8 @@ api.MapGet("/departments/{id:guid}/budgets",
         svc.ListAsync(id, fiscalHalf, ct));
 api.MapPost("/departments/{id:guid}/budgets",
     async (Guid id, CreateBudgetRequest req, DepartmentBudgetService svc, CancellationToken ct) =>
-        Results.Created((string?)null, await svc.CreateDraftAsync(id, req, ct)));
+        Results.Created((string?)null, await svc.CreateDraftAsync(id, req, ct)))
+    .Produces<BudgetDetailDto>(StatusCodes.Status201Created);
 api.MapGet("/budgets/{budgetId:guid}",
     (Guid budgetId, DepartmentBudgetService svc, CancellationToken ct) => svc.GetAsync(budgetId, ct));
 api.MapPut("/budgets/{budgetId:guid}/lines",
@@ -155,13 +178,15 @@ api.MapGet("/departments/{id:guid}/actuals",
         svc.ListAsync(id, fiscalHalf, ct));
 api.MapPost("/departments/{id:guid}/actuals",
     async (Guid id, RecordActualRequest req, ActualEntryService svc, CancellationToken ct) =>
-        Results.Created((string?)null, await svc.RecordAsync(id, req, ct)));
+        Results.Created((string?)null, await svc.RecordAsync(id, req, ct)))
+    .Produces<ActualEntryDto>(StatusCodes.Status201Created);
 api.MapDelete("/actuals/{actualId:guid}",
     async (Guid actualId, ActualEntryService svc, CancellationToken ct) =>
     {
         await svc.DeleteAsync(actualId, ct);
         return Results.NoContent();
-    });
+    })
+    .Produces(StatusCodes.Status204NoContent);
 
 // ---- 分析(予実差異・予算バージョン間比較・損益) ----
 api.MapGet("/departments/{id:guid}/variance",

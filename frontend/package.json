@@ -10,7 +10,8 @@
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "gen:api": "openapi-typescript ../docs/api/openapi.json -o src/api-schema.d.ts && prettier --write src/api-schema.d.ts"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -27,6 +28,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
+    "openapi-typescript": "^7.13.0",
     "playwright": "^1.61.1",
     "prettier": "^3.9.10",
     "typescript": "~5.8.0",

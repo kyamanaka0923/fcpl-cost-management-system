@@ -20,7 +20,13 @@ model: claude-sonnet-5
 
 ## 各層の規約
 
-- DTO は camelCase JSON で自動シリアライズされる(ASP.NET Core 既定)。フロントの型と一致させる
+- DTO は camelCase JSON で自動シリアライズされる(ASP.NET Core 既定)。数値は JSON の数値のみ受け付ける
+  (`NumberHandling.Strict`)
+- **API の型は OpenAPI から生成する**: DTO・エンドポイントを変えたら
+  `cd backend && UPDATE_OPENAPI=1 dotnet test --filter OpenApi`(`docs/api/openapi.json` を更新)→
+  `cd frontend && npm run gen:api`(`src/api-schema.d.ts` を再生成)。`api.ts` の型は生成型から導出し
+  (区分などの文字列は `Override` で4値に絞る)、手書きの interface を増やさない。
+  作成系(201)・204 のエンドポイントは `.Produces<T>()` で応答型を明示する
 - Dapper: decimal/Guid/DateTime は `SqliteConnectionFactory` の型ハンドラで TEXT 往復。
   金額カラムは TEXT。明細の `project_id` / `element_code` は区分により排他で、
   **未使用側は DB では `''` として保存し、読み出し時に null へ読み替える**

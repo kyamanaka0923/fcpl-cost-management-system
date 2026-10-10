@@ -1,221 +1,109 @@
 // バックエンド API クライアント。DTO はサーバ側 (CostManagement.Application) と対応する。
 
 import { authEnabled, getAccessToken, login } from './auth'
+import type { components } from './api-schema'
 
+/** 予算区分(バックエンドでは文字列。画面では4値に絞って扱う)。 */
 export type BudgetCategory = 'Revenue' | 'Processing' | 'Outsourcing' | 'PeriodCost'
+/** 予算の状態(策定中 / 承認済 / 失効)。 */
 export type BudgetStatus = 'Draft' | 'Approved' | 'Superseded'
 
-export interface Division {
-  id: string
-  code: string
-  name: string
-  createdAt: string
+/**
+ * バックエンドの DTO の型は OpenAPI 定義(docs/api/openapi.json)から生成した `api-schema.d.ts` を正とする。
+ * 生成し直すには `npm run gen:api`。バックエンドで項目を変えると、ここで型エラーになって気づける。
+ */
+type Schemas = components['schemas']
+
+/**
+ * 生成された型の一部の項目を、画面で扱う狭い型(区分の4値など)に置き換える。
+ * 置き換える項目はスキーマに実在し、元の型と互換でなければならない(名前の変更や型の変更は型エラーになる)。
+ */
+type Override<T, U extends { [K in keyof U]: K extends keyof T ? T[K] : never }> = Omit<
+  T,
+  keyof U
+> &
+  U
+
+/** リクエスト本文: null を許す項目は省略可能にする(サーバは省略を null として受け取る)。 */
+type RequestBody<T> = {
+  [K in keyof T as null extends T[K] ? never : K]: T[K]
+} & {
+  [K in keyof T as null extends T[K] ? K : never]?: T[K]
 }
 
-export interface Department {
-  id: string
-  divisionId: string
-  code: string
-  name: string
-  createdAt: string
-}
+/** 部。 */
+export type Division = Schemas['DivisionDto']
+/** 課(部に属する)。 */
+export type Department = Schemas['DepartmentDto']
+/** 区分ごとの部合計(予算・実績・差異)。 */
+export type CategorySummary = Override<Schemas['CategorySummaryDto'], { category: BudgetCategory }>
+/** 部の課別内訳の1行。 */
+export type DepartmentSummaryLine = Override<
+  Schemas['DepartmentSummaryLineDto'],
+  { categories: CategorySummary[] }
+>
+/** 部の予実サマリ。 */
+export type DivisionBudgetSummary = Override<
+  Schemas['DivisionBudgetSummaryDto'],
+  { categories: CategorySummary[]; departmentLines: DepartmentSummaryLine[] }
+>
+/** 案件(課に属するマスタ)。 */
+export type Project = Schemas['ProjectDto']
+/** 費目(期間費用のマスタ)。 */
+export type CostElement = Schemas['CostElementDto']
+/** 予算明細。monthlyAmounts は月インデックス(1..6)→ 金額。 */
+export type BudgetLine = Override<Schemas['BudgetLineDto'], { category: BudgetCategory }>
+/** 予算の一覧用サマリ(区分合計・計画損益つき)。 */
+export type BudgetSummary = Override<Schemas['BudgetSummaryDto'], { status: BudgetStatus }>
+/** 予算の詳細(明細つき)。 */
+export type BudgetDetail = Override<
+  Schemas['BudgetDetailDto'],
+  { status: BudgetStatus; lines: BudgetLine[] }
+>
+/** 実績。month は半期内の月(1..6)、null は半期一括。 */
+export type ActualEntry = Override<Schemas['ActualEntryDto'], { category: BudgetCategory }>
+/** 予実差異の明細。 */
+export type VarianceLine = Override<Schemas['VarianceLineDto'], { category: BudgetCategory }>
+/** 区分ごとの予実差異。 */
+export type CategoryVariance = Override<
+  Schemas['CategoryVarianceDto'],
+  { category: BudgetCategory; lines: VarianceLine[] }
+>
+/** 予実差異分析の結果。 */
+export type VarianceReport = Override<
+  Schemas['VarianceReportDto'],
+  { categories: CategoryVariance[] }
+>
+/** 予算バージョン間比較の明細。 */
+export type BudgetComparisonLine = Override<
+  Schemas['BudgetComparisonLineDto'],
+  { category: BudgetCategory }
+>
+/** 区分ごとのバージョン間比較。 */
+export type CategoryComparison = Override<
+  Schemas['CategoryComparisonDto'],
+  { category: BudgetCategory; lines: BudgetComparisonLine[] }
+>
+/** 予算バージョン間比較の結果。 */
+export type BudgetComparison = Override<
+  Schemas['BudgetComparisonDto'],
+  { categories: CategoryComparison[] }
+>
+/** 案件別の損益。 */
+export type ProjectProfitLine = Schemas['ProjectProfitLineDto']
+/** 損益サマリ(課全体・案件別)。 */
+export type ProfitSummary = Schemas['ProfitSummaryDto']
 
-export interface CategorySummary {
-  category: BudgetCategory
-  plannedAmount: number
-  actualAmount: number
-  variance: number
-}
-
-export interface DepartmentSummaryLine {
-  departmentId: string
-  departmentCode: string
-  departmentName: string
-  hasApprovedBudget: boolean
-  plannedRevenue: number
-  actualRevenue: number
-  plannedCost: number
-  actualCost: number
-  plannedProfit: number
-  actualProfit: number
-  profitVariance: number
-  categories: CategorySummary[]
-}
-
-export interface DivisionBudgetSummary {
-  categories: CategorySummary[]
-  plannedRevenue: number
-  actualRevenue: number
-  revenueVariance: number
-  plannedCost: number
-  actualCost: number
-  costVariance: number
-  plannedProfit: number
-  actualProfit: number
-  profitVariance: number
-  departmentLines: DepartmentSummaryLine[]
-  isApproved: boolean
-  approvedAt: string | null
-  canApprove: boolean
-}
-
-export interface Project {
-  id: string
-  departmentId: string
-  code: string
-  name: string
-  createdAt: string
-}
-
-export interface CostElement {
-  code: string
-  name: string
-}
-
-export interface BudgetLine {
-  id: string
-  category: BudgetCategory
-  projectId: string | null
-  elementCode: string | null
-  /** 期間費用の明細名(費目内を細分)。null = 費目一括。 */
-  periodDetail: string | null
-  amount: number
-  isMonthly: boolean
-  /** 月次モードの月別金額(月インデックス "1".."6" → 金額)。半期一括モードでは空。 */
-  monthlyAmounts: Record<string, number>
-}
-
-export interface BudgetSummary {
-  id: string
-  departmentId: string
-  fiscalHalf: string
-  version: number
-  label: string
-  status: BudgetStatus
-  createdAt: string
-  approvedAt: string | null
-  revenueTotal: number
-  processingTotal: number
-  outsourcingTotal: number
-  periodCostTotal: number
-  plannedProfit: number
-}
-
-export interface BudgetDetail extends BudgetSummary {
-  lines: BudgetLine[]
-}
-
-export interface ActualEntry {
-  id: string
-  departmentId: string
-  fiscalHalf: string
-  category: BudgetCategory
-  projectId: string | null
-  elementCode: string | null
-  /** 期間費用の明細名(計画明細に対する計上)。null = 費目一括。 */
-  periodDetail: string | null
-  /** 計上対象の月(半期内 1..6)。半期一括の計上は null。 */
-  month: number | null
-  amount: number
-  note: string | null
-  recordedAt: string
-}
-
-export interface VarianceLine {
-  category: BudgetCategory
-  projectId: string | null
-  projectName: string | null
-  elementCode: string | null
-  elementName: string | null
-  periodDetail: string | null
-  plannedAmount: number
-  actualAmount: number
-  variance: number
-  isUnplanned: boolean
-  isFavorable: boolean
-  isAdverse: boolean
-}
-
-export interface CategoryVariance {
-  category: BudgetCategory
-  lines: VarianceLine[]
-  plannedAmount: number
-  actualAmount: number
-  variance: number
-}
-
-export interface VarianceReport {
-  budgetId: string
-  budgetVersion: number
-  budgetLabel: string
-  categories: CategoryVariance[]
-  plannedRevenue: number
-  actualRevenue: number
-  revenueVariance: number
-  plannedCost: number
-  actualCost: number
-  costVariance: number
-}
-
-export interface BudgetComparisonLine {
-  category: BudgetCategory
-  projectId: string | null
-  projectName: string | null
-  elementCode: string | null
-  elementName: string | null
-  periodDetail: string | null
-  baseAmount: number
-  targetAmount: number
-  difference: number
-}
-
-export interface CategoryComparison {
-  category: BudgetCategory
-  lines: BudgetComparisonLine[]
-  baseAmount: number
-  targetAmount: number
-  difference: number
-}
-
-export interface BudgetComparison {
-  baseVersion: number
-  baseLabel: string
-  targetVersion: number
-  targetLabel: string
-  categories: CategoryComparison[]
-}
-
-export interface ProjectProfitLine {
-  projectId: string
-  projectCode: string
-  projectName: string
-  plannedRevenue: number
-  actualRevenue: number
-  plannedProcessing: number
-  actualProcessing: number
-  plannedOutsourcing: number
-  actualOutsourcing: number
-  plannedProfit: number
-  actualProfit: number
-  profitVariance: number
-}
-
-export interface ProfitSummary {
-  budgetVersion: number
-  budgetLabel: string
-  plannedRevenue: number
-  actualRevenue: number
-  plannedTotalCost: number
-  actualTotalCost: number
-  plannedPeriodCost: number
-  actualPeriodCost: number
-  plannedProfit: number
-  actualProfit: number
-  profitVariance: number
-  plannedMarginRate: number | null
-  actualMarginRate: number | null
-  projectLines: ProjectProfitLine[]
-}
+/** 予算明細の登録(月次モードなら monthlyAmounts に月インデックス → 金額)。 */
+type UpsertBudgetLineBody = Override<
+  RequestBody<Schemas['UpsertBudgetLineRequest']>,
+  { category: BudgetCategory }
+>
+/** 実績の計上(month を指定すると特定月の計上)。 */
+type RecordActualBody = Override<
+  RequestBody<Schemas['RecordActualRequest']>,
+  { category: BudgetCategory }
+>
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -247,7 +135,7 @@ export const api = {
   // ---- 部 ----
   listDivisions: () => request<Division[]>('/divisions'),
   getDivision: (id: string) => request<Division>(`/divisions/${id}`),
-  createDivision: (body: { code: string; name: string }) =>
+  createDivision: (body: Schemas['CreateDivisionRequest']) =>
     request<Division>('/divisions', { method: 'POST', body: JSON.stringify(body) }),
   getDivisionBudgetSummary: (divisionId: string, fiscalHalf: string) =>
     request<DivisionBudgetSummary>(
@@ -268,7 +156,7 @@ export const api = {
   listDepartments: (divisionId: string) =>
     request<Department[]>(`/divisions/${divisionId}/departments`),
   getDepartment: (id: string) => request<Department>(`/departments/${id}`),
-  createDepartment: (divisionId: string, body: { code: string; name: string }) =>
+  createDepartment: (divisionId: string, body: Schemas['CreateDepartmentRequest']) =>
     request<Department>(`/divisions/${divisionId}/departments`, {
       method: 'POST',
       body: JSON.stringify(body),
@@ -277,12 +165,12 @@ export const api = {
   // ---- 案件(課に属するマスタ) ----
   listProjects: (departmentId: string) =>
     request<Project[]>(`/departments/${departmentId}/projects`),
-  createProject: (departmentId: string, body: { code: string; name: string }) =>
+  createProject: (departmentId: string, body: Schemas['CreateProjectRequest']) =>
     request<Project>(`/departments/${departmentId}/projects`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  updateProject: (projectId: string, body: { code: string; name: string }) =>
+  updateProject: (projectId: string, body: Schemas['UpdateProjectRequest']) =>
     request<Project>(`/projects/${projectId}`, {
       method: 'PUT',
       body: JSON.stringify(body),
@@ -290,7 +178,7 @@ export const api = {
 
   // ---- 費目マスタ(期間費用) ----
   listCostElements: () => request<CostElement[]>('/cost-elements'),
-  createCostElement: (body: { code: string; name: string }) =>
+  createCostElement: (body: Schemas['CreateCostElementRequest']) =>
     request<CostElement>('/cost-elements', { method: 'POST', body: JSON.stringify(body) }),
 
   // ---- 課予算 ----
@@ -299,27 +187,12 @@ export const api = {
       `/departments/${departmentId}/budgets?fiscalHalf=${encodeURIComponent(fiscalHalf)}`,
     ),
   getBudget: (budgetId: string) => request<BudgetDetail>(`/budgets/${budgetId}`),
-  createBudget: (
-    departmentId: string,
-    body: { fiscalHalf: string; label: string; baseBudgetId?: string | null },
-  ) =>
+  createBudget: (departmentId: string, body: RequestBody<Schemas['CreateBudgetRequest']>) =>
     request<BudgetDetail>(`/departments/${departmentId}/budgets`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  upsertBudgetLine: (
-    budgetId: string,
-    body: {
-      category: BudgetCategory
-      projectId?: string | null
-      elementCode?: string | null
-      amount: number
-      /** 指定すると月次モード(月インデックス 1..6 → 金額)。未指定なら amount による半期一括。 */
-      monthlyAmounts?: Record<number, number>
-      /** 期間費用の明細名(費目内を細分)。未指定/空は費目一括。 */
-      periodDetail?: string | null
-    },
-  ) =>
+  upsertBudgetLine: (budgetId: string, body: UpsertBudgetLineBody) =>
     request<BudgetDetail>(`/budgets/${budgetId}/lines`, {
       method: 'PUT',
       body: JSON.stringify(body),
@@ -338,10 +211,7 @@ export const api = {
     return request<BudgetDetail>(`/budgets/${budgetId}/lines?${params}`, { method: 'DELETE' })
   },
   /** 期間費用の明細名を変更する(金額・月次は保持)。 */
-  renamePeriodDetail: (
-    budgetId: string,
-    body: { elementCode: string; oldDetail: string; newDetail: string },
-  ) =>
+  renamePeriodDetail: (budgetId: string, body: Schemas['RenamePeriodDetailRequest']) =>
     request<BudgetDetail>(`/budgets/${budgetId}/rename-period-detail`, {
       method: 'POST',
       body: JSON.stringify(body),
@@ -354,21 +224,7 @@ export const api = {
     request<ActualEntry[]>(
       `/departments/${departmentId}/actuals?fiscalHalf=${encodeURIComponent(fiscalHalf)}`,
     ),
-  recordActual: (
-    departmentId: string,
-    body: {
-      fiscalHalf: string
-      category: BudgetCategory
-      projectId?: string | null
-      elementCode?: string | null
-      amount: number
-      /** 指定すると特定月の計上(半期内 1..6)。未指定なら半期一括。 */
-      month?: number | null
-      note?: string | null
-      /** 期間費用の明細名(計画明細に対する計上)。未指定/空は費目一括。 */
-      periodDetail?: string | null
-    },
-  ) =>
+  recordActual: (departmentId: string, body: RecordActualBody) =>
     request<ActualEntry>(`/departments/${departmentId}/actuals`, {
       method: 'POST',
       body: JSON.stringify(body),

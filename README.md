@@ -48,6 +48,7 @@
 | 認証 | Amazon Cognito + Microsoft.AspNetCore.Authentication.JwtBearer | — / 10.0.9 | ログイン(Hosted UI・認可コード + PKCE)と API のアクセストークン検証。ローカル開発では無効 |
 | データ | SQLite(Microsoft.Data.Sqlite + SQLitePCLRaw.bundle_e_sqlite3) | 10.0.9 / 3.0.3 | 永続化(単一ファイル DB) |
 | | Dapper | 2.1.79 | マイクロ ORM。SQL は手書きし、結果をオブジェクトへ詰め替える(EF Core のような変更追跡・LINQ 変換・マイグレーション機能を持つフル機能 ORM は使わない) |
+| API 定義 | OpenAPI 3.1(Microsoft.AspNetCore.OpenApi)+ openapi-typescript | 10.0.9 / 7.13 | エンドポイントから OpenAPI 定義を生成し(`docs/api/openapi.json`)、フロントの TypeScript 型を自動生成 |
 | 設計 | ヘキサゴナルアーキテクチャ + ドメイン駆動設計(戦術パターン) | — | 依存は Domain に向かう。ルールは NetArchTest で検査 |
 
 ### テスト・品質
@@ -113,7 +114,7 @@ frontend/                               # React SPA(/api を dev proxy 経由で
 
 infra/                                  # AWS SAM テンプレートとデプロイスクリプト
 docker/                                 # 開発・ビルド・テスト共用イメージ
-docs/                                   # マニュアル・設計・要件・ADR・解説 HTML(docs/design/)
+docs/                                   # マニュアル・設計・要件・ADR・解説 HTML(docs/design/)・OpenAPI 定義(docs/api/)
 ```
 
 ### ドメインモデル(DDD 戦術パターン)
@@ -379,6 +380,19 @@ cd infra && ./deploy.sh     # 詳細・コスト目安・注意点は infra/READ
 | 2002 / 2003 | BusinessRuleRejected / ResourceNotFound | 業務ルール違反(400)・未検出(404)とその理由 |
 
 ## API 概要
+
+API の正式な定義は **OpenAPI 3.1** の [`docs/api/openapi.json`](docs/api/openapi.json) です(エンドポイントのコードから生成)。
+ローカル実行中(Development)は `http://localhost:5100/openapi/v1.json` でも取得できます。
+
+フロントエンドの API の型(`frontend/src/api-schema.d.ts`)はこの定義から自動生成し、`api.ts` の型はそこから導出しています。
+バックエンドで DTO やエンドポイントを変えたときは、次の手順で定義と型を更新します
+(更新し忘れると、バックエンドのテストと CI のフロントエンドジョブで検出されます)。
+
+```bash
+cd backend && UPDATE_OPENAPI=1 dotnet test --filter OpenApi   # docs/api/openapi.json を更新
+cd frontend && npm run gen:api                                 # src/api-schema.d.ts を作り直す
+cd frontend && npm run build                                   # 型の不一致(項目名・型の変更)はここでエラーになる
+```
 
 半期は `fiscalHalf=2026-H1`(上期)/ `fiscalHalf=2026-H2`(下期)の形式で指定します。
 
