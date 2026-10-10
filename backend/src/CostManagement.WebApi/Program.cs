@@ -12,6 +12,19 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? "Data Source=costmanagement.db";
 
 builder.Services.AddCostManagement(connectionString);
+// Outside Development (AWS Lambda), write one JSON object per log line so CloudWatch Logs
+// can filter by fields (EventId, User, RequestId, ...). Scopes carry the request ID and user.
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddJsonConsole(options =>
+    {
+        options.IncludeScopes = true;
+        options.UseUtcTimestamp = true;
+        options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+    });
+}
+
 var auth = builder.AddCostManagementAuth();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
     policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
@@ -27,11 +40,15 @@ app.Services.GetRequiredService<DatabaseInitializer>().Initialize();
 
 app.UseCors();
 
+// Request logging sits between authentication (so the user is known) and authorization
+// (so requests rejected with 401 are logged too).
 if (auth.Enabled)
-{
     app.UseAuthentication();
+app.UseRequestLogging();
+if (auth.Enabled)
     app.UseAuthorization();
-}
+
+var errorLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(RequestLogging.Category);
 
 // ドメイン例外 → 400, 未検出 → 404 に変換する。
 app.Use(async (context, next) =>
@@ -42,11 +59,13 @@ app.Use(async (context, next) =>
     }
     catch (DomainException ex)
     {
+        RequestLogging.BusinessRuleRejected(errorLogger, ex.Message);
         context.Response.StatusCode = StatusCodes.Status400BadRequest;
         await context.Response.WriteAsJsonAsync(new { error = ex.Message });
     }
     catch (NotFoundException ex)
     {
+        RequestLogging.ResourceNotFound(errorLogger, ex.Message);
         context.Response.StatusCode = StatusCodes.Status404NotFound;
         await context.Response.WriteAsJsonAsync(new { error = ex.Message });
     }

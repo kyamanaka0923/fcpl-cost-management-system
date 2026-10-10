@@ -44,6 +44,7 @@
 | | グラフ | (外部ライブラリなし) | `components/charts.tsx` の自前 SVG |
 | バックエンド | .NET / ASP.NET Core Minimal API | 10(`net10.0`) | HTTP API |
 | | Amazon.Lambda.AspNetCoreServer.Hosting | 2.1 | AWS Lambda 上での実行(ローカルでは通常の Kestrel) |
+| ログ | .NET 標準ロギング(Microsoft.Extensions.Logging)+ JSON コンソール出力 | 10 | 業務イベント・リクエストの構造化ログ。AWS では CloudWatch Logs で検索 |
 | 認証 | Amazon Cognito + Microsoft.AspNetCore.Authentication.JwtBearer | — / 10.0.9 | ログイン(Hosted UI・認可コード + PKCE)と API のアクセストークン検証。ローカル開発では無効 |
 | データ | SQLite(Microsoft.Data.Sqlite + SQLitePCLRaw.bundle_e_sqlite3) | 10.0.9 / 3.0.3 | 永続化(単一ファイル DB) |
 | | Dapper | 2.1.79 | マイクロ ORM。SQL は手書きし、結果をオブジェクトへ詰め替える(EF Core のような変更追跡・LINQ 変換・マイグレーション機能を持つフル機能 ORM は使わない) |
@@ -356,6 +357,26 @@ cd infra && ./deploy.sh     # 詳細・コスト目安・注意点は infra/READ
   未ログインなら Cognito のログイン画面へ移動します。画面右上にログイン中の利用者とログアウトが出ます。
   `infra/deploy.sh` がスタック出力からこの2つを埋め込みます。
 - **ローカル開発・テスト**: どちらも未設定(Development)なので、従来どおりログインなしで使えます。
+
+## ログ
+
+.NET 標準のロギングで**構造化ログ**を出します(Serilog などの追加ライブラリは使いません)。
+
+- **出力形式**: Development 以外(AWS Lambda)では **1行1 JSON**(`EventId`・`State` の各項目・スコープ)で出力し、
+  CloudWatch Logs Insights で項目ごとに検索できます。ローカル(Development)は従来どおり読みやすいテキストです
+- **リクエストログ**: すべての API リクエストについて、メソッド・パス・ステータス・処理時間を1行記録します。
+  スコープに **`RequestId` と操作した利用者 `User`**(認証時はトークンの `username`、未認証は `anonymous`)が付き、
+  そのリクエスト中に出た業務イベントのログにも同じ値が付きます。認証で拒否された 401 も記録します
+- **業務イベント**(Application 層。監査に使える状態変更):
+
+| EventId | 名前 | 内容 |
+|---|---|---|
+| 1001 | BudgetDraftCreated | 予算ドラフトの起票(当初・改定。予算ID・課・半期・版) |
+| 1002 | BudgetApproved | 予算の承認(失効させた旧版の番号つき) |
+| 1003 / 1004 | DivisionBudgetApproved / Revoked | 部予算の承認・取り消し |
+| 1005 / 1006 | ActualRecorded / ActualDeleted | 実績の計上(区分・金額)・削除 |
+| 2001 | HttpRequest | API リクエスト1件(メソッド・パス・ステータス・処理時間) |
+| 2002 / 2003 | BusinessRuleRejected / ResourceNotFound | 業務ルール違反(400)・未検出(404)とその理由 |
 
 ## API 概要
 

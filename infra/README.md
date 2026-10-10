@@ -25,6 +25,8 @@ EC2・コンテナを使わず、費用を極力抑えたサーバーレス構�
 - **NAT/IGW なし**: Lambda は外部通信しないため NAT ゲートウェイ(月約$32〜)を置かない。
 - **バックアップ**: **AWS Backup** が EFS(SQLite)を毎日 03:00 JST にバックアップし、
   保管庫 `<ProjectName>-vault` に既定 35 日保持する(`sam deploy --parameter-overrides BackupRetentionDays=90` などで変更)。
+- **ログ**: Lambda のログは CloudWatch Logs(`/aws/lambda/<ProjectName>-api`)に **1行1 JSON** で出る。
+  業務イベント(EventId 1001〜1006)には操作した利用者(`User`)が付く。
 - **認証**: **Amazon Cognito** のユーザープール + Hosted UI。フロントは認可コード + PKCE でログインし、
   API(Lambda)は環境変数 `Auth__Authority` の発行者が出したアクセストークンだけを受け付ける(なければ 401)。
 
@@ -88,6 +90,24 @@ aws cognito-idp admin-create-user --user-pool-id <UserPoolId> --username <メー
   直アクセスを塞ぎたい場合は `AuthType: AWS_IAM` に変更し、CloudFront の **OAC(Lambda 用)** で
   SigV4 署名する構成に切り替えてください。
 - **メモリ/タイムアウト**: `MemorySize: 512` / `Timeout: 30`。負荷に応じて調整。
+
+## ログの調べ方(CloudWatch Logs Insights)
+
+ロググループ `/aws/lambda/<ProjectName>-api` を選び、例えば次のように検索します。
+
+```
+# 誰がいつ予算を承認したか
+fields @timestamp, Scopes.3.User as user, State.BudgetId as budget, State.FiscalHalf as half, State.Version as version
+| filter EventId = 1002
+| sort @timestamp desc
+
+# エラー応答(400/404)とその理由
+fields @timestamp, Scopes.3.User as user, Message
+| filter EventId in [2002, 2003]
+```
+
+(`Scopes` の位置は ASP.NET Core が付ける標準スコープの数で決まります。ずれる場合は `fields Scopes` で確認してください)
+ロググループの保持期間は既定で無期限です。費用を抑えるなら CloudWatch のコンソールで保持期間(例: 90 日)を設定してください。
 
 ## バックアップからの復元
 

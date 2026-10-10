@@ -2,6 +2,7 @@ using CostManagement.Application.Common;
 using CostManagement.Domain.Analysis;
 using CostManagement.Infrastructure.Persistence;
 using CostManagement.Infrastructure.Repositories;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CostManagement.Application.Tests;
 
@@ -47,12 +48,14 @@ public sealed class UseCaseFixture : IDisposable
 
         Divisions = new DivisionService(divisions, Clock);
         DivisionApprovals = new DivisionBudgetApprovalService(divisionApprovals, divisions,
-            departments, budgets, Clock);
+            departments, budgets, Clock, NullLogger<DivisionBudgetApprovalService>.Instance);
         Departments = new DepartmentService(departments, divisions, Clock);
         Projects = new ProjectService(projects, departments, Clock);
         CostElements = new CostElementService(elements);
-        Budgets = new DepartmentBudgetService(budgets, departments, projects, elements, Clock);
-        Actuals = new ActualEntryService(actuals, departments, projects, elements, Clock);
+        Budgets = new DepartmentBudgetService(budgets, departments, projects, elements, Clock,
+            NullLogger<DepartmentBudgetService>.Instance);
+        Actuals = new ActualEntryService(actuals, departments, projects, elements, Clock,
+            NullLogger<ActualEntryService>.Instance);
         Analysis = new AnalysisService(budgets, actuals, projects, elements, departments, divisions,
             divisionApprovals,
             new BudgetVarianceAnalysisService(), new BudgetComparisonService(),
