@@ -31,12 +31,44 @@
 
 ## 技術スタック
 
-| レイヤ | 技術 |
-|---|---|
-| フロントエンド | React 19 + TypeScript + Vite |
-| バックエンド | .NET 10(ASP.NET Core Minimal API) |
-| データベース | SQLite + Dapper |
-| アーキテクチャ | ヘキサゴナルアーキテクチャ + ドメイン駆動設計(戦術パターン) |
+バージョンは `*.csproj` / `frontend/package-lock.json` / `backend/.config/dotnet-tools.json` の実値です。
+
+### アプリケーション
+
+| 区分 | 技術 | バージョン | 用途 |
+|---|---|---|---|
+| フロントエンド | React / React DOM | 19.2 | SPA |
+| | React Router(react-router-dom) | 7 | 画面遷移 |
+| | TypeScript | 5.8(`strict`) | 型付け |
+| | Vite + @vitejs/plugin-react | 6.4 / 4.7 | 開発サーバ(`/api` をバックエンドへプロキシ)・ビルド |
+| | グラフ | (外部ライブラリなし) | `components/charts.tsx` の自前 SVG |
+| バックエンド | .NET / ASP.NET Core Minimal API | 10(`net10.0`) | HTTP API |
+| | Amazon.Lambda.AspNetCoreServer.Hosting | 2.1 | AWS Lambda 上での実行(ローカルでは通常の Kestrel) |
+| データ | SQLite(Microsoft.Data.Sqlite + SQLitePCLRaw.bundle_e_sqlite3) | 10.0.9 / 3.0.3 | 永続化(単一ファイル DB) |
+| | Dapper | 2.1.79 | SQL マッピング(ORM は使わない) |
+| 設計 | ヘキサゴナルアーキテクチャ + ドメイン駆動設計(戦術パターン) | — | 依存は Domain に向かう。ルールは NetArchTest で検査 |
+
+### テスト・品質
+
+| 区分 | 技術 | バージョン | 用途 |
+|---|---|---|---|
+| 単体〜API テスト | xUnit | 2.9.3 | バックエンドのテスト全般(テスト名は日本語) |
+| | Microsoft.AspNetCore.Mvc.Testing | 10.0.9 | API E2E(WebApplicationFactory で WebApi を起動) |
+| | NetArchTest.Rules | 1.3.2 | アーキテクチャ(層の依存ルール)テスト |
+| | CsCheck | 4.9.1 | プロパティベーステスト(ランダム入力で不変条件を検証) |
+| | Reqnroll.xUnit | 3.3.4 | 日本語 Gherkin の業務シナリオテスト |
+| ブラウザ E2E | Playwright(@playwright/test) | 1.61 | 実ブラウザ(Chromium)での画面操作テスト |
+| カバレッジ | coverlet + ReportGenerator | 6.0.4 / 最新 | 計測と CI 実行サマリへの表示 |
+| ミューテーション | Stryker.NET(dotnet ローカルツール) | 4.16.0 | テストが仕様を検証しているかの測定(Domain・Application) |
+| メトリクス | cloc + scc | 最新 | 行数・複雑度の集計 |
+
+### 開発環境・CI・デプロイ
+
+| 区分 | 技術 | 内容 |
+|---|---|---|
+| 開発環境 | Docker / docker compose / VS Code Dev Containers | `docker/dev.Dockerfile`(.NET 10 SDK + Node.js 22)を共用 |
+| CI | GitHub Actions(ubuntu-latest) | 5 ジョブ: バックエンド(ビルド・テスト・カバレッジ)/ フロントエンド(型チェック・ビルド)/ ブラウザE2E / ミューテーションテスト / コードメトリクス |
+| デプロイ | AWS SAM | Lambda(`provided.al2023`, arm64)+ EFS(SQLite)+ S3 + CloudFront。詳細は [infra/README.md](infra/README.md) |
 
 ## アーキテクチャ
 
@@ -57,11 +89,24 @@ backend/
 │   │   └── Analysis/                   #   差異分析・バージョン比較・損益・部集計のドメインサービス群
 │   ├── CostManagement.Application/     # ユースケース(入力ポート)・DTO
 │   ├── CostManagement.Infrastructure/  # 出力アダプタ: Dapper + SQLite リポジトリ実装
-│   └── CostManagement.WebApi/          # 入力アダプタ: HTTP API(Minimal API)
+│   └── CostManagement.WebApi/          # 入力アダプタ: HTTP API(Minimal API。Lambda でも動く)
 └── tests/
-    └── CostManagement.Domain.Tests/    # ドメイン単体テスト(xUnit)
+    ├── CostManagement.Domain.Tests/    # ドメイン単体テスト(PropertyBased/ にプロパティベーステスト)
+    ├── CostManagement.Application.Tests/ # ユースケーステスト(Features/ に Gherkin シナリオ)
+    ├── CostManagement.Infrastructure.Tests/ # リポジトリの永続化・スキーマ移行
+    ├── CostManagement.E2E.Tests/       # API E2E(HTTP 経由の業務フロー)
+    └── CostManagement.Architecture.Tests/ # 層の依存ルール(NetArchTest)
 
 frontend/                               # React SPA(/api を dev proxy 経由でバックエンドへ)
+├── src/
+│   ├── pages/                          #   画面(部・課・予算編集・実績・分析・比較・費目マスタ)
+│   ├── components/                     #   グラフ(自前 SVG)・モーダル・トースト・金額入力
+│   └── api.ts                          #   API クライアントと型
+└── e2e/                                # ブラウザ E2E(Playwright)
+
+infra/                                  # AWS SAM テンプレートとデプロイスクリプト
+docker/                                 # 開発・ビルド・テスト共用イメージ
+docs/                                   # マニュアル・設計・要件・ADR・解説 HTML(docs/design/)
 ```
 
 ### ドメインモデル(DDD 戦術パターン)
@@ -155,12 +200,14 @@ frontend/                               # React SPA(/api を dev proxy 経由で
 department_budget_lines / actual_entries)ごと破棄して作り直します。
 この処理は冪等で、新スキーマの既存データには影響しません。
 
-一方、現世代スキーマ内での変更(既存データが衝突しないもの)は、既存の案件データを**保持したまま**
-`projects` テーブルを作り直すマイグレーションを起動時に実行します(冪等で、移行済みなら何もしません)。
-現在は次の2つを実行します:
+一方、現世代スキーマ内での変更(既存データが衝突しないもの)は、既存データを**保持したまま**
+テーブルを変更するマイグレーションを起動時に実行します(冪等で、移行済みなら何もしません)。
+現在は次の4つを順に実行します:
 
-- **案件コードの一意制約を「グローバル一意」→「課ごとに一意」へ変更**(制約の緩和のみ)
-- **案件の終了ステータス(`status` 列)を廃止**(案件は終了の概念を持たなくなったため。Issue #2)
+- **案件コードの一意制約を「グローバル一意」→「課ごとに一意」へ変更**(`projects` を作り直し。制約の緩和のみ。Issue #1)
+- **案件の終了ステータス(`status` 列)を廃止**(`projects` を作り直し。案件は終了の概念を持たなくなったため。Issue #2)
+- **実績に計上月(`month` 列)を追加**(`actual_entries` に列追加。Issue #5)
+- **期間費用の明細名(`period_detail` 列)を追加**(予算明細は一意制約に含めるため作り直し、実績は列追加。Issue #7)
 
 ## 実行方法
 
@@ -294,12 +341,12 @@ cd infra && ./deploy.sh     # 詳細・コスト目安・注意点は infra/READ
 | `GET/POST /api/divisions/{id}/departments` | 配下課一覧・課の登録(課は部に属する) |
 | `GET /api/departments/{id}` | 課の取得 |
 | `GET/POST /api/departments/{id}/projects` | 案件一覧・登録(案件は課に属する) |
-| `GET /api/projects/{id}` | 案件の取得 |
-| `POST /api/projects/{id}/complete` | 案件終了 |
+| `GET/PUT /api/projects/{id}` | 案件の取得・編集(コード・名称。コードは課ごとに一意) |
 | `GET/POST /api/cost-elements` | 費目マスタ一覧・追加(期間費用用) |
 | `GET/POST /api/departments/{id}/budgets?fiscalHalf=` | 予算バージョン一覧・ドラフト起票(初回は当初予算、以降は改定版) |
 | `GET /api/budgets/{budgetId}` | 予算詳細(明細・4区分合計含む) |
 | `PUT/DELETE /api/budgets/{budgetId}/lines` | 予算明細の登録(upsert)・削除(案件別 or 費目別) |
+| `POST /api/budgets/{budgetId}/rename-period-detail` | 期間費用の明細名の変更(金額・月次は保持) |
 | `POST /api/budgets/{budgetId}/approve` | 予算承認(同一課・半期の旧承認版は自動失効) |
 | `GET/POST /api/departments/{id}/actuals?fiscalHalf=` | 実績一覧・計上 |
 | `DELETE /api/actuals/{actualId}` | 実績取消 |
@@ -315,7 +362,9 @@ cd infra && ./deploy.sh     # 詳細・コスト目安・注意点は infra/READ
 - **課詳細** — 対象半期の選択、承認済み予算の4区分サマリ、予算バージョンの一覧・改定・承認
 - **予算編集** — 案件×区分のグリッドで売上高・加工費・外注費を案件別に直接入力
   (セルを離れると自動保存)。期間費用も費目別の表に同様に直接入力する。
-  案件の追加・終了もこの画面で行う(案件コードは課ごとに一意)。
+  案件の追加・編集(コード・名称)もこの画面で行う(案件コードは課ごとに一意)。
+  各セルの「月次入力」で月ごとの金額を入れると半期合計が自動計算される。
+  期間費用は費目内を明細名(例: ライセンス費 → AWS / GitHub)で細分でき、明細の追加・名称変更・削除・折りたたみができる。
   期間費用の費目は選択のみで、追加は「費目マスタ」画面で行う。
   区分合計・計画損益はサマリタイルに自動反映
 - **費目マスタ** — システム共通の期間費用の費目マスタ(一覧・追加)。画面右上のナビからアクセス
