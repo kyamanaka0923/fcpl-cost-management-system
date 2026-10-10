@@ -311,7 +311,7 @@ function ProfitTab({ departmentId, half }: { departmentId: string; half: string 
             <VarianceBarChart
               data={profitVarianceByProject}
               adverseWhenPositive={false}
-              legendLabels={['有利差異(損益改善)', '不利差異(損益悪化)']}
+              legendLabels={['利益が増える(損益改善)', '利益が減る(損益悪化)']}
             />
           </div>
         </>

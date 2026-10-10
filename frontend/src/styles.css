@@ -10,8 +10,8 @@
   --border: rgba(11, 11, 11, 0.1);
   --series-1: #2a78d6; /* 予算 (blue) */
   --series-2: #1baf7a; /* 実績 (aqua) */
-  --diverge-adverse: #e34948; /* 不利差異 (red pole) */
-  --diverge-favorable: #2a78d6; /* 有利差異 (blue pole) */
+  --diverge-adverse: #e34948; /* 利益が減る差異 (red pole) */
+  --diverge-favorable: #2a78d6; /* 利益が増える差異 (blue pole) */
   --diverge-neutral: #f0efec;
   --status-good: #0ca30c;
   --status-critical: #d03b3b;

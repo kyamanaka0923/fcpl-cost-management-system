@@ -15,7 +15,7 @@ public readonly record struct Money(decimal Value) : IComparable<Money>
     /// <summary>金額に係数を掛ける。</summary>
     public static Money operator *(Money a, decimal factor) => new(a.Value * factor);
 
-    /// <summary>金額が負(赤字・不利差異)かどうか。</summary>
+    /// <summary>金額が負(赤字・マイナスの差異)かどうか。</summary>
     public bool IsNegative => Value < 0m;
 
     /// <summary>金額の大小を比較する。</summary>

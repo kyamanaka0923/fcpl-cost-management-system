@@ -150,7 +150,7 @@ test('分析: 区分別の予実差異と案件別の損益が表示される', 
   await page.getByRole('button', { name: '予実差異分析・損益' }).click()
 
   // ---- 予実差異タブ(既定) ----
-  // コスト: 予算240万(140万+70万+30万) / 実績245万 → 差異 +5万(不利)。
+  // コスト: 予算240万(140万+70万+30万) / 実績245万 → 差異 +5万(予算超過で利益が減る)。
   // 集計タイルと明細テーブルの両方に出るため first で確認
   await expect(page.getByText('¥2,400,000').first()).toBeVisible()
   await expect(page.getByText('¥+50,000').first()).toBeVisible()

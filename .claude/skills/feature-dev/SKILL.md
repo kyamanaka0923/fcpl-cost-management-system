@@ -33,7 +33,7 @@ model: claude-sonnet-5
 - フロント: 依存追加は最小限(React/Router のみ。UIライブラリ・チャートライブラリは使わず手書きSVG)。
   金額表示は `formatYen`/`formatSignedYen`、区分名は `categoryLabel`、半期は `halfLabel`。
   対象半期は `?half=` クエリでページ間を引き回す(既定は `currentFiscalHalf()`)。
-  有利/不利の色はコスト=正が赤(adverse)、売上高・損益=正が緑(favorable)。
+  差異の色はコスト=正が赤(利益が減る / adverse)、売上高・損益=正が緑(利益が増える / favorable)。
   ダークモード対応必須(CSS変数)
   エラーは各ページの `error`/`setError` state を **`<Toast message={error} onClose={() => setError(null)} />`**
   (`components/Toast.tsx`・画面右下固定・自動消去)で表示する。最上部バナー(`.error-banner`)は

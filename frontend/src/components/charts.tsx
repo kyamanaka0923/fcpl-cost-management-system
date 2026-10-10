@@ -182,13 +182,13 @@ export interface DivergingBarDatum {
 
 /**
  * 差異の分岐棒グラフ。
- * 原価(既定): 正 = 不利差異 = 赤、負 = 有利差異 = 青。
- * 売上(adverseWhenPositive=false): 正 = 有利差異 = 青、負 = 不利差異 = 赤。
+ * 原価(既定): 正 = 予算超過で利益が減る = 赤、負 = 予算内で利益が増える = 青。
+ * 売上(adverseWhenPositive=false): 正 = 利益が増える = 青、負 = 利益が減る = 赤。
  */
 export function VarianceBarChart({
   data,
   adverseWhenPositive = true,
-  legendLabels = ['不利差異(予算超過)', '有利差異(予算内)'],
+  legendLabels = ['利益が減る(予算超過)', '利益が増える(予算内)'],
 }: {
   data: DivergingBarDatum[]
   adverseWhenPositive?: boolean

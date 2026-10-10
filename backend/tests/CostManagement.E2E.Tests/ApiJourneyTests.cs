@@ -133,7 +133,7 @@ public class 業務フロー全体のE2E : IDisposable
 
         // ---- 3. 分析: 差異と損益 ----
 
-        // コスト差異: 実績245万 − 予算240万 = +5万(不利)
+        // コスト差異: 実績245万 − 予算240万 = +5万(予算超過で利益が減る)
         var variance = await GetAsync($"/api/departments/{deptId}/variance?fiscalHalf=2026-H1");
         Assert.Equal(50_000, variance.GetProperty("costVariance").GetDecimal());
         Assert.Equal(0, variance.GetProperty("revenueVariance").GetDecimal());

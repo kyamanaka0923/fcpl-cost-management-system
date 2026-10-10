@@ -18,7 +18,7 @@ model: claude-haiku-4-5
 | `docs/DESIGN.md` | コンテキストマップ/C4/クラス図(Mermaid) | 集約・ドメインサービス・層構成・不変条件の変更 |
 
 - 費目マスタの一覧は `DatabaseInitializer` のシードと**突き合わせて**記載する(推測で書かない)
-- 差異の符号規則(原価=正が不利、売上=正が有利)は README・MANUAL・DESIGN の3箇所に
+- 差異の符号規則(原価=正で利益が減る、売上=正で利益が増える。「有利/不利」という語は使わない)は README・MANUAL・DESIGN の3箇所に
   登場する。変更時は全部直す
 
 ## Mermaid 図の規約と検証

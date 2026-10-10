@@ -19,7 +19,7 @@ import {
 
 type Tab = 'plan' | 'actual'
 
-// 区分別の差異の色: 売上高は正が有利(緑)、コスト系は正が不利(赤)。
+// 区分別の差異の色: 売上高は正なら利益が増える(緑)、コスト系は正なら利益が減る(赤)。
 const categoryVarianceClass = (category: BudgetCategory, variance: number) => {
   if (variance === 0) return ''
   const favorable = category === 'Revenue' ? variance > 0 : variance < 0

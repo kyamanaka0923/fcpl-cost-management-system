@@ -45,7 +45,7 @@ public class 差異分析と損益 : IDisposable
         Assert.Equal(3_000_000m, report.ActualRevenue);
         Assert.Equal(2_400_000m, report.PlannedCost);
         Assert.Equal(2_450_000m, report.ActualCost);
-        Assert.Equal(50_000m, report.CostVariance); // コスト超過 = 不利
+        Assert.Equal(50_000m, report.CostVariance); // コスト超過 = 利益が減る
 
         var processing = report.Categories.Single(c => c.Category == "Processing");
         var 案件A = processing.Lines.Single(l => l.ProjectId == projectAId);
@@ -55,7 +55,7 @@ public class 差異分析と損益 : IDisposable
     }
 
     [Fact]
-    public async Task 売上差異は売上超過が有利差異として算出される()
+    public async Task 売上が予算を超えた差異は利益が増える差異として算出される()
     {
         var (deptId, projectAId, projectBId) = await 予算と実績が揃った課を準備();
 
