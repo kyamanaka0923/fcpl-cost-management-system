@@ -62,6 +62,8 @@
 | カバレッジ | coverlet + ReportGenerator | 6.0.4 / 最新 | 計測と CI 実行サマリへの表示 |
 | ミューテーション | Stryker.NET(dotnet ローカルツール) | 4.16.0 | テストが仕様を検証しているかの測定(Domain・Application) |
 | メトリクス | cloc + scc | 最新 | 行数・複雑度の集計 |
+| 静的解析(フロント) | ESLint + typescript-eslint + eslint-plugin-react-hooks | 9.39 / 8.71 / 7.1 | TypeScript の推奨ルールと React Hooks の規則(`npm run lint`) |
+| フォーマッタ(フロント) | Prettier(+ eslint-config-prettier) | 3.9 | 書式の統一(`npm run format` / `npm run format:check`) |
 
 ### 開発環境・CI・デプロイ
 
@@ -250,6 +252,9 @@ cd frontend
 npm install
 npm run dev
 # => http://localhost:5173 (/api は localhost:5100 にプロキシ)
+
+npm run lint           # ESLint(TypeScript・React Hooks の規則)
+npm run format         # Prettier で整形(確認だけなら npm run format:check)
 ```
 
 ### テスト

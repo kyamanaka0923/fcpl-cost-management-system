@@ -52,6 +52,7 @@ model: claude-sonnet-5
 ```bash
 cd backend && dotnet test          # 全テスト(ドメイン/アプリ/インフラ/API E2E/アーキテクチャ)
 cd frontend && npm run build       # 型チェック + ビルド
+cd frontend && npm run lint && npm run format:check   # ESLint + Prettier(書式は npm run format で直す)
 cd frontend && npm run test:e2e    # 画面を触った場合(PW_CHROMIUM=/opt/pw-browsers/chromium が必要な環境あり)
 ```
 
