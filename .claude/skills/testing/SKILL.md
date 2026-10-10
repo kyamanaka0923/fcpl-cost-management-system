@@ -71,6 +71,27 @@ model: claude-sonnet-5
 - PBT で `BudgetLine.SetMonthly` が検証前に月別金額を書き換えていた不具合を検出・修正済み
   (回帰テスト `不正な月次金額での上書きが拒否されても既存明細の金額と月次は変わらない`)
 
+## Gherkin シナリオ(Reqnroll)
+
+業務フローは日本語 Gherkin でも書く(既存の xUnit テストは置き換えず併存)。
+ライブラリは `Reqnroll.xUnit`(SpecFlow の後継。xUnit 2.9 で動く)。置き場所は
+`Application.Tests/Features/`(`UseCaseFixture` を再利用し、CI・ミューテーションテストにそのまま乗る)。
+
+- **キーワード**: 各 .feature 先頭に `# language: ja`(`reqnroll.json` でも ja 指定)。
+  機能 / 背景 / シナリオ / シナリオアウトライン / 例 / 前提 / もし / ならば / かつ
+- **状態**: `Features/BusinessContext.cs` の `業務コンテキスト` をコンストラクタ注入で共有。
+  シナリオ終了時に Dispose され一時DBが消える。部・課・案件はフィーチャー上の**コード(=名称)**で書き、ここで ID に解決
+- **ステップ**: `Features/Steps/`(組織と案件 / 予算 / 実績と分析)。Cucumber Expression で
+  `{string}`(ダブルクォート)・`{int}`・`{long}` を使う。金額は `{long}`。**`(` `)` `/` はステップ文に書かない**
+  (Cucumber Expression の任意・択一記法と解釈される)
+- 前提でも操作でも使うステップは `[StepDefinition]`、エラーを期待する操作は「…しようとする」で
+  `ctx.試行(...)` を通し(DomainException/NotFoundException を捕捉)、`ならば "…" を含むエラーになる` で検証
+- 表(DataTable)の列名は日本語。区分は 売上高/加工費/外注費/期間費用 で書き `業務コンテキスト.区分()` で内部名へ。
+  空セルは null(費目一括・案件なし)
+- **新しいステップを足す前に既存ステップを探して再利用する**(言い回しの揺れでステップを増やさない)
+- 生成されるコードビハインド `*.feature.cs` はビルド時に作られるので gitignore 済み
+- 未定義ステップがあるとそのシナリオは Skipped/Inconclusive になる。全件 Passed で Skipped 0 を確認する
+
 ## 実行方法
 
 ```bash
