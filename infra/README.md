@@ -23,6 +23,8 @@ EC2・コンテナを使わず、費用を極力抑えたサーバーレス構�
 - **フロント**: `vite build` の成果物を **S3 + CloudFront**。`/api` は相対パスなので
   CloudFront が同一ドメインで振り分け、フロント側のコード変更は不要。
 - **NAT/IGW なし**: Lambda は外部通信しないため NAT ゲートウェイ(月約$32〜)を置かない。
+- **バックアップ**: **AWS Backup** が EFS(SQLite)を毎日 03:00 JST にバックアップし、
+  保管庫 `<ProjectName>-vault` に既定 35 日保持する(`sam deploy --parameter-overrides BackupRetentionDays=90` などで変更)。
 - **認証**: **Amazon Cognito** のユーザープール + Hosted UI。フロントは認可コード + PKCE でログインし、
   API(Lambda)は環境変数 `Auth__Authority` の発行者が出したアクセストークンだけを受け付ける(なければ 401)。
 
@@ -69,6 +71,7 @@ aws cognito-idp admin-create-user --user-pool-id <UserPoolId> --username <メー
 | S3 | 月 数円 | 静的ファイルのみ |
 | CloudFront | 月 数円〜 | 1TB/月まで無料枠あり |
 | Cognito | ほぼ無料 | 小規模の月間アクティブユーザーは無料枠内 |
+| AWS Backup | 月 数円〜 | EFS バックアップは保存容量に比例(数十MB × 保持日数の差分) |
 | **合計** | **月 数百円以内** | 使用量が小さければ実質ほぼ無料〜 |
 
 ## 設計上の注意 / チューニング
@@ -86,6 +89,18 @@ aws cognito-idp admin-create-user --user-pool-id <UserPoolId> --username <メー
   SigV4 署名する構成に切り替えてください。
 - **メモリ/タイムアウト**: `MemorySize: 512` / `Timeout: 30`。負荷に応じて調整。
 
+## バックアップからの復元
+
+AWS Backup の保管庫 `<ProjectName>-vault` に、EFS の日次の復旧ポイントがたまります。
+
+1. AWS コンソールの **AWS Backup → 保管庫 → `<ProjectName>-vault`** で、戻したい日時の復旧ポイントを選んで「復元」
+2. 復元先は「既存のファイルシステム」を選び、**項目レベルの復元**で `costmanagement.db` を指定する
+   (EFS 内の `aws-backup-restore_<日時>/` ディレクトリに復元される)
+3. Lambda の予約同時実行数を一時的に 0 にして書き込みを止める
+4. EFS をマウントできる環境(同じ VPC・EFS 用セキュリティグループに一時的に立てた EC2 など。
+   このスタックには常設していない)で、復元されたファイルを EFS 直下の `costmanagement.db` に上書きする
+5. 予約同時実行数を 1 に戻し、一時的な EC2 を削除する
+
 ## 片付け(削除)
 
 ```bash
@@ -94,6 +109,9 @@ aws s3 rm "s3://$(aws cloudformation describe-stacks --stack-name fcpl-cost \
   --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)" --recursive
 sam delete --stack-name fcpl-cost
 ```
+
+バックアップの保管庫(`<ProjectName>-vault`)はデータ保護のため、スタックを削除しても残ります。
+不要になったら、復旧ポイントを削除してから保管庫を削除してください。
 
 > 注: この環境(サンドボックス)からは実 AWS へデプロイできません。AWS 認証情報のある
 > 手元/CI 環境で `deploy.sh` を実行してください。デプロイ前に `sam validate --lint` で

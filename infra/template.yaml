@@ -6,6 +6,7 @@ Description: >
   DB = SQLite ファイルを Amazon EFS に永続化(Lambda にマウント、予約同時実行=1 で書き込み直列化)。
   フロント = React 静的ビルドを S3 + CloudFront で配信。CloudFront が /api/* を Lambda に振り分け同一ドメイン化。
   認証 = Amazon Cognito(Hosted UI + PKCE)。API はアクセストークン必須。
+  バックアップ = AWS Backup で EFS を毎日バックアップ(既定 35 日保持)。
 
 Parameters:
   ProjectName:
@@ -21,6 +22,11 @@ Parameters:
   SubnetBCidr:
     Type: String
     Default: 10.20.2.0/24
+  BackupRetentionDays:
+    Type: Number
+    Default: 35
+    MinValue: 1
+    Description: EFS(SQLite)の日次バックアップを保持する日数。
 
 Resources:
   # ---------------------------------------------------------------------------
@@ -91,6 +97,57 @@ Resources:
       FileSystemTags:
         - Key: Name
           Value: !Sub '${ProjectName}-efs'
+
+  # ---------------------------------------------------------------------------
+  # バックアップ(AWS Backup)。SQLite ファイルは EFS 上の1ファイルだけなので、
+  # 誤操作・破損に備えて EFS を毎日バックアップする。
+  # 保管庫はスタックを削除しても残す(バックアップごと消えないように)。
+  # ---------------------------------------------------------------------------
+  BackupVault:
+    Type: AWS::Backup::BackupVault
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BackupVaultName: !Sub '${ProjectName}-vault'
+
+  BackupPlan:
+    Type: AWS::Backup::BackupPlan
+    Properties:
+      BackupPlan:
+        BackupPlanName: !Sub '${ProjectName}-daily'
+        BackupPlanRule:
+          - RuleName: daily
+            TargetBackupVault: !Ref BackupVault
+            # 毎日 03:00 JST(18:00 UTC)に開始
+            ScheduleExpression: cron(0 18 * * ? *)
+            StartWindowMinutes: 60
+            CompletionWindowMinutes: 180
+            Lifecycle:
+              DeleteAfterDays: !Ref BackupRetentionDays
+
+  BackupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: backup.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores
+
+  BackupSelection:
+    Type: AWS::Backup::BackupSelection
+    Properties:
+      BackupPlanId: !Ref BackupPlan
+      BackupSelection:
+        SelectionName: !Sub '${ProjectName}-efs'
+        IamRoleArn: !GetAtt BackupRole.Arn
+        Resources:
+          - !GetAtt FileSystem.Arn
 
   MountTargetA:
     Type: AWS::EFS::MountTarget
@@ -345,6 +402,9 @@ Outputs:
   DistributionId:
     Description: CloudFront ディストリビューションID(キャッシュ無効化に使用)
     Value: !Ref Distribution
+  BackupVaultName:
+    Description: EFS(SQLite)の日次バックアップの保管庫(復元に使用)
+    Value: !Ref BackupVault
   UserPoolId:
     Description: Cognito ユーザープールID(利用者の登録に使用)
     Value: !Ref UserPool

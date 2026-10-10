@@ -69,7 +69,7 @@
 |---|---|---|
 | 開発環境 | Docker / docker compose / VS Code Dev Containers | `docker/dev.Dockerfile`(.NET 10 SDK + Node.js 22)を共用 |
 | CI | GitHub Actions(ubuntu-latest) | 5 ジョブ: バックエンド(ビルド・テスト・カバレッジ)/ フロントエンド(型チェック・ビルド)/ ブラウザE2E / ミューテーションテスト / コードメトリクス |
-| デプロイ | AWS SAM | Lambda(`provided.al2023`, arm64)+ EFS(SQLite)+ S3 + CloudFront + Cognito。詳細は [infra/README.md](infra/README.md) |
+| デプロイ | AWS SAM | Lambda(`provided.al2023`, arm64)+ EFS(SQLite)+ S3 + CloudFront + Cognito + AWS Backup(EFS を日次バックアップ)。詳細は [infra/README.md](infra/README.md) |
 
 ## アーキテクチャ
 
@@ -323,6 +323,8 @@ EC2・コンテナを使わず費用を抑えたサーバーレス構成の IaC(
 
 - **バックエンド**: .NET 10 を **Lambda**(`provided.al2023` カスタムランタイム, arm64)で実行(コンテナ不使用)
 - **DB**: SQLite ファイルを **EFS** に永続化(予約同時実行=1 で書き込み直列化)
+- **バックアップ**: **AWS Backup** で EFS を毎日 03:00 JST にバックアップ(既定 35 日保持。
+  パラメータ `BackupRetentionDays` で変更可)。保管庫はスタックを削除しても残る
 - **フロント**: React 静的ビルドを **S3 + CloudFront**。CloudFront が `/api/*` を Lambda に振り分け同一ドメイン化
 - **認証**: **Amazon Cognito**。画面は Hosted UI でログインし、API はアクセストークンがないと 401 を返す。
   利用者は管理者が登録する(自己サインアップ不可。登録コマンドはデプロイ完了時に表示)
