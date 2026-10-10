@@ -355,12 +355,15 @@ test('月次入力: 明細を月ごとに入力でき半期合計に反映され
   await form.getByRole('button', { name: '追加' }).click()
   await expect(page.getByRole('cell', { name: /案件M/ }).first()).toBeVisible()
 
-  // 売上高を月次入力(4月100万 + 5月50万 = 半期150万)
+  // 売上高を月次入力(半期の1か月目100万 + 2か月目50万 = 半期150万)。
+  // 画面の初期半期は実行日で決まる(上期=4〜9月 / 下期=10〜3月)ため、月名ではなく位置で指定する。
   await page.getByRole('button', { name: '案件M 売上高 を月次入力' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
-  await dialog.getByLabel('月次 4月').fill('1000000')
-  await dialog.getByLabel('月次 5月').fill('500000')
+  const 月次入力 = dialog.getByLabel(/^月次 \d+月$/)
+  await expect(月次入力).toHaveCount(6)
+  await 月次入力.nth(0).fill('1000000')
+  await 月次入力.nth(1).fill('500000')
   await expect(dialog.getByText('¥1,500,000')).toBeVisible() // 半期合計の自動計算
   await dialog.getByRole('button', { name: '保存' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
