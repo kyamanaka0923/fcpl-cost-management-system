@@ -39,10 +39,10 @@ public sealed class 実績と分析のステップ(業務コンテキスト ctx)
         foreach (var row in table.Rows)
         {
             var line = 明細を探す(lines, row["区分"], row["案件"], row["費目"], row["明細名"]);
-            var 判定 = line.IsFavorable ? "有利" : line.IsAdverse ? "不利" : "差異なし";
+            var 利益への影響 = line.IsFavorable ? "利益が増える" : line.IsAdverse ? "利益が減る" : "影響なし";
             Assert.Equal(
-                (decimal.Parse(row["予算"]), decimal.Parse(row["実績"]), decimal.Parse(row["差異"]), row["判定"]),
-                (line.PlannedAmount, line.ActualAmount, line.Variance, 判定));
+                (decimal.Parse(row["予算"]), decimal.Parse(row["実績"]), decimal.Parse(row["差異"]), row["利益への影響"]),
+                (line.PlannedAmount, line.ActualAmount, line.Variance, 利益への影響));
         }
     }
 
