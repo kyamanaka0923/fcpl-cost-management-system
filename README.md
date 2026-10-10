@@ -45,7 +45,7 @@
 | バックエンド | .NET / ASP.NET Core Minimal API | 10(`net10.0`) | HTTP API |
 | | Amazon.Lambda.AspNetCoreServer.Hosting | 2.1 | AWS Lambda 上での実行(ローカルでは通常の Kestrel) |
 | データ | SQLite(Microsoft.Data.Sqlite + SQLitePCLRaw.bundle_e_sqlite3) | 10.0.9 / 3.0.3 | 永続化(単一ファイル DB) |
-| | Dapper | 2.1.79 | SQL マッピング(ORM は使わない) |
+| | Dapper | 2.1.79 | マイクロ ORM。SQL は手書きし、結果をオブジェクトへ詰め替える(EF Core のような変更追跡・LINQ 変換・マイグレーション機能を持つフル機能 ORM は使わない) |
 | 設計 | ヘキサゴナルアーキテクチャ + ドメイン駆動設計(戦術パターン) | — | 依存は Domain に向かう。ルールは NetArchTest で検査 |
 
 ### テスト・品質
