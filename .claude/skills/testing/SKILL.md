@@ -48,6 +48,8 @@ model: claude-sonnet-5
   クリアされる画面なら `await expect(欄).toHaveValue('')` で完了を待ってから次へ進む
   (`reuseExistingServer` で残ったサーバを掴むと結果がぶれるので、E2E前に 5173/5100 を掃除する)
 
+E2E(API E2E・ブラウザE2E)のテストケースを追加・変更したら、解説 `docs/design/e2e-test-guide.html` も更新する。
+
 ## プロパティベーステスト(CsCheck)
 
 例示テストに加えて、ドメインとユースケースの**不変条件**は CsCheck で任意の入力に対して検証する

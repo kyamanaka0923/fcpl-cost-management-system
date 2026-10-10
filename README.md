@@ -239,6 +239,8 @@ dotnet test
 
 さらに**ブラウザ E2E テスト**(Playwright)が `frontend/e2e/` にあります。
 バックエンドとフロントエンドを自動起動し、実際のブラウザで計画策定→実績入力→分析→計画変更を操作します。
+API E2E とブラウザ E2E の各テストケースが何をどの数値で確かめているかは
+[`docs/design/e2e-test-guide.html`](docs/design/e2e-test-guide.html)(ブラウザで開く)にまとめています。
 
 ```bash
 cd frontend
