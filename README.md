@@ -44,6 +44,7 @@
 | | グラフ | (外部ライブラリなし) | `components/charts.tsx` の自前 SVG |
 | バックエンド | .NET / ASP.NET Core Minimal API | 10(`net10.0`) | HTTP API |
 | | Amazon.Lambda.AspNetCoreServer.Hosting | 2.1 | AWS Lambda 上での実行(ローカルでは通常の Kestrel) |
+| 認証 | Amazon Cognito + Microsoft.AspNetCore.Authentication.JwtBearer | — / 10.0.9 | ログイン(Hosted UI・認可コード + PKCE)と API のアクセストークン検証。ローカル開発では無効 |
 | データ | SQLite(Microsoft.Data.Sqlite + SQLitePCLRaw.bundle_e_sqlite3) | 10.0.9 / 3.0.3 | 永続化(単一ファイル DB) |
 | | Dapper | 2.1.79 | マイクロ ORM。SQL は手書きし、結果をオブジェクトへ詰め替える(EF Core のような変更追跡・LINQ 変換・マイグレーション機能を持つフル機能 ORM は使わない) |
 | 設計 | ヘキサゴナルアーキテクチャ + ドメイン駆動設計(戦術パターン) | — | 依存は Domain に向かう。ルールは NetArchTest で検査 |
@@ -68,7 +69,7 @@
 |---|---|---|
 | 開発環境 | Docker / docker compose / VS Code Dev Containers | `docker/dev.Dockerfile`(.NET 10 SDK + Node.js 22)を共用 |
 | CI | GitHub Actions(ubuntu-latest) | 5 ジョブ: バックエンド(ビルド・テスト・カバレッジ)/ フロントエンド(型チェック・ビルド)/ ブラウザE2E / ミューテーションテスト / コードメトリクス |
-| デプロイ | AWS SAM | Lambda(`provided.al2023`, arm64)+ EFS(SQLite)+ S3 + CloudFront。詳細は [infra/README.md](infra/README.md) |
+| デプロイ | AWS SAM | Lambda(`provided.al2023`, arm64)+ EFS(SQLite)+ S3 + CloudFront + Cognito。詳細は [infra/README.md](infra/README.md) |
 
 ## アーキテクチャ
 
@@ -323,10 +324,25 @@ EC2・コンテナを使わず費用を抑えたサーバーレス構成の IaC(
 - **バックエンド**: .NET 10 を **Lambda**(`provided.al2023` カスタムランタイム, arm64)で実行(コンテナ不使用)
 - **DB**: SQLite ファイルを **EFS** に永続化(予約同時実行=1 で書き込み直列化)
 - **フロント**: React 静的ビルドを **S3 + CloudFront**。CloudFront が `/api/*` を Lambda に振り分け同一ドメイン化
+- **認証**: **Amazon Cognito**。画面は Hosted UI でログインし、API はアクセストークンがないと 401 を返す。
+  利用者は管理者が登録する(自己サインアップ不可。登録コマンドはデプロイ完了時に表示)
 
 ```bash
 cd infra && ./deploy.sh     # 詳細・コスト目安・注意点は infra/README.md
 ```
+
+## 認証
+
+認証は **AWS にデプロイした環境でだけ有効**です(設計判断は [ADR-0014](docs/adr/0014-cognito-authentication.md))。
+
+- **バックエンド**: 設定 `Auth:Authority`(Cognito ユーザープールの発行者 URL)があると、すべての `/api` で
+  JWT アクセストークンを検証します(署名・発行者・有効期限・アクセストークンであること。
+  `Auth:ClientId` を設定すれば発行先クライアントも検証)。トークンがない・無効なら **401** を返します。
+- **安全策**: `ASPNETCORE_ENVIRONMENT` が Development 以外で `Auth:Authority` が未設定だと、**起動時にエラー**にします。
+- **フロント**: ビルド時に `VITE_AUTH_DOMAIN`(Hosted UI の URL)と `VITE_AUTH_CLIENT_ID` を渡すとログインが有効になり、
+  未ログインなら Cognito のログイン画面へ移動します。画面右上にログイン中の利用者とログアウトが出ます。
+  `infra/deploy.sh` がスタック出力からこの2つを埋め込みます。
+- **ローカル開発・テスト**: どちらも未設定(Development)なので、従来どおりログインなしで使えます。
 
 ## API 概要
 

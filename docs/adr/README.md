@@ -24,6 +24,7 @@
 | [0011](0011-testing-strategy-and-mutation.md) | テスト戦略(多層テスト + カバレッジ + ミューテーションテスト) | Accepted |
 | [0012](0012-frontend-svg-and-toast.md) | フロントは自前 SVG 描画・エラーは固定トースト通知 | Accepted |
 | [0013](0013-period-cost-detail-lines.md) | 期間費用は費目内を明細名で細分できる(費目一括との排他) | Accepted |
+| [0014](0014-cognito-authentication.md) | 認証は Amazon Cognito(Hosted UI + PKCE)と API の JWT 検証で行う | Accepted |
 
 ## 状態の凡例
 

@@ -4,6 +4,7 @@ using CostManagement.Application.Common;
 using CostManagement.Domain.Shared;
 using CostManagement.Infrastructure;
 using CostManagement.Infrastructure.Persistence;
+using CostManagement.WebApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +12,7 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? "Data Source=costmanagement.db";
 
 builder.Services.AddCostManagement(connectionString);
+var auth = builder.AddCostManagementAuth();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
     policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
@@ -24,6 +26,12 @@ var app = builder.Build();
 app.Services.GetRequiredService<DatabaseInitializer>().Initialize();
 
 app.UseCors();
+
+if (auth.Enabled)
+{
+    app.UseAuthentication();
+    app.UseAuthorization();
+}
 
 // ドメイン例外 → 400, 未検出 → 404 に変換する。
 app.Use(async (context, next) =>
@@ -45,6 +53,9 @@ app.Use(async (context, next) =>
 });
 
 var api = app.MapGroup("/api");
+// With authentication configured, every API endpoint requires a valid access token (401 otherwise).
+if (auth.Enabled)
+    api.RequireAuthorization();
 
 // ---- 部 ----
 api.MapGet("/divisions", (DivisionService svc, CancellationToken ct) => svc.ListAsync(ct));

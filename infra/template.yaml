@@ -5,6 +5,7 @@ Description: >
   バックエンド = .NET 10 を AWS Lambda(provided.al2023 カスタムランタイム, arm64)で実行。
   DB = SQLite ファイルを Amazon EFS に永続化(Lambda にマウント、予約同時実行=1 で書き込み直列化)。
   フロント = React 静的ビルドを S3 + CloudFront で配信。CloudFront が /api/* を Lambda に振り分け同一ドメイン化。
+  認証 = Amazon Cognito(Hosted UI + PKCE)。API はアクセストークン必須。
 
 Parameters:
   ProjectName:
@@ -147,6 +148,8 @@ Resources:
         Variables:
           ConnectionStrings__Default: 'Data Source=/mnt/efs/costmanagement.db'
           ASPNETCORE_ENVIRONMENT: Production
+          # API は Cognito ユーザープールが発行したアクセストークンを必須にする(未設定だと起動しない)。
+          Auth__Authority: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}'
       VpcConfig:
         SubnetIds:
           - !Ref SubnetA
@@ -167,6 +170,73 @@ Resources:
                 - elasticfilesystem:ClientWrite
                 - elasticfilesystem:ClientRootAccess
               Resource: !GetAtt FileSystem.Arn
+
+  # ---------------------------------------------------------------------------
+  # 認証(Amazon Cognito)。利用者は管理者だけが登録できる(自己サインアップ不可)。
+  # フロントは Hosted UI で認可コードフロー + PKCE によりログインし、
+  # API にはアクセストークンを Bearer で付けて呼ぶ。
+  # ---------------------------------------------------------------------------
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${ProjectName}-users'
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      # Hosted UI のドメイン(リージョン内で一意である必要があるためアカウントIDを付ける)
+      Domain: !Sub '${ProjectName}-${AWS::AccountId}'
+
+  # フロント(SPA)用のアプリクライアント。シークレットなし(ブラウザに置けないため)+ PKCE。
+  # コールバック URL に CloudFront のドメインを使うため、Lambda ではなくこちらが Distribution に依存する
+  # (Lambda はユーザープールの発行者 URL だけで検証し、循環参照を避ける)。
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: !Sub '${ProjectName}-web'
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs:
+        - !Sub 'https://${Distribution.DomainName}/auth/callback'
+      LogoutURLs:
+        - !Sub 'https://${Distribution.DomainName}/'
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 12
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: hours
 
   # ---------------------------------------------------------------------------
   # フロント配信(S3 は非公開。CloudFront の OAC からのみ読める)。
@@ -275,3 +345,12 @@ Outputs:
   DistributionId:
     Description: CloudFront ディストリビューションID(キャッシュ無効化に使用)
     Value: !Ref Distribution
+  UserPoolId:
+    Description: Cognito ユーザープールID(利用者の登録に使用)
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: フロント用 Cognito アプリクライアントID(フロントのビルド時に VITE_AUTH_CLIENT_ID として埋め込む)
+    Value: !Ref UserPoolClient
+  AuthDomain:
+    Description: Cognito Hosted UI の URL(フロントのビルド時に VITE_AUTH_DOMAIN として埋め込む)
+    Value: !Sub 'https://${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com'

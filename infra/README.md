@@ -23,6 +23,8 @@ EC2・コンテナを使わず、費用を極力抑えたサーバーレス構�
 - **フロント**: `vite build` の成果物を **S3 + CloudFront**。`/api` は相対パスなので
   CloudFront が同一ドメインで振り分け、フロント側のコード変更は不要。
 - **NAT/IGW なし**: Lambda は外部通信しないため NAT ゲートウェイ(月約$32〜)を置かない。
+- **認証**: **Amazon Cognito** のユーザープール + Hosted UI。フロントは認可コード + PKCE でログインし、
+  API(Lambda)は環境変数 `Auth__Authority` の発行者が出したアクセストークンだけを受け付ける(なければ 401)。
 
 ## 前提ツール
 
@@ -48,6 +50,16 @@ STACK=fcpl-cost REGION=ap-northeast-1 ./deploy.sh
 
 完了後に表示される **CloudFront URL** がアプリの入口です。
 
+### 利用者の登録(初回)
+
+自己サインアップはできません。管理者が Cognito に利用者を登録します(`deploy.sh` の最後にコマンドが表示されます)。
+
+```bash
+aws cognito-idp admin-create-user --user-pool-id <UserPoolId> --username <メールアドレス> --region ap-northeast-1
+```
+
+招待メールの仮パスワードでログインすると、初回にパスワードの変更を求められます(12文字以上・大小英字と数字を含む)。
+
 ## コスト目安(小規模・社内利用)
 
 | リソース | 目安 | 備考 |
@@ -56,6 +68,7 @@ STACK=fcpl-cost REGION=ap-northeast-1 ./deploy.sh
 | EFS | 月 数円〜 | 数十MBのSQLite想定。Bursting スループット |
 | S3 | 月 数円 | 静的ファイルのみ |
 | CloudFront | 月 数円〜 | 1TB/月まで無料枠あり |
+| Cognito | ほぼ無料 | 小規模の月間アクティブユーザーは無料枠内 |
 | **合計** | **月 数百円以内** | 使用量が小さければ実質ほぼ無料〜 |
 
 ## 設計上の注意 / チューニング
@@ -67,10 +80,10 @@ STACK=fcpl-cost REGION=ap-northeast-1 ./deploy.sh
 - **コールドスタート**: self-contained のみ(R2R/AOT なし)で概ね1〜2秒。短縮したい場合は
   `CostManagement.WebApi.csproj` の `LambdaPublish` 条件に `<PublishReadyToRun>true</PublishReadyToRun>`
   を追加(クロスアーキビルドが不安定な環境では CodeBuild/arm64 上でのビルドを推奨)。
-- **セキュリティ**: Function URL は既定で `AuthType: NONE`(CloudFront 経由が入口)。
-  Function URL の直アクセスを塞ぐには `AuthType: AWS_IAM` に変更し、CloudFront の
-  **OAC(Lambda 用)** で SigV4 署名する構成に切り替えてください。アプリ自体に認証が必要なら
-  CloudFront + Cognito の付加を検討します。
+- **セキュリティ**: API はアプリ側で Cognito のアクセストークンを検証するため、Function URL
+  (`AuthType: NONE`)を直接呼ばれてもトークンがなければ 401 になります。ネットワークの段階でも
+  直アクセスを塞ぎたい場合は `AuthType: AWS_IAM` に変更し、CloudFront の **OAC(Lambda 用)** で
+  SigV4 署名する構成に切り替えてください。
 - **メモリ/タイムアウト**: `MemorySize: 512` / `Timeout: 30`。負荷に応じて調整。
 
 ## 片付け(削除)

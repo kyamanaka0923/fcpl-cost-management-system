@@ -1,5 +1,7 @@
 // バックエンド API クライアント。DTO はサーバ側 (CostManagement.Application) と対応する。
 
+import { authEnabled, getAccessToken, login } from './auth'
+
 export type BudgetCategory = 'Revenue' | 'Processing' | 'Outsourcing' | 'PeriodCost'
 export type BudgetStatus = 'Draft' | 'Approved' | 'Superseded'
 
@@ -216,10 +218,17 @@ export interface ProfitSummary {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  })
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (authEnabled) {
+    const token = await getAccessToken()
+    if (token) headers.Authorization = `Bearer ${token}`
+  }
+  const res = await fetch(`/api${path}`, { headers, ...init })
+  if (res.status === 401 && authEnabled) {
+    // トークン切れ・未ログイン: ログイン画面へ移動する
+    void login()
+    throw new Error('ログインが必要です。ログイン画面へ移動します。')
+  }
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`
     try {
