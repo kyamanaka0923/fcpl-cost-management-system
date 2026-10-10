@@ -70,7 +70,7 @@ public sealed class 予算のステップ(業務コンテキスト ctx)
                 "Outsourcing" => budget.OutsourcingTotal,
                 _ => budget.PeriodCostTotal,
             };
-            Assert.True(decimal.Parse(row["金額"]) == actual, $"{row["区分"]} の合計: 期待 {row["金額"]} / 実際 {actual}");
+            Assert.True(金額(row["金額"]) == actual, $"{row["区分"]} の合計: 期待 {row["金額"]} / 実際 {actual}");
         }
     }
 
@@ -82,7 +82,7 @@ public sealed class 予算のステップ(業務コンテキスト ctx)
     {
         var versions = await ctx.Fx.Budgets.ListAsync(ctx.課Id(department), half);
         Assert.Equal(
-            table.Rows.Select(r => (int.Parse(r["版"]), r["名称"], r["状態"])),
+            table.Rows.Select(r => (整数(r["版"]), r["名称"], r["状態"])),
             versions.Select(v => (v.Version, v.Label, 状態(v.Status))));
     }
 
@@ -100,6 +100,6 @@ public sealed class 予算のステップ(業務コンテキスト ctx)
         var category = 区分(row["区分"]);
         var project = 空ならnull(row["案件"]) is { } code ? ctx.案件Id(ctx.現在の課!, code) : (Guid?)null;
         return new UpsertBudgetLineRequest(category, project, 空ならnull(row["費目"]),
-            decimal.Parse(row["金額"]), null, 空ならnull(row["明細名"]));
+            金額(row["金額"]), null, 空ならnull(row["明細名"]));
     }
 }

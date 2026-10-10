@@ -41,6 +41,14 @@ model: claude-sonnet-5
 - チャートを追加・変更するときは dataviz スキル(バンドル)を先に読み込み、検証済みパレット
   (`frontend/src/styles.css` の CSS 変数)を使う
 
+## 静的解析
+
+- バックエンドは `backend/Directory.Build.props` で `AnalysisLevel=latest-recommended` + **警告をエラー扱い**。
+  ロケール依存の `ToString`/`Parse`(CA1305)、比較方法未指定の文字列比較(CA1310)などはビルドが通らない。
+  ルールを外すときはリポジトリ直下の `.editorconfig` に**理由のコメントつき**で書く(抑制属性を散らさない)
+- `dotnet format` は既存コードの意図的な桁揃えを崩すため CI では強制しない(`.editorconfig` はエディタ用)
+- フロントは ESLint + Prettier(CI で検査)
+
 ## コメント規約
 
 - C# は XML コメント + `<summary>`。ドメイン層は日本語、他層は英語。

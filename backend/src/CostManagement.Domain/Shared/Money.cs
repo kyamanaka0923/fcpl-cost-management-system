@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace CostManagement.Domain.Shared;
 
 /// <summary>金額を表す値オブジェクト(円)。</summary>
@@ -21,6 +23,18 @@ public readonly record struct Money(decimal Value) : IComparable<Money>
     /// <summary>金額の大小を比較する。</summary>
     public int CompareTo(Money other) => Value.CompareTo(other.Value);
 
-    /// <summary>3桁区切りの文字列表現を返す。</summary>
-    public override string ToString() => Value.ToString("#,0.##");
+    /// <summary>a が b より小さいか。</summary>
+    public static bool operator <(Money a, Money b) => a.Value < b.Value;
+
+    /// <summary>a が b 以下か。</summary>
+    public static bool operator <=(Money a, Money b) => a.Value <= b.Value;
+
+    /// <summary>a が b より大きいか。</summary>
+    public static bool operator >(Money a, Money b) => a.Value > b.Value;
+
+    /// <summary>a が b 以上か。</summary>
+    public static bool operator >=(Money a, Money b) => a.Value >= b.Value;
+
+    /// <summary>3桁区切りの文字列表現を返す(実行環境のロケールに依存しない)。</summary>
+    public override string ToString() => Value.ToString("#,0.##", CultureInfo.InvariantCulture);
 }

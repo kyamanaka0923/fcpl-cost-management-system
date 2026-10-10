@@ -38,6 +38,10 @@ public class 値オブジェクトの性質
         Gen.Select(任意の金額, 任意の金額).Sample((a, b) =>
         {
             Assert.Equal(Math.Sign(a.Value.CompareTo(b.Value)), Math.Sign(a.CompareTo(b)));
+            Assert.Equal(a.Value < b.Value, a < b);
+            Assert.Equal(a.Value <= b.Value, a <= b);
+            Assert.Equal(a.Value > b.Value, a > b);
+            Assert.Equal(a.Value >= b.Value, a >= b);
             Assert.Equal(a.Value < 0m, a.IsNegative);
         });
     }

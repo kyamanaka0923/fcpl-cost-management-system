@@ -64,6 +64,8 @@
 | メトリクス | cloc + scc | 最新 | 行数・複雑度の集計 |
 | 静的解析(フロント) | ESLint + typescript-eslint + eslint-plugin-react-hooks | 9.39 / 8.71 / 7.1 | TypeScript の推奨ルールと React Hooks の規則(`npm run lint`) |
 | フォーマッタ(フロント) | Prettier(+ eslint-config-prettier) | 3.9 | 書式の統一(`npm run format` / `npm run format:check`) |
+| 静的解析(バックエンド) | .NET アナライザ(`AnalysisLevel=latest-recommended`)+ 警告をエラー扱い | .NET 10 SDK 同梱 | `backend/Directory.Build.props` で全プロジェクトに適用。方針に合わないルールは `.editorconfig` で理由つきで無効化 |
+| 書式設定(共通) | EditorConfig | — | リポジトリ直下の `.editorconfig`(文字コード・改行・インデント・C# のスタイル) |
 
 ### 開発環境・CI・デプロイ
 
@@ -238,6 +240,9 @@ VS Code でのリモート開発は、拡張機能「Dev Containers」を入れ�
 デバッグ実行は `.vscode/launch.json` の構成(`full: backend デバッグ + frontend` など)を使います。
 
 ### バックエンド(ローカルに SDK がある場合)
+
+ビルドでは .NET アナライザの推奨ルールが働き、**警告はエラーとして扱われます**(`backend/Directory.Build.props`)。
+ロケールに依存する数値の書式化・解析などはビルドが通らないので、`CultureInfo.InvariantCulture` などで明示してください。
 
 ```bash
 cd backend

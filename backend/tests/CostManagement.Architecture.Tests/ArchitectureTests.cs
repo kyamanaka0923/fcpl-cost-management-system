@@ -115,7 +115,7 @@ public class PortAndAdapterTests
 
     private static IEnumerable<Type> RepositoryPorts() =>
         DomainAssembly.GetTypes()
-            .Where(t => t.IsInterface && t.Name.EndsWith("Repository"));
+            .Where(t => t.IsInterface && t.Name.EndsWith("Repository", StringComparison.Ordinal));
 
     [Fact]
     public void リポジトリポートはドメイン層に定義されている()

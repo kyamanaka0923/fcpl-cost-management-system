@@ -1,3 +1,4 @@
+using System.Globalization;
 using CostManagement.Application.Common;
 using CostManagement.Domain.Shared;
 using Reqnroll;
@@ -72,6 +73,12 @@ public sealed class 業務コンテキスト : IDisposable
         "Superseded" => "失効",
         _ => 内部,
     };
+
+    /// <summary>表のセルの金額(実行環境のロケールに依存せずに読む)。</summary>
+    public static decimal 金額(string cell) => decimal.Parse(cell, CultureInfo.InvariantCulture);
+
+    /// <summary>表のセルの整数(月・版など)。</summary>
+    public static int 整数(string cell) => int.Parse(cell, CultureInfo.InvariantCulture);
 
     /// <summary>表のセルの空文字・空白を null として扱う。</summary>
     public static string? 空ならnull(string? cell) => string.IsNullOrWhiteSpace(cell) ? null : cell.Trim();

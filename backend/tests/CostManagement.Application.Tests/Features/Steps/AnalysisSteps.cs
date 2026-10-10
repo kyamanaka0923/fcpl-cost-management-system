@@ -15,9 +15,9 @@ public sealed class 実績と分析のステップ(業務コンテキスト ctx)
         foreach (var row in table.Rows)
         {
             var project = 空ならnull(row["案件"]) is { } code ? ctx.案件Id(department, code) : (Guid?)null;
-            var month = 空ならnull(row["月"]) is { } m ? int.Parse(m) : (int?)null;
+            var month = 空ならnull(row["月"]) is { } m ? 整数(m) : (int?)null;
             await ctx.Fx.Actuals.RecordAsync(ctx.課Id(department), new RecordActualRequest(half,
-                区分(row["区分"]), project, 空ならnull(row["費目"]), decimal.Parse(row["金額"]), month,
+                区分(row["区分"]), project, 空ならnull(row["費目"]), 金額(row["金額"]), month,
                 null, 空ならnull(row["明細名"])));
         }
     }
@@ -41,7 +41,7 @@ public sealed class 実績と分析のステップ(業務コンテキスト ctx)
             var line = 明細を探す(lines, row["区分"], row["案件"], row["費目"], row["明細名"]);
             var 利益への影響 = line.IsFavorable ? "利益が増える" : line.IsAdverse ? "利益が減る" : "影響なし";
             Assert.Equal(
-                (decimal.Parse(row["予算"]), decimal.Parse(row["実績"]), decimal.Parse(row["差異"]), row["利益への影響"]),
+                (金額(row["予算"]), 金額(row["実績"]), 金額(row["差異"]), row["利益への影響"]),
                 (line.PlannedAmount, line.ActualAmount, line.Variance, 利益への影響));
         }
     }
@@ -79,7 +79,7 @@ public sealed class 実績と分析のステップ(業務コンテキスト ctx)
         foreach (var row in table.Rows)
         {
             var line = lines.Single(l => l.ProjectId == ctx.案件Id(ctx.現在の課!, row["案件"]));
-            Assert.Equal((decimal.Parse(row["計画損益"]), decimal.Parse(row["実績損益"])),
+            Assert.Equal((金額(row["計画損益"]), 金額(row["実績損益"])),
                 (line.PlannedProfit, line.ActualProfit));
         }
     }
@@ -113,7 +113,7 @@ public sealed class 実績と分析のステップ(業務コンテキスト ctx)
         {
             var line = lines.Single(l => l.DepartmentName == row["課"]);
             Assert.Equal(
-                (row["予算"], decimal.Parse(row["計画売上高"]), decimal.Parse(row["実績売上高"]), decimal.Parse(row["計画コスト"])),
+                (row["予算"], 金額(row["計画売上高"]), 金額(row["実績売上高"]), 金額(row["計画コスト"])),
                 (line.HasApprovedBudget ? "承認済" : "未策定", line.PlannedRevenue, line.ActualRevenue, line.PlannedCost));
         }
     }
