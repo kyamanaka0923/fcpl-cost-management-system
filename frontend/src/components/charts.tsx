@@ -123,7 +123,8 @@ export function PlannedVsActualChart({
             const xPlanned = cx - barW - 1
             const xActual = cx + 1
             const show = (e: React.MouseEvent) =>
-              tooltip.show(e, (
+              tooltip.show(
+                e,
                 <>
                   <div className="tt-title">{d.label}</div>
                   <div className="tt-line">
@@ -138,8 +139,8 @@ export function PlannedVsActualChart({
                     <span>差異</span>
                     <span className="v">¥{formatSignedYen(d.actual - d.planned)}</span>
                   </div>
-                </>
-              ))
+                </>,
+              )
             const zeroY = yScale(0)
             const bar = (x: number, v: number, color: string) => {
               const vy = yScale(v)
@@ -245,7 +246,8 @@ export function VarianceBarChart({
             const x0 = Math.min(xScale(0), xScale(d.value))
             const w = Math.abs(xScale(d.value) - xScale(0))
             const show = (e: React.MouseEvent) =>
-              tooltip.show(e, (
+              tooltip.show(
+                e,
                 <>
                   <div className="tt-title">{d.label}</div>
                   <div className="tt-line">
@@ -253,11 +255,17 @@ export function VarianceBarChart({
                     <span className="v">¥{formatSignedYen(d.value)}</span>
                   </div>
                   {d.detail}
-                </>
-              ))
+                </>,
+              )
             return (
               <g key={d.label} onMouseMove={show} onMouseLeave={tooltip.hide}>
-                <rect x={-margin.left} y={i * rowH} width={width} height={rowH} fill="transparent" />
+                <rect
+                  x={-margin.left}
+                  y={i * rowH}
+                  width={width}
+                  height={rowH}
+                  fill="transparent"
+                />
                 <text
                   x={-10}
                   y={y}

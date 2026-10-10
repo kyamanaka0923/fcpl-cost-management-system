@@ -373,8 +373,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  deleteActual: (actualId: string) =>
-    request<void>(`/actuals/${actualId}`, { method: 'DELETE' }),
+  deleteActual: (actualId: string) => request<void>(`/actuals/${actualId}`, { method: 'DELETE' }),
 
   // ---- 分析 ----
   getVariance: (departmentId: string, fiscalHalf: string, opts?: { budgetId?: string }) => {
@@ -405,8 +404,7 @@ export const api = {
 export const formatYen = (value: number): string =>
   new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(value)
 
-export const formatSignedYen = (value: number): string =>
-  (value > 0 ? '+' : '') + formatYen(value)
+export const formatSignedYen = (value: number): string => (value > 0 ? '+' : '') + formatYen(value)
 
 /** 粗利率などの割合表示。null / 分母0 は「—」。 */
 export const formatPercent = (rate: number | null): string =>

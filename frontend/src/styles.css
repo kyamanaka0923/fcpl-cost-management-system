@@ -45,8 +45,13 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Kaku Gothic ProN',
-    'Noto Sans JP', sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    'Hiragino Kaku Gothic ProN',
+    'Noto Sans JP',
+    sans-serif;
   background: var(--page);
   color: var(--text-primary);
   font-size: 14px;

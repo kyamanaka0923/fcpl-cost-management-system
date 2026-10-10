@@ -29,7 +29,10 @@ function VarianceTab({ departmentId, half }: { departmentId: string; half: strin
   const [budgetId, setBudgetId] = useState('')
 
   useEffect(() => {
-    api.listBudgets(departmentId, half).then(setBudgets).catch((e: Error) => setError(e.message))
+    api
+      .listBudgets(departmentId, half)
+      .then(setBudgets)
+      .catch((e: Error) => setError(e.message))
   }, [departmentId, half])
 
   const load = useCallback(() => {

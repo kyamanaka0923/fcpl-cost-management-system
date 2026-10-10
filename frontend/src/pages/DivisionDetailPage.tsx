@@ -148,13 +148,7 @@ function PlanView({ summary, half }: { summary: DivisionBudgetSummary; half: str
 }
 
 /** 予実サマリタブ: 予算と実績を突き合わせた差異・損益。 */
-function ActualSummaryView({
-  summary,
-  half,
-}: {
-  summary: DivisionBudgetSummary
-  half: string
-}) {
+function ActualSummaryView({ summary, half }: { summary: DivisionBudgetSummary; half: string }) {
   return (
     <>
       <div className="stat-row">
@@ -294,7 +288,10 @@ export default function DivisionDetailPage() {
 
   const load = useCallback(() => {
     if (!divisionId) return
-    api.getDivision(divisionId).then(setDivision).catch((e: Error) => setError(e.message))
+    api
+      .getDivision(divisionId)
+      .then(setDivision)
+      .catch((e: Error) => setError(e.message))
     api
       .getDivisionBudgetSummary(divisionId, half)
       .then(setSummary)
@@ -427,11 +424,21 @@ export default function DivisionDetailPage() {
         <form onSubmit={addDepartment} className="form-row">
           <label>
             課コード
-            <input value={code} onChange={(e) => setCode(e.target.value)} required placeholder="DEV-1" />
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              required
+              placeholder="DEV-1"
+            />
           </label>
           <label>
             課名
-            <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="開発1課" />
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              placeholder="開発1課"
+            />
           </label>
           <button type="submit" className="primary" disabled={saving}>
             登録

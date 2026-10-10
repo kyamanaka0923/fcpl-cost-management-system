@@ -151,7 +151,9 @@ export default function ComparisonPage() {
                         <td>{lineName(l)}</td>
                         <td className="num">¥{formatYen(l.baseAmount)}</td>
                         <td className="num">¥{formatYen(l.targetAmount)}</td>
-                        <td className={`num ${l.difference === 0 ? '' : l.difference > 0 ? 'adverse' : 'favorable'}`}>
+                        <td
+                          className={`num ${l.difference === 0 ? '' : l.difference > 0 ? 'adverse' : 'favorable'}`}
+                        >
                           ¥{formatSignedYen(l.difference)}
                         </td>
                       </tr>
@@ -160,7 +162,9 @@ export default function ComparisonPage() {
                       <td>合計</td>
                       <td className="num">¥{formatYen(c.baseAmount)}</td>
                       <td className="num">¥{formatYen(c.targetAmount)}</td>
-                      <td className={`num ${c.difference === 0 ? '' : c.difference > 0 ? 'adverse' : 'favorable'}`}>
+                      <td
+                        className={`num ${c.difference === 0 ? '' : c.difference > 0 ? 'adverse' : 'favorable'}`}
+                      >
                         ¥{formatSignedYen(c.difference)}
                       </td>
                     </tr>

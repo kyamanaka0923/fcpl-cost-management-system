@@ -11,7 +11,10 @@ export default function DivisionListPage() {
   const [saving, setSaving] = useState(false)
 
   const load = () => {
-    api.listDivisions().then(setDivisions).catch((e: Error) => setError(e.message))
+    api
+      .listDivisions()
+      .then(setDivisions)
+      .catch((e: Error) => setError(e.message))
   }
   useEffect(load, [])
 
@@ -40,11 +43,21 @@ export default function DivisionListPage() {
         <form onSubmit={onSubmit} className="form-row">
           <label>
             部コード
-            <input value={code} onChange={(e) => setCode(e.target.value)} required placeholder="SALES" />
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              required
+              placeholder="SALES"
+            />
           </label>
           <label>
             部名
-            <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="営業本部" />
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              placeholder="営業本部"
+            />
           </label>
           <button type="submit" className="primary" disabled={saving}>
             登録

@@ -61,7 +61,10 @@ export default function App() {
             <Route path="/cost-elements" element={<CostElementsPage />} />
             <Route path="/divisions/:divisionId" element={<DivisionDetailPage />} />
             <Route path="/departments/:departmentId" element={<DepartmentDetailPage />} />
-            <Route path="/departments/:departmentId/budgets/:budgetId" element={<BudgetEditPage />} />
+            <Route
+              path="/departments/:departmentId/budgets/:budgetId"
+              element={<BudgetEditPage />}
+            />
             <Route path="/departments/:departmentId/actuals" element={<ActualsPage />} />
             <Route path="/departments/:departmentId/variance" element={<VariancePage />} />
             <Route path="/departments/:departmentId/comparison" element={<ComparisonPage />} />

@@ -95,7 +95,9 @@ function BudgetVersionsCard({
         承認すると旧バージョンは失効(履歴として保持)します。
       </p>
       {budgets.length === 0 ? (
-        <p className="muted small">予算がまだありません。下のフォームから当初予算を作成してください。</p>
+        <p className="muted small">
+          予算がまだありません。下のフォームから当初予算を作成してください。
+        </p>
       ) : (
         <table>
           <thead>
@@ -193,10 +195,16 @@ export default function DepartmentDetailPage() {
       .getDepartment(departmentId)
       .then((d) => {
         setDepartment(d)
-        api.getDivision(d.divisionId).then(setDivision).catch(() => undefined)
+        api
+          .getDivision(d.divisionId)
+          .then(setDivision)
+          .catch(() => undefined)
       })
       .catch((e: Error) => setError(e.message))
-    api.listBudgets(departmentId, half).then(setBudgets).catch((e: Error) => setError(e.message))
+    api
+      .listBudgets(departmentId, half)
+      .then(setBudgets)
+      .catch((e: Error) => setError(e.message))
   }, [departmentId, half])
   useEffect(load, [load])
 
@@ -208,7 +216,9 @@ export default function DepartmentDetailPage() {
     <>
       <div className="breadcrumbs">
         <Link to="/">部一覧</Link> /{' '}
-        <Link to={`/divisions/${department?.divisionId}?half=${half}`}>{division?.name ?? '…'}</Link>{' '}
+        <Link to={`/divisions/${department?.divisionId}?half=${half}`}>
+          {division?.name ?? '…'}
+        </Link>{' '}
         / {department?.name ?? '…'}
       </div>
       <Toast message={error} onClose={() => setError(null)} />

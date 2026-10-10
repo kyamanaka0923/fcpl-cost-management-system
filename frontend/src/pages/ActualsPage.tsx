@@ -42,13 +42,22 @@ export default function ActualsPage() {
 
   const load = useCallback(() => {
     if (!departmentId) return
-    api.listActuals(departmentId, half).then(setEntries).catch((e: Error) => setError(e.message))
+    api
+      .listActuals(departmentId, half)
+      .then(setEntries)
+      .catch((e: Error) => setError(e.message))
   }, [departmentId, half])
   useEffect(load, [load])
   useEffect(() => {
     if (!departmentId) return
-    api.listProjects(departmentId).then(setProjects).catch((e: Error) => setError(e.message))
-    api.listCostElements().then(setElements).catch((e: Error) => setError(e.message))
+    api
+      .listProjects(departmentId)
+      .then(setProjects)
+      .catch((e: Error) => setError(e.message))
+    api
+      .listCostElements()
+      .then(setElements)
+      .catch((e: Error) => setError(e.message))
   }, [departmentId])
   // 計画済みの期間費用明細名を集める(承認済みがあれば優先、なければ最新版)。実績入力時の候補にする。
   useEffect(() => {
@@ -134,7 +143,10 @@ export default function ActualsPage() {
         <form onSubmit={record} className="form-row">
           <label>
             区分
-            <select value={category} onChange={(e) => setCategory(e.target.value as BudgetCategory)}>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as BudgetCategory)}
+            >
               {(Object.keys(categoryLabel) as BudgetCategory[]).map((c) => (
                 <option key={c} value={c}>
                   {categoryLabel[c]}
@@ -158,7 +170,11 @@ export default function ActualsPage() {
             <>
               <label>
                 費目
-                <select value={elementCode} onChange={(e) => setElementCode(e.target.value)} required>
+                <select
+                  value={elementCode}
+                  onChange={(e) => setElementCode(e.target.value)}
+                  required
+                >
                   <option value="">選択してください</option>
                   {elements.map((el) => (
                     <option key={el.code} value={el.code}>
@@ -201,7 +217,11 @@ export default function ActualsPage() {
           </label>
           <label>
             備考
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="4月分 など" />
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="4月分 など"
+            />
           </label>
           <button type="submit" className="primary" disabled={saving}>
             計上

@@ -70,7 +70,7 @@
 | 区分 | 技術 | 内容 |
 |---|---|---|
 | 開発環境 | Docker / docker compose / VS Code Dev Containers | `docker/dev.Dockerfile`(.NET 10 SDK + Node.js 22)を共用 |
-| CI | GitHub Actions(ubuntu-latest) | 5 ジョブ: バックエンド(ビルド・テスト・カバレッジ)/ フロントエンド(型チェック・ビルド)/ ブラウザE2E / ミューテーションテスト / コードメトリクス |
+| CI | GitHub Actions(ubuntu-latest) | 5 ジョブ: バックエンド(ビルド・テスト・カバレッジ)/ フロントエンド(ESLint・Prettier・型チェック・ビルド)/ ブラウザE2E / ミューテーションテスト / コードメトリクス |
 | デプロイ | AWS SAM | Lambda(`provided.al2023`, arm64)+ EFS(SQLite)+ S3 + CloudFront + Cognito + AWS Backup(EFS を日次バックアップ)。詳細は [infra/README.md](infra/README.md) |
 
 ## アーキテクチャ

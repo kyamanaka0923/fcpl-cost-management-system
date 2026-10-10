@@ -177,6 +177,9 @@ export function currentUser(): CurrentUser | null {
 /** トークンを破棄し、Hosted UI のログアウトを経てトップへ戻る。 */
 export function logout(): void {
   sessionStorage.removeItem(TOKENS_KEY)
-  const query = new URLSearchParams({ client_id: clientId, logout_uri: `${window.location.origin}/` })
+  const query = new URLSearchParams({
+    client_id: clientId,
+    logout_uri: `${window.location.origin}/`,
+  })
   window.location.assign(`${domain}/logout?${query}`)
 }

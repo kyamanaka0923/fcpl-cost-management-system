@@ -83,7 +83,7 @@ test('計画策定: 部と課を登録し予算編集で案件別に金額を入
 
   // 課の区分合計 = 案件明細の合計(サマリタイルで確認)
   await expect(page.getByText('¥3,000,000').first()).toBeVisible() // 売上高
-  await expect(page.getByText('¥600,000').first()).toBeVisible()   // 計画損益
+  await expect(page.getByText('¥600,000').first()).toBeVisible() // 計画損益
 
   // ---- 承認 ----
   await page.getByRole('button', { name: 'この予算を承認する' }).click()
@@ -140,8 +140,8 @@ test('実績入力: 区分ごとに案件別・費目別の実績を計上でき
 
   // 明細行と合計行の両方に同額が出るため first で確認
   await expect(page.getByRole('cell', { name: '¥2,100,000' }).first()).toBeVisible()
-  await expect(page.getByRole('cell', { name: '¥900,000' }).first()).toBeVisible()   // 案件B 売上
-  await expect(page.getByRole('cell', { name: '¥650,000' }).first()).toBeVisible()   // 案件B 外注
+  await expect(page.getByRole('cell', { name: '¥900,000' }).first()).toBeVisible() // 案件B 売上
+  await expect(page.getByRole('cell', { name: '¥650,000' }).first()).toBeVisible() // 案件B 外注
   await expect(page.getByRole('cell', { name: '¥320,000' }).first()).toBeVisible()
 })
 
@@ -170,7 +170,9 @@ test('分析: 区分別の予実差異と案件別の損益が表示される', 
   await expect(page.getByText('¥550,000').first()).toBeVisible()
 })
 
-test('計画変更: 改定版の承認で旧バージョンが失効しバージョン比較で増減を確認できる', async ({ page }) => {
+test('計画変更: 改定版の承認で旧バージョンが失効しバージョン比較で増減を確認できる', async ({
+  page,
+}) => {
   // ---- 改定版(v2)を作成して加工費を増額・承認 ----
   await 課詳細を開く(page)
   const 予算カード = page.locator('.card', { hasText: '予算バージョン' })

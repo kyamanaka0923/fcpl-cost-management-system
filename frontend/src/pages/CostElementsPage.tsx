@@ -15,7 +15,10 @@ export default function CostElementsPage() {
   const [saving, setSaving] = useState(false)
 
   const load = () => {
-    api.listCostElements().then(setElements).catch((e: Error) => setError(e.message))
+    api
+      .listCostElements()
+      .then(setElements)
+      .catch((e: Error) => setError(e.message))
   }
   useEffect(load, [])
 
@@ -73,11 +76,21 @@ export default function CostElementsPage() {
         <form onSubmit={onSubmit} className="form-row">
           <label>
             費目コード
-            <input value={code} onChange={(e) => setCode(e.target.value)} required placeholder="TRAVEL" />
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              required
+              placeholder="TRAVEL"
+            />
           </label>
           <label>
             費目名
-            <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="旅費交通費" />
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              placeholder="旅費交通費"
+            />
           </label>
           <button type="submit" className="primary" disabled={saving}>
             追加
