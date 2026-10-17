@@ -31,7 +31,7 @@
     "openapi-typescript": "^7.13.0",
     "playwright": "^1.61.1",
     "prettier": "^3.9.10",
-    "typescript": "~5.8.0",
+    "typescript": "~7.0.2",
     "typescript-eslint": "^8.71.1",
     "vite": "^6.3.0"
   }
