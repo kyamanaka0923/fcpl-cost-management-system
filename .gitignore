@@ -29,3 +29,6 @@ infra/packaged.yaml
 
 # Stryker.NET(ミューテーションテストの出力)
 StrykerOutput/
+
+# Reqnroll(Gherkin のコードビハインドはビルド時に生成される)
+*.feature.cs

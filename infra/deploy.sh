@@ -22,9 +22,13 @@ outputs=$(aws cloudformation describe-stacks --stack-name "${STACK}" --region "$
 bucket=$(echo "${outputs}" | python3 -c "import sys,json;print(next(o['OutputValue'] for o in json.load(sys.stdin) if o['OutputKey']=='FrontendBucketName'))")
 dist=$(echo "${outputs}" | python3 -c "import sys,json;print(next(o['OutputValue'] for o in json.load(sys.stdin) if o['OutputKey']=='DistributionId'))")
 url=$(echo "${outputs}" | python3 -c "import sys,json;print(next(o['OutputValue'] for o in json.load(sys.stdin) if o['OutputKey']=='CloudFrontUrl'))")
+auth_domain=$(echo "${outputs}" | python3 -c "import sys,json;print(next(o['OutputValue'] for o in json.load(sys.stdin) if o['OutputKey']=='AuthDomain'))")
+auth_client=$(echo "${outputs}" | python3 -c "import sys,json;print(next(o['OutputValue'] for o in json.load(sys.stdin) if o['OutputKey']=='UserPoolClientId'))")
+user_pool=$(echo "${outputs}" | python3 -c "import sys,json;print(next(o['OutputValue'] for o in json.load(sys.stdin) if o['OutputKey']=='UserPoolId'))")
 
 echo "==> 3/4 フロントをビルドして S3 (${bucket}) へ配信"
-(cd ../frontend && npm ci && npm run build)
+# Cognito の Hosted UI とクライアントIDをビルド時に埋め込む(これで画面のログインが有効になる)
+(cd ../frontend && npm ci && VITE_AUTH_DOMAIN="${auth_domain}" VITE_AUTH_CLIENT_ID="${auth_client}" npm run build)
 aws s3 sync ../frontend/dist "s3://${bucket}" --delete --region "${REGION}"
 
 echo "==> 4/4 CloudFront (${dist}) のキャッシュを無効化"
@@ -32,3 +36,6 @@ aws cloudfront create-invalidation --distribution-id "${dist}" --paths "/*" >/de
 
 echo ""
 echo "完了。アプリURL: ${url}"
+echo ""
+echo "利用者の登録(初回のみ。招待メールに仮パスワードが届く):"
+echo "  aws cognito-idp admin-create-user --user-pool-id ${user_pool} --username <メールアドレス> --region ${REGION}"

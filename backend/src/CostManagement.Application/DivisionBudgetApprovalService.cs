@@ -3,6 +3,7 @@ using CostManagement.Domain.Budgeting;
 using CostManagement.Domain.Departments;
 using CostManagement.Domain.Divisions;
 using CostManagement.Domain.Shared;
+using Microsoft.Extensions.Logging;
 
 namespace CostManagement.Application;
 
@@ -18,12 +19,15 @@ public sealed class DivisionBudgetApprovalService
     private readonly IDepartmentRepository _departments;
     private readonly IDepartmentBudgetRepository _budgets;
     private readonly ISystemClock _clock;
+    private readonly ILogger<DivisionBudgetApprovalService> _logger;
 
     /// <summary>依存する部承認・部・課・課予算の各リポジトリと時計を受け取る。</summary>
     public DivisionBudgetApprovalService(IDivisionBudgetApprovalRepository approvals,
         IDivisionRepository divisions, IDepartmentRepository departments,
-        IDepartmentBudgetRepository budgets, ISystemClock clock)
+        IDepartmentBudgetRepository budgets, ISystemClock clock,
+        ILogger<DivisionBudgetApprovalService> logger)
     {
+        _logger = logger;
         _approvals = approvals;
         _divisions = divisions;
         _departments = departments;
@@ -55,6 +59,7 @@ public sealed class DivisionBudgetApprovalService
         if (existing is not null)
             await _approvals.DeleteAsync(divId, half, ct);
         await _approvals.AddAsync(DivisionBudgetApproval.Approve(divId, half, _clock.UtcNow), ct);
+        _logger.DivisionBudgetApproved(divisionId, half);
     }
 
     /// <summary>部予算の承認を取り消す(未承認に戻す)。</summary>
@@ -63,6 +68,8 @@ public sealed class DivisionBudgetApprovalService
         var divId = new DivisionId(divisionId);
         _ = await _divisions.FindByIdAsync(divId, ct)
             ?? throw new NotFoundException($"部が見つかりません: {divisionId}");
-        await _approvals.DeleteAsync(divId, FiscalHalf.Parse(fiscalHalf), ct);
+        var half = FiscalHalf.Parse(fiscalHalf);
+        await _approvals.DeleteAsync(divId, half, ct);
+        _logger.DivisionBudgetRevoked(divisionId, half);
     }
 }

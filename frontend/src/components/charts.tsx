@@ -123,7 +123,8 @@ export function PlannedVsActualChart({
             const xPlanned = cx - barW - 1
             const xActual = cx + 1
             const show = (e: React.MouseEvent) =>
-              tooltip.show(e, (
+              tooltip.show(
+                e,
                 <>
                   <div className="tt-title">{d.label}</div>
                   <div className="tt-line">
@@ -138,8 +139,8 @@ export function PlannedVsActualChart({
                     <span>差異</span>
                     <span className="v">¥{formatSignedYen(d.actual - d.planned)}</span>
                   </div>
-                </>
-              ))
+                </>,
+              )
             const zeroY = yScale(0)
             const bar = (x: number, v: number, color: string) => {
               const vy = yScale(v)
@@ -182,13 +183,13 @@ export interface DivergingBarDatum {
 
 /**
  * 差異の分岐棒グラフ。
- * 原価(既定): 正 = 不利差異 = 赤、負 = 有利差異 = 青。
- * 売上(adverseWhenPositive=false): 正 = 有利差異 = 青、負 = 不利差異 = 赤。
+ * 原価(既定): 正 = 予算超過で利益が減る = 赤、負 = 予算内で利益が増える = 青。
+ * 売上(adverseWhenPositive=false): 正 = 利益が増える = 青、負 = 利益が減る = 赤。
  */
 export function VarianceBarChart({
   data,
   adverseWhenPositive = true,
-  legendLabels = ['不利差異(予算超過)', '有利差異(予算内)'],
+  legendLabels = ['利益が減る(予算超過)', '利益が増える(予算内)'],
 }: {
   data: DivergingBarDatum[]
   adverseWhenPositive?: boolean
@@ -245,7 +246,8 @@ export function VarianceBarChart({
             const x0 = Math.min(xScale(0), xScale(d.value))
             const w = Math.abs(xScale(d.value) - xScale(0))
             const show = (e: React.MouseEvent) =>
-              tooltip.show(e, (
+              tooltip.show(
+                e,
                 <>
                   <div className="tt-title">{d.label}</div>
                   <div className="tt-line">
@@ -253,11 +255,17 @@ export function VarianceBarChart({
                     <span className="v">¥{formatSignedYen(d.value)}</span>
                   </div>
                   {d.detail}
-                </>
-              ))
+                </>,
+              )
             return (
               <g key={d.label} onMouseMove={show} onMouseLeave={tooltip.hide}>
-                <rect x={-margin.left} y={i * rowH} width={width} height={rowH} fill="transparent" />
+                <rect
+                  x={-margin.left}
+                  y={i * rowH}
+                  width={width}
+                  height={rowH}
+                  fill="transparent"
+                />
                 <text
                   x={-10}
                   y={y}

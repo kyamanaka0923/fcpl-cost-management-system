@@ -5,6 +5,7 @@ using CostManagement.Domain.CostElements;
 using CostManagement.Domain.Departments;
 using CostManagement.Domain.Projects;
 using CostManagement.Domain.Shared;
+using Microsoft.Extensions.Logging;
 
 namespace CostManagement.Application;
 
@@ -16,11 +17,14 @@ public sealed class ActualEntryService
     private readonly IProjectRepository _projects;
     private readonly ICostElementRepository _elements;
     private readonly ISystemClock _clock;
+    private readonly ILogger<ActualEntryService> _logger;
 
     /// <summary>依存する実績・課・案件・費目の各リポジトリと時計を受け取る。</summary>
     public ActualEntryService(IActualEntryRepository actuals, IDepartmentRepository departments,
-        IProjectRepository projects, ICostElementRepository elements, ISystemClock clock)
+        IProjectRepository projects, ICostElementRepository elements, ISystemClock clock,
+        ILogger<ActualEntryService> logger)
     {
+        _logger = logger;
         _actuals = actuals;
         _departments = departments;
         _projects = projects;
@@ -67,6 +71,7 @@ public sealed class ActualEntryService
         var entry = ActualEntry.Record(did, fiscalHalf, category, projectId, elementCode,
             request.Month, new Money(request.Amount), request.Note, _clock.UtcNow, request.PeriodDetail);
         await _actuals.AddAsync(entry, ct);
+        _logger.ActualRecorded(entry.Id.Value, did.Value, fiscalHalf, category, entry.Amount.Value);
         return ToDto(entry);
     }
 
@@ -89,6 +94,7 @@ public sealed class ActualEntryService
         _ = await _actuals.FindByIdAsync(id, ct)
             ?? throw new NotFoundException($"実績が見つかりません: {actualId}");
         await _actuals.DeleteAsync(id, ct);
+        _logger.ActualDeleted(actualId);
     }
 
     /// <summary>ドメインの実績を応答 DTO へ変換する。</summary>

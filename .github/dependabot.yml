@@ -1,0 +1,61 @@
+# 依存関係の自動更新(Dependabot)。
+# 毎週月曜 09:00 JST に更新を確認し、更新があればプルリクエストを作る。
+# マイナー・パッチ更新はエコシステムごとに1つの PR にまとめ、
+# メジャー更新(破壊的変更の可能性)は個別の PR にして1つずつ確認できるようにする。
+# PR は CI(テスト・ビルド・E2E・ミューテーション)を通ってからマージする。
+version: 2
+updates:
+  # バックエンド(NuGet パッケージ)
+  - package-ecosystem: nuget
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: '依存更新(NuGet)'
+    groups:
+      nuget-minor-patch:
+        update-types: [minor, patch]
+
+  # フロントエンド(npm パッケージ)
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: '依存更新(npm)'
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  # GitHub Actions のアクション(Node.js ランタイムの非推奨対応もこれで追従する)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Tokyo
+    commit-message:
+      prefix: '依存更新(Actions)'
+    groups:
+      actions:
+        patterns: ['*']
+
+  # 開発用コンテナのベースイメージ(docker/dev.Dockerfile)
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Tokyo
+    commit-message:
+      prefix: '依存更新(Docker)'

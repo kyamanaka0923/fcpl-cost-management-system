@@ -4,6 +4,7 @@ using CostManagement.Domain.CostElements;
 using CostManagement.Domain.Departments;
 using CostManagement.Domain.Projects;
 using CostManagement.Domain.Shared;
+using Microsoft.Extensions.Logging;
 
 namespace CostManagement.Application;
 
@@ -18,12 +19,14 @@ public sealed class DepartmentBudgetService
     private readonly IProjectRepository _projects;
     private readonly ICostElementRepository _elements;
     private readonly ISystemClock _clock;
+    private readonly ILogger<DepartmentBudgetService> _logger;
 
-    /// <summary>依存する課予算・課・案件・費目の各リポジトリと時計を受け取る。</summary>
+    /// <summary>依存する課予算・課・案件・費目の各リポジトリ、時計、業務イベントのロガーを受け取る。</summary>
     public DepartmentBudgetService(IDepartmentBudgetRepository budgets,
         IDepartmentRepository departments, IProjectRepository projects,
-        ICostElementRepository elements, ISystemClock clock)
+        ICostElementRepository elements, ISystemClock clock, ILogger<DepartmentBudgetService> logger)
     {
+        _logger = logger;
         _budgets = budgets;
         _departments = departments;
         _projects = projects;
@@ -64,6 +67,7 @@ public sealed class DepartmentBudgetService
         }
 
         await _budgets.AddAsync(draft, ct);
+        _logger.BudgetDraftCreated(draft.Id.Value, did.Value, fiscalHalf, draft.Version);
         return ToDetailDto(draft);
     }
 
@@ -164,14 +168,18 @@ public sealed class DepartmentBudgetService
         budget.Approve(_clock.UtcNow);
 
         var siblings = await _budgets.ListAsync(budget.DepartmentId, budget.FiscalHalf, ct);
+        var superseded = new List<int>();
         foreach (var sibling in siblings.Where(b =>
                      b.Id != budget.Id && b.Status == BudgetStatus.Approved))
         {
             sibling.Supersede();
             await _budgets.UpdateAsync(sibling, ct);
+            superseded.Add(sibling.Version);
         }
 
         await _budgets.UpdateAsync(budget, ct);
+        _logger.BudgetApproved(budget.Id.Value, budget.DepartmentId.Value, budget.FiscalHalf,
+            budget.Version, superseded);
         return ToDetailDto(budget);
     }
 

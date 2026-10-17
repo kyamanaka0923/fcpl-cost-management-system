@@ -19,7 +19,7 @@
   細分不要な費目(人件費など)は従来どおり費目一括の1金額でも入力でき、費目合計は明細の合計になります(Issue #7)
 - 明細は**半期一括の金額**が基本ですが、**明細ごとに月次入力**もできます(各セルの「月次入力」で
   月ごとの金額を入力すると半期合計が自動算出。表示・集計・差異分析は半期のまま)。実績も計上月を任意で指定できます
-- 予実の**差異分析**: 差異 = 実績金額 − 予算金額(コストは超過が不利、売上は超過が有利)
+- 予実の**差異分析**: 差異 = 実績金額 − 予算金額(コストは予算超過で利益が減り、売上は予算超過で利益が増える)
 - **損益分析**: 課全体(売上高 − 総コスト)と案件別(売上高 − 加工費 − 外注費。期間費用は課共通)。
   計画損益・損益実績には**粗利率(損益 ÷ 売上高)**を併記します
 - 予算バージョン間の**変動比較**(例: 当初予算 vs 上期見直し)ができます
@@ -31,12 +31,52 @@
 
 ## 技術スタック
 
-| レイヤ | 技術 |
-|---|---|
-| フロントエンド | React 19 + TypeScript + Vite |
-| バックエンド | .NET 10(ASP.NET Core Minimal API) |
-| データベース | SQLite + Dapper |
-| アーキテクチャ | ヘキサゴナルアーキテクチャ + ドメイン駆動設計(戦術パターン) |
+バージョンは `*.csproj` / `frontend/package-lock.json` / `backend/.config/dotnet-tools.json` の実値です。
+
+### アプリケーション
+
+| 区分 | 技術 | バージョン | 用途 |
+|---|---|---|---|
+| フロントエンド | React / React DOM | 19.2 | SPA |
+| | React Router(react-router-dom) | 7 | 画面遷移 |
+| | TypeScript | 5.8(`strict`) | 型付け |
+| | Vite + @vitejs/plugin-react | 6.4 / 4.7 | 開発サーバ(`/api` をバックエンドへプロキシ)・ビルド |
+| | グラフ | (外部ライブラリなし) | `components/charts.tsx` の自前 SVG |
+| バックエンド | .NET / ASP.NET Core Minimal API | 10(`net10.0`) | HTTP API |
+| | Amazon.Lambda.AspNetCoreServer.Hosting | 2.1 | AWS Lambda 上での実行(ローカルでは通常の Kestrel) |
+| ログ | .NET 標準ロギング(Microsoft.Extensions.Logging)+ JSON コンソール出力 | 10 | 業務イベント・リクエストの構造化ログ。AWS では CloudWatch Logs で検索 |
+| 認証 | Amazon Cognito + Microsoft.AspNetCore.Authentication.JwtBearer | — / 10.0.9 | ログイン(Hosted UI・認可コード + PKCE)と API のアクセストークン検証。ローカル開発では無効 |
+| データ | SQLite(Microsoft.Data.Sqlite + SQLitePCLRaw.bundle_e_sqlite3) | 10.0.9 / 3.0.3 | 永続化(単一ファイル DB) |
+| | Dapper | 2.1.79 | マイクロ ORM。SQL は手書きし、結果をオブジェクトへ詰め替える(EF Core のような変更追跡・LINQ 変換・マイグレーション機能を持つフル機能 ORM は使わない) |
+| API 定義 | OpenAPI 3.1(Microsoft.AspNetCore.OpenApi)+ openapi-typescript | 10.0.9 / 7.13 | エンドポイントから OpenAPI 定義を生成し(`docs/api/openapi.json`)、フロントの TypeScript 型を自動生成 |
+| 設計 | ヘキサゴナルアーキテクチャ + ドメイン駆動設計(戦術パターン) | — | 依存は Domain に向かう。ルールは NetArchTest で検査 |
+
+### テスト・品質
+
+| 区分 | 技術 | バージョン | 用途 |
+|---|---|---|---|
+| 単体〜API テスト | xUnit | 2.9.3 | バックエンドのテスト全般(テスト名は日本語) |
+| | Microsoft.AspNetCore.Mvc.Testing | 10.0.9 | API E2E(WebApplicationFactory で WebApi を起動) |
+| | NetArchTest.Rules | 1.3.2 | アーキテクチャ(層の依存ルール)テスト |
+| | CsCheck | 4.9.1 | プロパティベーステスト(ランダム入力で不変条件を検証) |
+| | Reqnroll.xUnit | 3.3.4 | 日本語 Gherkin の業務シナリオテスト |
+| ブラウザ E2E | Playwright(@playwright/test) | 1.61 | 実ブラウザ(Chromium)での画面操作テスト |
+| カバレッジ | coverlet + ReportGenerator | 6.0.4 / 最新 | 計測と CI 実行サマリへの表示 |
+| ミューテーション | Stryker.NET(dotnet ローカルツール) | 4.16.0 | テストが仕様を検証しているかの測定(Domain・Application) |
+| メトリクス | cloc + scc | 最新 | 行数・複雑度の集計 |
+| 静的解析(フロント) | ESLint + typescript-eslint + eslint-plugin-react-hooks | 9.39 / 8.71 / 7.1 | TypeScript の推奨ルールと React Hooks の規則(`npm run lint`) |
+| フォーマッタ(フロント) | Prettier(+ eslint-config-prettier) | 3.9 | 書式の統一(`npm run format` / `npm run format:check`) |
+| 静的解析(バックエンド) | .NET アナライザ(`AnalysisLevel=latest-recommended`)+ 警告をエラー扱い | .NET 10 SDK 同梱 | `backend/Directory.Build.props` で全プロジェクトに適用。方針に合わないルールは `.editorconfig` で理由つきで無効化 |
+| 書式設定(共通) | EditorConfig | — | リポジトリ直下の `.editorconfig`(文字コード・改行・インデント・C# のスタイル) |
+
+### 開発環境・CI・デプロイ
+
+| 区分 | 技術 | 内容 |
+|---|---|---|
+| 開発環境 | Docker / docker compose / VS Code Dev Containers | `docker/dev.Dockerfile`(.NET 10 SDK + Node.js 22)を共用 |
+| CI | GitHub Actions(ubuntu-latest) | 5 ジョブ: バックエンド(ビルド・テスト・カバレッジ)/ フロントエンド(ESLint・Prettier・型チェック・ビルド)/ ブラウザE2E / ミューテーションテスト / コードメトリクス |
+| 依存の自動更新 | Dependabot | NuGet・npm・GitHub Actions・Docker ベースイメージを毎週月曜 09:00 JST に確認して PR を作成(`.github/dependabot.yml`)。マイナー・パッチはまとめて1件、メジャーは個別 |
+| デプロイ | AWS SAM | Lambda(`provided.al2023`, arm64)+ EFS(SQLite)+ S3 + CloudFront + Cognito + AWS Backup(EFS を日次バックアップ)。詳細は [infra/README.md](infra/README.md) |
 
 ## アーキテクチャ
 
@@ -57,11 +97,24 @@ backend/
 │   │   └── Analysis/                   #   差異分析・バージョン比較・損益・部集計のドメインサービス群
 │   ├── CostManagement.Application/     # ユースケース(入力ポート)・DTO
 │   ├── CostManagement.Infrastructure/  # 出力アダプタ: Dapper + SQLite リポジトリ実装
-│   └── CostManagement.WebApi/          # 入力アダプタ: HTTP API(Minimal API)
+│   └── CostManagement.WebApi/          # 入力アダプタ: HTTP API(Minimal API。Lambda でも動く)
 └── tests/
-    └── CostManagement.Domain.Tests/    # ドメイン単体テスト(xUnit)
+    ├── CostManagement.Domain.Tests/    # ドメイン単体テスト(PropertyBased/ にプロパティベーステスト)
+    ├── CostManagement.Application.Tests/ # ユースケーステスト(Features/ に Gherkin シナリオ)
+    ├── CostManagement.Infrastructure.Tests/ # リポジトリの永続化・スキーマ移行
+    ├── CostManagement.E2E.Tests/       # API E2E(HTTP 経由の業務フロー)
+    └── CostManagement.Architecture.Tests/ # 層の依存ルール(NetArchTest)
 
 frontend/                               # React SPA(/api を dev proxy 経由でバックエンドへ)
+├── src/
+│   ├── pages/                          #   画面(部・課・予算編集・実績・分析・比較・費目マスタ)
+│   ├── components/                     #   グラフ(自前 SVG)・モーダル・トースト・金額入力
+│   └── api.ts                          #   API クライアントと型
+└── e2e/                                # ブラウザ E2E(Playwright)
+
+infra/                                  # AWS SAM テンプレートとデプロイスクリプト
+docker/                                 # 開発・ビルド・テスト共用イメージ
+docs/                                   # マニュアル・設計・要件・ADR・解説 HTML(docs/design/)・OpenAPI 定義(docs/api/)
 ```
 
 ### ドメインモデル(DDD 戦術パターン)
@@ -112,8 +165,8 @@ frontend/                               # React SPA(/api を dev proxy 経由で
 
 明細は金額で管理されるため、差異は「実績金額 − 予算金額」で符号付きに算出します。
 
-- **コスト(加工費・外注費・期間費用)**: (区分, 案件 or 費目) の粒度で突き合わせ。正 = 予算超過 = 不利差異
-- **売上高**: (案件) の粒度で突き合わせ。正 = 売上超過 = 有利差異(コストと逆)
+- **コスト(加工費・外注費・期間費用)**: (区分, 案件 or 費目) の粒度で突き合わせ。正 = 予算超過 = 利益が減る
+- **売上高**: (案件) の粒度で突き合わせ。正 = 売上超過 = 利益が増える(コストと逆)
 
 同一キーに複数の実績がある場合は合算されます。予算にない実績は「予定外」として報告されます。
 
@@ -155,12 +208,14 @@ frontend/                               # React SPA(/api を dev proxy 経由で
 department_budget_lines / actual_entries)ごと破棄して作り直します。
 この処理は冪等で、新スキーマの既存データには影響しません。
 
-一方、現世代スキーマ内での変更(既存データが衝突しないもの)は、既存の案件データを**保持したまま**
-`projects` テーブルを作り直すマイグレーションを起動時に実行します(冪等で、移行済みなら何もしません)。
-現在は次の2つを実行します:
+一方、現世代スキーマ内での変更(既存データが衝突しないもの)は、既存データを**保持したまま**
+テーブルを変更するマイグレーションを起動時に実行します(冪等で、移行済みなら何もしません)。
+現在は次の4つを順に実行します:
 
-- **案件コードの一意制約を「グローバル一意」→「課ごとに一意」へ変更**(制約の緩和のみ)
-- **案件の終了ステータス(`status` 列)を廃止**(案件は終了の概念を持たなくなったため。Issue #2)
+- **案件コードの一意制約を「グローバル一意」→「課ごとに一意」へ変更**(`projects` を作り直し。制約の緩和のみ。Issue #1)
+- **案件の終了ステータス(`status` 列)を廃止**(`projects` を作り直し。案件は終了の概念を持たなくなったため。Issue #2)
+- **実績に計上月(`month` 列)を追加**(`actual_entries` に列追加。Issue #5)
+- **期間費用の明細名(`period_detail` 列)を追加**(予算明細は一意制約に含めるため作り直し、実績は列追加。Issue #7)
 
 ## 実行方法
 
@@ -189,6 +244,9 @@ VS Code でのリモート開発は、拡張機能「Dev Containers」を入れ�
 
 ### バックエンド(ローカルに SDK がある場合)
 
+ビルドでは .NET アナライザの推奨ルールが働き、**警告はエラーとして扱われます**(`backend/Directory.Build.props`)。
+ロケールに依存する数値の書式化・解析などはビルドが通らないので、`CultureInfo.InvariantCulture` などで明示してください。
+
 ```bash
 cd backend
 dotnet run --project src/CostManagement.WebApi
@@ -202,6 +260,9 @@ cd frontend
 npm install
 npm run dev
 # => http://localhost:5173 (/api は localhost:5100 にプロキシ)
+
+npm run lint           # ESLint(TypeScript・React Hooks の規則)
+npm run format         # Prettier で整形(確認だけなら npm run format:check)
 ```
 
 ### テスト
@@ -223,8 +284,24 @@ dotnet test
 - **アーキテクチャテスト**(`tests/CostManagement.Architecture.Tests`) — NetArchTest による
   ヘキサゴナルアーキテクチャの依存ルール検証(層依存・ポート&アダプタ配置・ドメイン規約)
 
+書き方として、上記に加えて次の2つを併用しています。
+
+- **プロパティベーステスト**(CsCheck) — ランダムに生成した入力で不変条件を検証
+  (`Domain.Tests/PropertyBased/`、`Application.Tests/UseCasePropertyTests.cs`)。
+  区分合計 = 明細合計、「案件別損益 − 期間費用 = 全体損益」、「部合計 = 課別内訳の合計」など
+- **Gherkin シナリオ**(Reqnroll) — 業務フローを日本語の 機能/シナリオ/前提/もし/ならば で記述
+  (`Application.Tests/Features/*.feature`)。業務担当者もそのまま読めます
+
+  | フィーチャー | 主なシナリオ |
+  |---|---|
+  | 課予算の策定と改定 | 区分合計=明細合計、承認済みは編集不可、改定版の承認で旧版が失効、費目一括と明細の混在禁止 |
+  | 予実差異と損益 | 差異=実績−予算と利益が増えるか減るか、計画にない明細名は予定外、案件別損益と全体損益の整合 |
+  | 部の予実と承認 | 部合計は承認済み課のみ、未承認の課があると部承認不可、部承認と取り消し |
+
 さらに**ブラウザ E2E テスト**(Playwright)が `frontend/e2e/` にあります。
 バックエンドとフロントエンドを自動起動し、実際のブラウザで計画策定→実績入力→分析→計画変更を操作します。
+API E2E とブラウザ E2E の各テストケースが何をどの数値で確かめているかは
+[`docs/design/e2e-test-guide.html`](docs/design/e2e-test-guide.html)(ブラウザで開く)にまとめています。
 
 ```bash
 cd frontend
@@ -259,13 +336,63 @@ EC2・コンテナを使わず費用を抑えたサーバーレス構成の IaC(
 
 - **バックエンド**: .NET 10 を **Lambda**(`provided.al2023` カスタムランタイム, arm64)で実行(コンテナ不使用)
 - **DB**: SQLite ファイルを **EFS** に永続化(予約同時実行=1 で書き込み直列化)
+- **バックアップ**: **AWS Backup** で EFS を毎日 03:00 JST にバックアップ(既定 35 日保持。
+  パラメータ `BackupRetentionDays` で変更可)。保管庫はスタックを削除しても残る
 - **フロント**: React 静的ビルドを **S3 + CloudFront**。CloudFront が `/api/*` を Lambda に振り分け同一ドメイン化
+- **認証**: **Amazon Cognito**。画面は Hosted UI でログインし、API はアクセストークンがないと 401 を返す。
+  利用者は管理者が登録する(自己サインアップ不可。登録コマンドはデプロイ完了時に表示)
 
 ```bash
 cd infra && ./deploy.sh     # 詳細・コスト目安・注意点は infra/README.md
 ```
 
+## 認証
+
+認証は **AWS にデプロイした環境でだけ有効**です(設計判断は [ADR-0014](docs/adr/0014-cognito-authentication.md))。
+
+- **バックエンド**: 設定 `Auth:Authority`(Cognito ユーザープールの発行者 URL)があると、すべての `/api` で
+  JWT アクセストークンを検証します(署名・発行者・有効期限・アクセストークンであること。
+  `Auth:ClientId` を設定すれば発行先クライアントも検証)。トークンがない・無効なら **401** を返します。
+- **安全策**: `ASPNETCORE_ENVIRONMENT` が Development 以外で `Auth:Authority` が未設定だと、**起動時にエラー**にします。
+- **フロント**: ビルド時に `VITE_AUTH_DOMAIN`(Hosted UI の URL)と `VITE_AUTH_CLIENT_ID` を渡すとログインが有効になり、
+  未ログインなら Cognito のログイン画面へ移動します。画面右上にログイン中の利用者とログアウトが出ます。
+  `infra/deploy.sh` がスタック出力からこの2つを埋め込みます。
+- **ローカル開発・テスト**: どちらも未設定(Development)なので、従来どおりログインなしで使えます。
+
+## ログ
+
+.NET 標準のロギングで**構造化ログ**を出します(Serilog などの追加ライブラリは使いません)。
+
+- **出力形式**: Development 以外(AWS Lambda)では **1行1 JSON**(`EventId`・`State` の各項目・スコープ)で出力し、
+  CloudWatch Logs Insights で項目ごとに検索できます。ローカル(Development)は従来どおり読みやすいテキストです
+- **リクエストログ**: すべての API リクエストについて、メソッド・パス・ステータス・処理時間を1行記録します。
+  スコープに **`RequestId` と操作した利用者 `User`**(認証時はトークンの `username`、未認証は `anonymous`)が付き、
+  そのリクエスト中に出た業務イベントのログにも同じ値が付きます。認証で拒否された 401 も記録します
+- **業務イベント**(Application 層。監査に使える状態変更):
+
+| EventId | 名前 | 内容 |
+|---|---|---|
+| 1001 | BudgetDraftCreated | 予算ドラフトの起票(当初・改定。予算ID・課・半期・版) |
+| 1002 | BudgetApproved | 予算の承認(失効させた旧版の番号つき) |
+| 1003 / 1004 | DivisionBudgetApproved / Revoked | 部予算の承認・取り消し |
+| 1005 / 1006 | ActualRecorded / ActualDeleted | 実績の計上(区分・金額)・削除 |
+| 2001 | HttpRequest | API リクエスト1件(メソッド・パス・ステータス・処理時間) |
+| 2002 / 2003 | BusinessRuleRejected / ResourceNotFound | 業務ルール違反(400)・未検出(404)とその理由 |
+
 ## API 概要
+
+API の正式な定義は **OpenAPI 3.1** の [`docs/api/openapi.json`](docs/api/openapi.json) です(エンドポイントのコードから生成)。
+ローカル実行中(Development)は `http://localhost:5100/openapi/v1.json` でも取得できます。
+
+フロントエンドの API の型(`frontend/src/api-schema.d.ts`)はこの定義から自動生成し、`api.ts` の型はそこから導出しています。
+バックエンドで DTO やエンドポイントを変えたときは、次の手順で定義と型を更新します
+(更新し忘れると、バックエンドのテストと CI のフロントエンドジョブで検出されます)。
+
+```bash
+cd backend && UPDATE_OPENAPI=1 dotnet test --filter OpenApi   # docs/api/openapi.json を更新
+cd frontend && npm run gen:api                                 # src/api-schema.d.ts を作り直す
+cd frontend && npm run build                                   # 型の不一致(項目名・型の変更)はここでエラーになる
+```
 
 半期は `fiscalHalf=2026-H1`(上期)/ `fiscalHalf=2026-H2`(下期)の形式で指定します。
 
@@ -278,12 +405,12 @@ cd infra && ./deploy.sh     # 詳細・コスト目安・注意点は infra/READ
 | `GET/POST /api/divisions/{id}/departments` | 配下課一覧・課の登録(課は部に属する) |
 | `GET /api/departments/{id}` | 課の取得 |
 | `GET/POST /api/departments/{id}/projects` | 案件一覧・登録(案件は課に属する) |
-| `GET /api/projects/{id}` | 案件の取得 |
-| `POST /api/projects/{id}/complete` | 案件終了 |
+| `GET/PUT /api/projects/{id}` | 案件の取得・編集(コード・名称。コードは課ごとに一意) |
 | `GET/POST /api/cost-elements` | 費目マスタ一覧・追加(期間費用用) |
 | `GET/POST /api/departments/{id}/budgets?fiscalHalf=` | 予算バージョン一覧・ドラフト起票(初回は当初予算、以降は改定版) |
 | `GET /api/budgets/{budgetId}` | 予算詳細(明細・4区分合計含む) |
 | `PUT/DELETE /api/budgets/{budgetId}/lines` | 予算明細の登録(upsert)・削除(案件別 or 費目別) |
+| `POST /api/budgets/{budgetId}/rename-period-detail` | 期間費用の明細名の変更(金額・月次は保持) |
 | `POST /api/budgets/{budgetId}/approve` | 予算承認(同一課・半期の旧承認版は自動失効) |
 | `GET/POST /api/departments/{id}/actuals?fiscalHalf=` | 実績一覧・計上 |
 | `DELETE /api/actuals/{actualId}` | 実績取消 |
@@ -299,7 +426,9 @@ cd infra && ./deploy.sh     # 詳細・コスト目安・注意点は infra/READ
 - **課詳細** — 対象半期の選択、承認済み予算の4区分サマリ、予算バージョンの一覧・改定・承認
 - **予算編集** — 案件×区分のグリッドで売上高・加工費・外注費を案件別に直接入力
   (セルを離れると自動保存)。期間費用も費目別の表に同様に直接入力する。
-  案件の追加・終了もこの画面で行う(案件コードは課ごとに一意)。
+  案件の追加・編集(コード・名称)もこの画面で行う(案件コードは課ごとに一意)。
+  各セルの「月次入力」で月ごとの金額を入れると半期合計が自動計算される。
+  期間費用は費目内を明細名(例: ライセンス費 → AWS / GitHub)で細分でき、明細の追加・名称変更・削除・折りたたみができる。
   期間費用の費目は選択のみで、追加は「費目マスタ」画面で行う。
   区分合計・計画損益はサマリタイルに自動反映
 - **費目マスタ** — システム共通の期間費用の費目マスタ(一覧・追加)。画面右上のナビからアクセス

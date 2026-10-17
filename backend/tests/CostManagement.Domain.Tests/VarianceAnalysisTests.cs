@@ -82,15 +82,15 @@ public class VarianceAnalysisTests
     }
 
     [Fact]
-    public void 有利差異の向きは売上とコストで逆になる()
+    public void 差異が利益を増やすか減らすかの向きは売上とコストで逆になる()
     {
         var budget = ApprovedBudget(
             (BudgetCategory.Revenue, ProjectA, null, 3_000_000m),
             (BudgetCategory.Processing, ProjectA, null, 1_000_000m));
         var report = Service.Analyze(budget,
         [
-            Actual(BudgetCategory.Revenue, ProjectA, null, 3_500_000m),    // 売上超過 = 有利
-            Actual(BudgetCategory.Processing, ProjectA, null, 1_200_000m), // コスト超過 = 不利
+            Actual(BudgetCategory.Revenue, ProjectA, null, 3_500_000m),    // 売上超過 = 利益が増える
+            Actual(BudgetCategory.Processing, ProjectA, null, 1_200_000m), // コスト超過 = 利益が減る
         ]);
 
         var revenueLine = report.Categories.Single(c => c.Category == BudgetCategory.Revenue).Lines.Single();

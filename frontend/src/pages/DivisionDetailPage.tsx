@@ -19,7 +19,7 @@ import {
 
 type Tab = 'plan' | 'actual'
 
-// 区分別の差異の色: 売上高は正が有利(緑)、コスト系は正が不利(赤)。
+// 区分別の差異の色: 売上高は正なら利益が増える(緑)、コスト系は正なら利益が減る(赤)。
 const categoryVarianceClass = (category: BudgetCategory, variance: number) => {
   if (variance === 0) return ''
   const favorable = category === 'Revenue' ? variance > 0 : variance < 0
@@ -148,13 +148,7 @@ function PlanView({ summary, half }: { summary: DivisionBudgetSummary; half: str
 }
 
 /** 予実サマリタブ: 予算と実績を突き合わせた差異・損益。 */
-function ActualSummaryView({
-  summary,
-  half,
-}: {
-  summary: DivisionBudgetSummary
-  half: string
-}) {
+function ActualSummaryView({ summary, half }: { summary: DivisionBudgetSummary; half: string }) {
   return (
     <>
       <div className="stat-row">
@@ -294,7 +288,10 @@ export default function DivisionDetailPage() {
 
   const load = useCallback(() => {
     if (!divisionId) return
-    api.getDivision(divisionId).then(setDivision).catch((e: Error) => setError(e.message))
+    api
+      .getDivision(divisionId)
+      .then(setDivision)
+      .catch((e: Error) => setError(e.message))
     api
       .getDivisionBudgetSummary(divisionId, half)
       .then(setSummary)
@@ -427,11 +424,21 @@ export default function DivisionDetailPage() {
         <form onSubmit={addDepartment} className="form-row">
           <label>
             課コード
-            <input value={code} onChange={(e) => setCode(e.target.value)} required placeholder="DEV-1" />
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              required
+              placeholder="DEV-1"
+            />
           </label>
           <label>
             課名
-            <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="開発1課" />
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              placeholder="開発1課"
+            />
           </label>
           <button type="submit" className="primary" disabled={saving}>
             登録

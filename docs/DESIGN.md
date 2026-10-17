@@ -427,7 +427,7 @@ classDiagram
         +decimal ActualAmount
         +decimal Variance ※実績−予算
         +bool IsUnplanned ※予定外
-        +bool IsFavorable ※売上は正が有利・コストは負が有利
+        +bool IsFavorable ※売上は正、コストは負のとき利益が増える
     }
     class BudgetComparisonReport {
         <<record>>
@@ -460,8 +460,8 @@ classDiagram
 **分析の計算規則**
 
 - 差異 = 実績金額 − 予算金額(符号付き)
-  - コスト(加工費・外注費・期間費用): 正 = 予算超過 = **不利差異**(`IsAdverse`)
-  - 売上高: 正 = 売上超過 = **有利差異**(`IsFavorable`)
+  - コスト(加工費・外注費・期間費用): 正 = 予算超過 = **利益が減る**(`IsAdverse`)
+  - 売上高: 正 = 売上超過 = **利益が増える**(`IsFavorable`)
 - 突き合わせ粒度: (区分, 案件) または (期間費用, 費目, 明細名)。**分析・集計は半期粒度**
   (明細は月次入力もできるが半期合計に畳んで比較する。Issue #5)。
   同一キーの実績は合算。計画にない期間費用の明細名の実績は「予定外」(Issue #7)

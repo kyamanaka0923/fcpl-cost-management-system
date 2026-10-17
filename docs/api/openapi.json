@@ -1,0 +1,2792 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "CostManagement.WebApi | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/divisions": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DivisionDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDivisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DivisionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/divisions/{id}": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DivisionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/divisions/{id}/budget-summary": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fiscalHalf",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DivisionBudgetSummaryDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/divisions/{id}/budget-approval": {
+      "post": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fiscalHalf",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fiscalHalf",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/divisions/{id}/departments": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DepartmentDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDepartmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/departments/{id}": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/departments/{id}/projects": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cost-elements": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CostElementDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCostElementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostElementDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/departments/{id}/budgets": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fiscalHalf",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BudgetSummaryDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBudgetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/budgets/{budgetId}": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "budgetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/budgets/{budgetId}/lines": {
+      "put": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "budgetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertBudgetLineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetDetailDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "budgetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "elementCode",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodDetail",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/budgets/{budgetId}/rename-period-detail": {
+      "post": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "budgetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenamePeriodDetailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/budgets/{budgetId}/approve": {
+      "post": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "budgetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/departments/{id}/actuals": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fiscalHalf",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActualEntryDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordActualRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActualEntryDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/actuals/{actualId}": {
+      "delete": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "actualId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/departments/{id}/variance": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fiscalHalf",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "budgetId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VarianceReportDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/departments/{id}/budget-comparison": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fiscalHalf",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "baseVersion",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "targetVersion",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetComparisonDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/departments/{id}/profit": {
+      "get": {
+        "tags": [
+          "CostManagement.WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fiscalHalf",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "budgetId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfitSummaryDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActualEntryDto": {
+        "required": [
+          "id",
+          "departmentId",
+          "fiscalHalf",
+          "category",
+          "projectId",
+          "elementCode",
+          "periodDetail",
+          "month",
+          "amount",
+          "note",
+          "recordedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "departmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fiscalHalf": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "elementCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "periodDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "month": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BudgetComparisonDto": {
+        "required": [
+          "baseVersion",
+          "baseLabel",
+          "targetVersion",
+          "targetLabel",
+          "categories"
+        ],
+        "type": "object",
+        "properties": {
+          "baseVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "baseLabel": {
+            "type": "string"
+          },
+          "targetVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "targetLabel": {
+            "type": "string"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryComparisonDto"
+            }
+          }
+        }
+      },
+      "BudgetComparisonLineDto": {
+        "required": [
+          "category",
+          "projectId",
+          "projectName",
+          "elementCode",
+          "elementName",
+          "periodDetail",
+          "baseAmount",
+          "targetAmount",
+          "difference"
+        ],
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "projectName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "elementCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "elementName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "periodDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "baseAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "targetAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "difference": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "BudgetDetailDto": {
+        "required": [
+          "id",
+          "departmentId",
+          "fiscalHalf",
+          "version",
+          "label",
+          "status",
+          "createdAt",
+          "approvedAt",
+          "revenueTotal",
+          "processingTotal",
+          "outsourcingTotal",
+          "periodCostTotal",
+          "plannedProfit",
+          "lines"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "departmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fiscalHalf": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "revenueTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "processingTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "outsourcingTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "periodCostTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetLineDto"
+            }
+          }
+        }
+      },
+      "BudgetLineDto": {
+        "required": [
+          "id",
+          "category",
+          "projectId",
+          "elementCode",
+          "periodDetail",
+          "amount",
+          "isMonthly",
+          "monthlyAmounts"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "elementCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "periodDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "isMonthly": {
+            "type": "boolean"
+          },
+          "monthlyAmounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        }
+      },
+      "BudgetSummaryDto": {
+        "required": [
+          "id",
+          "departmentId",
+          "fiscalHalf",
+          "version",
+          "label",
+          "status",
+          "createdAt",
+          "approvedAt",
+          "revenueTotal",
+          "processingTotal",
+          "outsourcingTotal",
+          "periodCostTotal",
+          "plannedProfit"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "departmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fiscalHalf": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "revenueTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "processingTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "outsourcingTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "periodCostTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedProfit": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "CategoryComparisonDto": {
+        "required": [
+          "category",
+          "lines",
+          "baseAmount",
+          "targetAmount",
+          "difference"
+        ],
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetComparisonLineDto"
+            }
+          },
+          "baseAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "targetAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "difference": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "CategorySummaryDto": {
+        "required": [
+          "category",
+          "plannedAmount",
+          "actualAmount",
+          "variance"
+        ],
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "plannedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "variance": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "CategoryVarianceDto": {
+        "required": [
+          "category",
+          "lines",
+          "plannedAmount",
+          "actualAmount",
+          "variance"
+        ],
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VarianceLineDto"
+            }
+          },
+          "plannedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "variance": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "CostElementDto": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateBudgetRequest": {
+        "required": [
+          "fiscalHalf",
+          "label"
+        ],
+        "type": "object",
+        "properties": {
+          "fiscalHalf": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "baseBudgetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "CreateCostElementRequest": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateDepartmentRequest": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateDivisionRequest": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateProjectRequest": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "DepartmentDto": {
+        "required": [
+          "id",
+          "divisionId",
+          "code",
+          "name",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "divisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DepartmentSummaryLineDto": {
+        "required": [
+          "departmentId",
+          "departmentCode",
+          "departmentName",
+          "hasApprovedBudget",
+          "plannedRevenue",
+          "actualRevenue",
+          "plannedCost",
+          "actualCost",
+          "plannedProfit",
+          "actualProfit",
+          "profitVariance",
+          "categories"
+        ],
+        "type": "object",
+        "properties": {
+          "departmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "departmentCode": {
+            "type": "string"
+          },
+          "departmentName": {
+            "type": "string"
+          },
+          "hasApprovedBudget": {
+            "type": "boolean"
+          },
+          "plannedRevenue": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualRevenue": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "profitVariance": {
+            "type": "number",
+            "format": "double"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategorySummaryDto"
+            }
+          }
+        }
+      },
+      "DivisionBudgetSummaryDto": {
+        "required": [
+          "categories",
+          "plannedRevenue",
+          "actualRevenue",
+          "revenueVariance",
+          "plannedCost",
+          "actualCost",
+          "costVariance",
+          "plannedProfit",
+          "actualProfit",
+          "profitVariance",
+          "departmentLines",
+          "isApproved",
+          "approvedAt",
+          "canApprove"
+        ],
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategorySummaryDto"
+            }
+          },
+          "plannedRevenue": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualRevenue": {
+            "type": "number",
+            "format": "double"
+          },
+          "revenueVariance": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "costVariance": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "profitVariance": {
+            "type": "number",
+            "format": "double"
+          },
+          "departmentLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DepartmentSummaryLineDto"
+            }
+          },
+          "isApproved": {
+            "type": "boolean"
+          },
+          "approvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "canApprove": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DivisionDto": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "required": [
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "ProfitSummaryDto": {
+        "required": [
+          "budgetVersion",
+          "budgetLabel",
+          "plannedRevenue",
+          "actualRevenue",
+          "plannedTotalCost",
+          "actualTotalCost",
+          "plannedPeriodCost",
+          "actualPeriodCost",
+          "plannedProfit",
+          "actualProfit",
+          "profitVariance",
+          "plannedMarginRate",
+          "actualMarginRate",
+          "projectLines"
+        ],
+        "type": "object",
+        "properties": {
+          "budgetVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "budgetLabel": {
+            "type": "string"
+          },
+          "plannedRevenue": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualRevenue": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedTotalCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualTotalCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedPeriodCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualPeriodCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "profitVariance": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedMarginRate": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "actualMarginRate": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "projectLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectProfitLineDto"
+            }
+          }
+        }
+      },
+      "ProjectDto": {
+        "required": [
+          "id",
+          "departmentId",
+          "code",
+          "name",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "departmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectProfitLineDto": {
+        "required": [
+          "projectId",
+          "projectCode",
+          "projectName",
+          "plannedRevenue",
+          "actualRevenue",
+          "plannedProcessing",
+          "actualProcessing",
+          "plannedOutsourcing",
+          "actualOutsourcing",
+          "plannedProfit",
+          "actualProfit",
+          "profitVariance"
+        ],
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectCode": {
+            "type": "string"
+          },
+          "projectName": {
+            "type": "string"
+          },
+          "plannedRevenue": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualRevenue": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedProcessing": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualProcessing": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedOutsourcing": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualOutsourcing": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "profitVariance": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "RecordActualRequest": {
+        "required": [
+          "fiscalHalf",
+          "category",
+          "projectId",
+          "elementCode",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "fiscalHalf": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "elementCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "month": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "periodDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RenamePeriodDetailRequest": {
+        "required": [
+          "elementCode",
+          "oldDetail",
+          "newDetail"
+        ],
+        "type": "object",
+        "properties": {
+          "elementCode": {
+            "type": "string"
+          },
+          "oldDetail": {
+            "type": "string"
+          },
+          "newDetail": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateProjectRequest": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "UpsertBudgetLineRequest": {
+        "required": [
+          "category",
+          "projectId",
+          "elementCode",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "elementCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "monthlyAmounts": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "periodDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "VarianceLineDto": {
+        "required": [
+          "category",
+          "projectId",
+          "projectName",
+          "elementCode",
+          "elementName",
+          "periodDetail",
+          "plannedAmount",
+          "actualAmount",
+          "variance",
+          "isUnplanned",
+          "isFavorable",
+          "isAdverse"
+        ],
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "projectName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "elementCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "elementName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "periodDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "plannedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "variance": {
+            "type": "number",
+            "format": "double"
+          },
+          "isUnplanned": {
+            "type": "boolean"
+          },
+          "isFavorable": {
+            "type": "boolean"
+          },
+          "isAdverse": {
+            "type": "boolean"
+          }
+        }
+      },
+      "VarianceReportDto": {
+        "required": [
+          "budgetId",
+          "budgetVersion",
+          "budgetLabel",
+          "categories",
+          "plannedRevenue",
+          "actualRevenue",
+          "revenueVariance",
+          "plannedCost",
+          "actualCost",
+          "costVariance"
+        ],
+        "type": "object",
+        "properties": {
+          "budgetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "budgetVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "budgetLabel": {
+            "type": "string"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryVarianceDto"
+            }
+          },
+          "plannedRevenue": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualRevenue": {
+            "type": "number",
+            "format": "double"
+          },
+          "revenueVariance": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "actualCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "costVariance": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "CostManagement.WebApi"
+    }
+  ]
+}

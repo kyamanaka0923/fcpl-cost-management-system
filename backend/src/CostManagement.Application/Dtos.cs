@@ -91,7 +91,7 @@ public sealed record ActualEntryDto(
     string? Note,
     DateTime RecordedAt);
 
-/// <summary>予実差異の明細 DTO(案件/費目の表示名・有利/不利フラグつき)。</summary>
+/// <summary>予実差異の明細 DTO(案件/費目の表示名・利益が増えるか減るかのフラグつき)。</summary>
 public sealed record VarianceLineDto(
     string Category,
     Guid? ProjectId,

@@ -83,7 +83,7 @@ test('計画策定: 部と課を登録し予算編集で案件別に金額を入
 
   // 課の区分合計 = 案件明細の合計(サマリタイルで確認)
   await expect(page.getByText('¥3,000,000').first()).toBeVisible() // 売上高
-  await expect(page.getByText('¥600,000').first()).toBeVisible()   // 計画損益
+  await expect(page.getByText('¥600,000').first()).toBeVisible() // 計画損益
 
   // ---- 承認 ----
   await page.getByRole('button', { name: 'この予算を承認する' }).click()
@@ -140,8 +140,8 @@ test('実績入力: 区分ごとに案件別・費目別の実績を計上でき
 
   // 明細行と合計行の両方に同額が出るため first で確認
   await expect(page.getByRole('cell', { name: '¥2,100,000' }).first()).toBeVisible()
-  await expect(page.getByRole('cell', { name: '¥900,000' }).first()).toBeVisible()   // 案件B 売上
-  await expect(page.getByRole('cell', { name: '¥650,000' }).first()).toBeVisible()   // 案件B 外注
+  await expect(page.getByRole('cell', { name: '¥900,000' }).first()).toBeVisible() // 案件B 売上
+  await expect(page.getByRole('cell', { name: '¥650,000' }).first()).toBeVisible() // 案件B 外注
   await expect(page.getByRole('cell', { name: '¥320,000' }).first()).toBeVisible()
 })
 
@@ -150,7 +150,7 @@ test('分析: 区分別の予実差異と案件別の損益が表示される', 
   await page.getByRole('button', { name: '予実差異分析・損益' }).click()
 
   // ---- 予実差異タブ(既定) ----
-  // コスト: 予算240万(140万+70万+30万) / 実績245万 → 差異 +5万(不利)。
+  // コスト: 予算240万(140万+70万+30万) / 実績245万 → 差異 +5万(予算超過で利益が減る)。
   // 集計タイルと明細テーブルの両方に出るため first で確認
   await expect(page.getByText('¥2,400,000').first()).toBeVisible()
   await expect(page.getByText('¥+50,000').first()).toBeVisible()
@@ -170,7 +170,9 @@ test('分析: 区分別の予実差異と案件別の損益が表示される', 
   await expect(page.getByText('¥550,000').first()).toBeVisible()
 })
 
-test('計画変更: 改定版の承認で旧バージョンが失効しバージョン比較で増減を確認できる', async ({ page }) => {
+test('計画変更: 改定版の承認で旧バージョンが失効しバージョン比較で増減を確認できる', async ({
+  page,
+}) => {
   // ---- 改定版(v2)を作成して加工費を増額・承認 ----
   await 課詳細を開く(page)
   const 予算カード = page.locator('.card', { hasText: '予算バージョン' })
@@ -355,12 +357,15 @@ test('月次入力: 明細を月ごとに入力でき半期合計に反映され
   await form.getByRole('button', { name: '追加' }).click()
   await expect(page.getByRole('cell', { name: /案件M/ }).first()).toBeVisible()
 
-  // 売上高を月次入力(4月100万 + 5月50万 = 半期150万)
+  // 売上高を月次入力(半期の1か月目100万 + 2か月目50万 = 半期150万)。
+  // 画面の初期半期は実行日で決まる(上期=4〜9月 / 下期=10〜3月)ため、月名ではなく位置で指定する。
   await page.getByRole('button', { name: '案件M 売上高 を月次入力' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
-  await dialog.getByLabel('月次 4月').fill('1000000')
-  await dialog.getByLabel('月次 5月').fill('500000')
+  const 月次入力 = dialog.getByLabel(/^月次 \d+月$/)
+  await expect(月次入力).toHaveCount(6)
+  await 月次入力.nth(0).fill('1000000')
+  await 月次入力.nth(1).fill('500000')
   await expect(dialog.getByText('¥1,500,000')).toBeVisible() // 半期合計の自動計算
   await dialog.getByRole('button', { name: '保存' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)

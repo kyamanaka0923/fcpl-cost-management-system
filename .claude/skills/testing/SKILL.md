@@ -48,6 +48,52 @@ model: claude-sonnet-5
   クリアされる画面なら `await expect(欄).toHaveValue('')` で完了を待ってから次へ進む
   (`reuseExistingServer` で残ったサーバを掴むと結果がぶれるので、E2E前に 5173/5100 を掃除する)
 
+E2E(API E2E・ブラウザE2E)のテストケースを追加・変更したら、解説 `docs/design/e2e-test-guide.html` も更新する。
+
+## プロパティベーステスト(CsCheck)
+
+例示テストに加えて、ドメインとユースケースの**不変条件**は CsCheck で任意の入力に対して検証する
+(C# ネイティブ・縮小付き。Domain.Tests / Application.Tests が参照)。`[Fact]` の中で
+`gen.Sample(...)` / `gen.SampleAsync(...)` を呼ぶだけでよい。
+
+| 置き場所 | クラス | 検証する性質 |
+|---|---|---|
+| Domain.Tests/PropertyBased/ValueObjectPropertyTests.cs | `値オブジェクトの性質` | Money の加減算の法則、FiscalHalf の文字列往復と全順序、費目コードの正規化、月 1..6 |
+| 〃 DepartmentBudgetPropertyTests.cs | `課予算の性質` | **モデルベース**: 任意の編集操作列を集約と単純モデルに適用し成否・状態が一致、拒否された操作は無副作用、不変条件(区分合計=明細合計・月次合計・混在禁止)。承認後の編集拒否、改定の引き継ぎ、Restore 往復 |
+| 〃 ActualEntryPropertyTests.cs | `実績計上の性質` | 計上可否の規則、明細名・備考の正規化、Restore 往復 |
+| 〃 AnalysisServicePropertyTests.cs | `分析サービスの性質` | 差異=実績−予算、区分合計=明細合計、予定外判定、入力順非依存、比較の反対称性、「案件別損益−期間費用=全体損益」、「部合計=課別内訳の合計」 |
+| Application.Tests/UseCasePropertyTests.cs | `ユースケースの性質` | SQLite 往復後も応答どおり読み戻せる、改定を繰り返しても承認版は常に1件、実績合計の反映、部合計は承認済み課のみ |
+
+- 生成器は `PropertyBased/DomainGenerators.cs`(`ドメイン生成器`)。案件・費目・明細名は**小さなプール**から選び、
+  上書き・衝突・混在が頻繁に起きるようにする。金額は1円単位の整数(decimal の和を厳密比較するため)
+- 失敗時は `Set seed: "..."` が出る。`CsCheck_Seed=<seed> dotnet test --filter ...` で再現。
+  反復回数は `CsCheck_Iter=2000` 等で一時的に増やせる(既定 100。Application は DB を作るため `iter: 25`)
+- 反例表示のため、Dictionary を持つ操作 record は `ToString` を上書きする(既定では中身が出ない)
+- **落とし穴**: SQLite 往復した decimal は値が同じでも scale が変わる(`100` → `100.0`)。文字列比較時は正規化する
+- PBT で `BudgetLine.SetMonthly` が検証前に月別金額を書き換えていた不具合を検出・修正済み
+  (回帰テスト `不正な月次金額での上書きが拒否されても既存明細の金額と月次は変わらない`)
+
+## Gherkin シナリオ(Reqnroll)
+
+業務フローは日本語 Gherkin でも書く(既存の xUnit テストは置き換えず併存)。
+ライブラリは `Reqnroll.xUnit`(SpecFlow の後継。xUnit 2.9 で動く)。置き場所は
+`Application.Tests/Features/`(`UseCaseFixture` を再利用し、CI・ミューテーションテストにそのまま乗る)。
+
+- **キーワード**: 各 .feature 先頭に `# language: ja`(`reqnroll.json` でも ja 指定)。
+  機能 / 背景 / シナリオ / シナリオアウトライン / 例 / 前提 / もし / ならば / かつ
+- **状態**: `Features/BusinessContext.cs` の `業務コンテキスト` をコンストラクタ注入で共有。
+  シナリオ終了時に Dispose され一時DBが消える。部・課・案件はフィーチャー上の**コード(=名称)**で書き、ここで ID に解決
+- **ステップ**: `Features/Steps/`(組織と案件 / 予算 / 実績と分析)。Cucumber Expression で
+  `{string}`(ダブルクォート)・`{int}`・`{long}` を使う。金額は `{long}`。**`(` `)` `/` はステップ文に書かない**
+  (Cucumber Expression の任意・択一記法と解釈される)
+- 前提でも操作でも使うステップは `[StepDefinition]`、エラーを期待する操作は「…しようとする」で
+  `ctx.試行(...)` を通し(DomainException/NotFoundException を捕捉)、`ならば "…" を含むエラーになる` で検証
+- 表(DataTable)の列名は日本語。区分は 売上高/加工費/外注費/期間費用 で書き `業務コンテキスト.区分()` で内部名へ。
+  空セルは null(費目一括・案件なし)
+- **新しいステップを足す前に既存ステップを探して再利用する**(言い回しの揺れでステップを増やさない)
+- 生成されるコードビハインド `*.feature.cs` はビルド時に作られるので gitignore 済み
+- 未定義ステップがあるとそのシナリオは Skipped/Inconclusive になる。全件 Passed で Skipped 0 を確認する
+
 ## 実行方法
 
 ```bash

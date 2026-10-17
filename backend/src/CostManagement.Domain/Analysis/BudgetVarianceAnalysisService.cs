@@ -6,8 +6,8 @@ namespace CostManagement.Domain.Analysis;
 
 /// <summary>
 /// (区分, 案件 or 費目) ごとの予実差異。
-/// 差異は「実績 − 予算」で符号付き。有利/不利の向きは区分で異なる
-/// (売上高は正 = 有利、コスト系区分は正 = 不利)。
+/// 差異は「実績 − 予算」で符号付き。利益への影響の向きは区分で異なる
+/// (売上高は正 = 利益が増える、コスト系区分は正 = 利益が減る)。
 /// </summary>
 public sealed record VarianceLine(
     BudgetCategory Category,
@@ -19,11 +19,11 @@ public sealed record VarianceLine(
     decimal Variance,
     bool IsUnplanned)
 {
-    /// <summary>有利差異かどうか(売上高は超過が有利、コストは未達が有利)。</summary>
+    /// <summary>利益が増える差異かどうか(売上高は予算超過、コストは予算未達のとき)。</summary>
     public bool IsFavorable =>
         Category == BudgetCategory.Revenue ? Variance > 0m : Variance < 0m;
 
-    /// <summary>不利差異かどうか。</summary>
+    /// <summary>利益が減る差異かどうか(売上高は予算未達、コストは予算超過のとき)。</summary>
     public bool IsAdverse =>
         Category == BudgetCategory.Revenue ? Variance < 0m : Variance > 0m;
 }

@@ -890,13 +890,13 @@ if (detail is not null &amp;&amp; elementLines.Any(l =&gt; l.PeriodDetail is nul
     <li><strong>4 区分ぶんのサブトータル</strong>を作り(明細が 0 件の区分も必ず 1 要素として現れる)、売上高と「それ以外の合計 = コスト」に畳んで <code>VarianceReport</code> を返す。</li>
   </ol>
   <h4>差異の符号</h4>
-  <p>差異は一貫して <strong>実績 − 予算</strong> です。有利/不利の解釈だけが区分で反転します。</p>
+  <p>差異は一貫して <strong>実績 − 予算</strong> です。利益が増えるか減るかの解釈だけが区分で反転します。</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th></th><th><code>Variance &gt; 0</code>(実績超過)</th><th><code>Variance &lt; 0</code>(実績未達)</th></tr></thead>
     <tbody>
-      <tr><td>売上高</td><td><span class="badge b-agg">有利</span> <code>IsFavorable</code></td><td><span class="badge b-app">不利</span> <code>IsAdverse</code></td></tr>
-      <tr><td>加工費 / 外注費 / 期間費用</td><td><span class="badge b-app">不利</span> <code>IsAdverse</code></td><td><span class="badge b-agg">有利</span> <code>IsFavorable</code></td></tr>
+      <tr><td>売上高</td><td><span class="badge b-agg">利益が増える</span> <code>IsFavorable</code></td><td><span class="badge b-app">利益が減る</span> <code>IsAdverse</code></td></tr>
+      <tr><td>加工費 / 外注費 / 期間費用</td><td><span class="badge b-app">利益が減る</span> <code>IsAdverse</code></td><td><span class="badge b-agg">利益が増える</span> <code>IsFavorable</code></td></tr>
     </tbody>
   </table>
   </div>
@@ -1231,7 +1231,7 @@ if (detail is not null &amp;&amp; elementLines.Any(l =&gt; l.PeriodDetail is nul
     <tr><td>14</td><td>明細のない予算は承認できない</td><td><code>Approve</code></td></tr>
     <tr><td>15</td><td>改定版のバージョンは基準版より大きい</td><td><code>ReviseFrom</code></td></tr>
     <tr><td>16</td><td>同一 (課, 半期) にドラフトは 1 件、承認済みは 1 件</td><td>アプリケーション層(<code>CreateDraftAsync</code> / <code>ApproveAsync</code>)</td></tr>
-    <tr><td>17</td><td>差異 = 実績 − 予算(有利/不利の向きだけ区分で反転)</td><td><code>VarianceLine.IsFavorable</code> / <code>IsAdverse</code></td></tr>
+    <tr><td>17</td><td>差異 = 実績 − 予算(利益が増えるか減るかの向きだけ区分で反転)</td><td><code>VarianceLine.IsFavorable</code> / <code>IsAdverse</code></td></tr>
     <tr><td>18</td><td>案件別損益の合計 − 期間費用 = 課全体の損益</td><td><code>ProfitAnalysisService</code> の 2 つの定義 + テスト</td></tr>
     <tr><td>19</td><td>部合計 = 課別内訳の合計</td><td><code>DivisionBudgetSummaryService</code> が同じ入力から両方を生成</td></tr>
     <tr><td>20</td><td>比較できるのは同一 (課, 半期) の予算同士だけ</td><td><code>BudgetComparisonService.Compare</code></td></tr>

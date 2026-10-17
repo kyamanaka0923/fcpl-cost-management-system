@@ -62,20 +62,31 @@ export default function BudgetEditPage() {
   // 費目ごとの明細の折りたたみ状態(費目コード → 折りたたみ中か。既定は展開)
   const [collapsedElements, setCollapsedElements] = useState<Record<string, boolean>>({})
   // 明細名のインライン変更(対象の費目コード・現在の明細名)
-  const [renamingDetail, setRenamingDetail] = useState<{ code: string; oldName: string } | null>(null)
+  const [renamingDetail, setRenamingDetail] = useState<{ code: string; oldName: string } | null>(
+    null,
+  )
   const [renameValue, setRenameValue] = useState('')
   const [savingRename, setSavingRename] = useState(false)
 
   const loadBudget = useCallback(() => {
     if (!budgetId) return
-    api.getBudget(budgetId).then(setBudget).catch((e: Error) => setError(e.message))
+    api
+      .getBudget(budgetId)
+      .then(setBudget)
+      .catch((e: Error) => setError(e.message))
   }, [budgetId])
   const loadProjects = useCallback(() => {
     if (!departmentId) return
-    api.listProjects(departmentId).then(setProjects).catch((e: Error) => setError(e.message))
+    api
+      .listProjects(departmentId)
+      .then(setProjects)
+      .catch((e: Error) => setError(e.message))
   }, [departmentId])
   const loadElements = useCallback(() => {
-    api.listCostElements().then(setElements).catch((e: Error) => setError(e.message))
+    api
+      .listCostElements()
+      .then(setElements)
+      .catch((e: Error) => setError(e.message))
   }, [])
 
   useEffect(loadBudget, [loadBudget])
@@ -152,7 +163,8 @@ export default function BudgetEditPage() {
     saveCell(
       periodKey(code),
       periodAmount(code),
-      (amount) => api.upsertBudgetLine(budgetId, { category: 'PeriodCost', elementCode: code, amount }),
+      (amount) =>
+        api.upsertBudgetLine(budgetId, { category: 'PeriodCost', elementCode: code, amount }),
       () => api.removeBudgetLine(budgetId, 'PeriodCost', null, code),
     )
 
@@ -450,7 +462,11 @@ export default function BudgetEditPage() {
             {budget ? halfLabel(budget.fiscalHalf) : ''}
           </span>
           <span className={`badge ${budget?.status.toLowerCase()}`} style={{ marginLeft: 12 }}>
-            {budget?.status === 'Draft' ? '策定中' : budget?.status === 'Approved' ? '承認済' : '失効'}
+            {budget?.status === 'Draft'
+              ? '策定中'
+              : budget?.status === 'Approved'
+                ? '承認済'
+                : '失効'}
           </span>
         </h2>
         <div className="stat-row">
@@ -476,12 +492,17 @@ export default function BudgetEditPage() {
               ¥{formatYen(budget?.plannedProfit ?? 0)}
             </div>
             <div className="label">
-              粗利率 {formatPercent(marginRate(budget?.plannedProfit ?? 0, budget?.revenueTotal ?? 0))}
+              粗利率{' '}
+              {formatPercent(marginRate(budget?.plannedProfit ?? 0, budget?.revenueTotal ?? 0))}
             </div>
           </div>
         </div>
         {editable && (
-          <button className="primary" onClick={approve} disabled={(budget?.lines.length ?? 0) === 0}>
+          <button
+            className="primary"
+            onClick={approve}
+            disabled={(budget?.lines.length ?? 0) === 0}
+          >
             この予算を承認する
           </button>
         )}
@@ -496,7 +517,8 @@ export default function BudgetEditPage() {
         <h2>案件別の売上高・加工費・外注費</h2>
         <p className="muted small">
           案件ごとに半期一括の金額を入力します(空欄・0 は明細なし)。
-          {editable && '金額を入力して次の欄へ移ると自動保存されます。各セルの「月次入力」で月ごとの金額も入力でき、その明細は半期合計が自動算出されます。'}
+          {editable &&
+            '金額を入力して次の欄へ移ると自動保存されます。各セルの「月次入力」で月ごとの金額も入力でき、その明細は半期合計が自動算出されます。'}
           案件名の横の「編集」からコード・名称を後から変更できます(参照はGUIDのため予算・実績は保持されます)。
           課の区分合計は案件明細の合計として上部サマリに反映されます。
         </p>
@@ -571,7 +593,10 @@ export default function BudgetEditPage() {
                             className="num"
                             style={{ width: '9rem' }}
                             aria-label={label}
-                            value={cellValue(projectKey(p.id, category), projectAmount(p.id, category))}
+                            value={cellValue(
+                              projectKey(p.id, category),
+                              projectAmount(p.id, category),
+                            )}
                             onChange={(v) => onCellChange(projectKey(p.id, category), v)}
                             onBlur={() => onProjectBlur(p.id, category)}
                           />
@@ -607,7 +632,8 @@ export default function BudgetEditPage() {
               <td className="num">¥{formatYen(budget?.processingTotal ?? 0)}</td>
               <td className="num">¥{formatYen(budget?.outsourcingTotal ?? 0)}</td>
               <td className="num">
-                ¥{formatYen(
+                ¥
+                {formatYen(
                   (budget?.revenueTotal ?? 0) -
                     (budget?.processingTotal ?? 0) -
                     (budget?.outsourcingTotal ?? 0),
@@ -713,7 +739,9 @@ export default function BudgetEditPage() {
                           <button
                             className="cell-monthly-btn"
                             aria-label={
-                              collapsed ? `${el.name} の明細を展開` : `${el.name} の明細を折りたたむ`
+                              collapsed
+                                ? `${el.name} の明細を展開`
+                                : `${el.name} の明細を折りたたむ`
                             }
                             aria-expanded={!collapsed}
                             onClick={() => toggleCollapse(el.code)}
@@ -721,7 +749,9 @@ export default function BudgetEditPage() {
                             {collapsed ? '▸' : '▾'}
                           </button>
                         )}
-                        {hasDetails && <span className="badge-monthly">明細{details.length}件</span>}
+                        {hasDetails && (
+                          <span className="badge-monthly">明細{details.length}件</span>
+                        )}
                       </td>
                       <td className="num">
                         {hasDetails ? (
@@ -748,7 +778,9 @@ export default function BudgetEditPage() {
                               <button
                                 className="cell-monthly-btn"
                                 aria-label={`${el.name} を月次入力`}
-                                onClick={() => openMonthly('PeriodCost', null, el.code, simpleLabel)}
+                                onClick={() =>
+                                  openMonthly('PeriodCost', null, el.code, simpleLabel)
+                                }
                               >
                                 {simpleMonthly ? '月次編集' : '月次入力'}
                               </button>
@@ -757,88 +789,91 @@ export default function BudgetEditPage() {
                         )}
                       </td>
                     </tr>
-                    {!collapsed && details.map((d) => {
-                      const detail = d.periodDetail!
-                      const detailLabel = `${el.name} ${detail} 金額`
-                      return (
-                        <tr key={detail}>
-                          <td className="muted small" style={{ paddingLeft: '2rem' }}>
-                            {renamingDetail?.code === el.code &&
-                            renamingDetail.oldName === detail ? (
-                              <span className="project-edit">
-                                <input
-                                  aria-label={`${el.name} ${detail} の明細名`}
-                                  value={renameValue}
-                                  onChange={(e) => setRenameValue(e.target.value)}
+                    {!collapsed &&
+                      details.map((d) => {
+                        const detail = d.periodDetail!
+                        const detailLabel = `${el.name} ${detail} 金額`
+                        return (
+                          <tr key={detail}>
+                            <td className="muted small" style={{ paddingLeft: '2rem' }}>
+                              {renamingDetail?.code === el.code &&
+                              renamingDetail.oldName === detail ? (
+                                <span className="project-edit">
+                                  <input
+                                    aria-label={`${el.name} ${detail} の明細名`}
+                                    value={renameValue}
+                                    onChange={(e) => setRenameValue(e.target.value)}
+                                    style={{ width: '9rem' }}
+                                  />
+                                  <button
+                                    className="primary"
+                                    onClick={saveRenameDetail}
+                                    disabled={savingRename}
+                                  >
+                                    保存
+                                  </button>
+                                  <button onClick={cancelRenameDetail} disabled={savingRename}>
+                                    取消
+                                  </button>
+                                </span>
+                              ) : (
+                                <>
+                                  <span>└ {detail}</span>
+                                  {editable && (
+                                    <button
+                                      className="row-edit-link"
+                                      aria-label={`${el.name} ${detail} の名称変更`}
+                                      onClick={() => startRenameDetail(el.code, detail)}
+                                    >
+                                      編集
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </td>
+                            <td className="num">
+                              {editable && !d.isMonthly && (
+                                <MoneyInput
+                                  className="num"
                                   style={{ width: '9rem' }}
+                                  aria-label={detailLabel}
+                                  value={cellValue(periodDetailKey(el.code, detail), d.amount)}
+                                  onChange={(v) =>
+                                    onCellChange(periodDetailKey(el.code, detail), v)
+                                  }
+                                  onBlur={() => onPeriodDetailBlur(el.code, detail)}
                                 />
-                                <button
-                                  className="primary"
-                                  onClick={saveRenameDetail}
-                                  disabled={savingRename}
-                                >
-                                  保存
-                                </button>
-                                <button onClick={cancelRenameDetail} disabled={savingRename}>
-                                  取消
-                                </button>
-                              </span>
-                            ) : (
-                              <>
-                                <span>└ {detail}</span>
-                                {editable && (
+                              )}
+                              {(!editable || d.isMonthly) && (
+                                <span>
+                                  ¥{formatYen(d.amount)}
+                                  {d.isMonthly && <span className="badge-monthly">月次</span>}
+                                </span>
+                              )}
+                              {editable && (
+                                <>
+                                  <button
+                                    className="cell-monthly-btn"
+                                    aria-label={`${el.name} ${detail} を月次入力`}
+                                    onClick={() =>
+                                      openMonthly('PeriodCost', null, el.code, detailLabel, detail)
+                                    }
+                                  >
+                                    {d.isMonthly ? '月次編集' : '月次入力'}
+                                  </button>
                                   <button
                                     className="row-edit-link"
-                                    aria-label={`${el.name} ${detail} の名称変更`}
-                                    onClick={() => startRenameDetail(el.code, detail)}
+                                    aria-label={`${el.name} ${detail} を削除`}
+                                    onClick={() => removePeriodDetail(el.code, detail)}
                                   >
-                                    編集
+                                    削除
                                   </button>
-                                )}
-                              </>
-                            )}
-                          </td>
-                          <td className="num">
-                            {editable && !d.isMonthly && (
-                              <MoneyInput
-                                className="num"
-                                style={{ width: '9rem' }}
-                                aria-label={detailLabel}
-                                value={cellValue(periodDetailKey(el.code, detail), d.amount)}
-                                onChange={(v) => onCellChange(periodDetailKey(el.code, detail), v)}
-                                onBlur={() => onPeriodDetailBlur(el.code, detail)}
-                              />
-                            )}
-                            {(!editable || d.isMonthly) && (
-                              <span>
-                                ¥{formatYen(d.amount)}
-                                {d.isMonthly && <span className="badge-monthly">月次</span>}
-                              </span>
-                            )}
-                            {editable && (
-                              <>
-                                <button
-                                  className="cell-monthly-btn"
-                                  aria-label={`${el.name} ${detail} を月次入力`}
-                                  onClick={() =>
-                                    openMonthly('PeriodCost', null, el.code, detailLabel, detail)
-                                  }
-                                >
-                                  {d.isMonthly ? '月次編集' : '月次入力'}
-                                </button>
-                                <button
-                                  className="row-edit-link"
-                                  aria-label={`${el.name} ${detail} を削除`}
-                                  onClick={() => removePeriodDetail(el.code, detail)}
-                                >
-                                  削除
-                                </button>
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
+                                </>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
                     {editable && !collapsed && (
                       <tr>
                         <td style={{ paddingLeft: '2rem' }}>
@@ -858,9 +893,7 @@ export default function BudgetEditPage() {
                             style={{ width: '9rem' }}
                             aria-label={`${el.name} 明細金額`}
                             value={detailAmount[el.code] ?? ''}
-                            onChange={(v) =>
-                              setDetailAmount((prev) => ({ ...prev, [el.code]: v }))
-                            }
+                            onChange={(v) => setDetailAmount((prev) => ({ ...prev, [el.code]: v }))}
                           />
                           <button
                             className="cell-monthly-btn"

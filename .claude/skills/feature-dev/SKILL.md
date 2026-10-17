@@ -20,7 +20,13 @@ model: claude-sonnet-5
 
 ## 各層の規約
 
-- DTO は camelCase JSON で自動シリアライズされる(ASP.NET Core 既定)。フロントの型と一致させる
+- DTO は camelCase JSON で自動シリアライズされる(ASP.NET Core 既定)。数値は JSON の数値のみ受け付ける
+  (`NumberHandling.Strict`)
+- **API の型は OpenAPI から生成する**: DTO・エンドポイントを変えたら
+  `cd backend && UPDATE_OPENAPI=1 dotnet test --filter OpenApi`(`docs/api/openapi.json` を更新)→
+  `cd frontend && npm run gen:api`(`src/api-schema.d.ts` を再生成)。`api.ts` の型は生成型から導出し
+  (区分などの文字列は `Override` で4値に絞る)、手書きの interface を増やさない。
+  作成系(201)・204 のエンドポイントは `.Produces<T>()` で応答型を明示する
 - Dapper: decimal/Guid/DateTime は `SqliteConnectionFactory` の型ハンドラで TEXT 往復。
   金額カラムは TEXT。明細の `project_id` / `element_code` は区分により排他で、
   **未使用側は DB では `''` として保存し、読み出し時に null へ読み替える**
@@ -33,13 +39,21 @@ model: claude-sonnet-5
 - フロント: 依存追加は最小限(React/Router のみ。UIライブラリ・チャートライブラリは使わず手書きSVG)。
   金額表示は `formatYen`/`formatSignedYen`、区分名は `categoryLabel`、半期は `halfLabel`。
   対象半期は `?half=` クエリでページ間を引き回す(既定は `currentFiscalHalf()`)。
-  有利/不利の色はコスト=正が赤(adverse)、売上高・損益=正が緑(favorable)。
+  差異の色はコスト=正が赤(利益が減る / adverse)、売上高・損益=正が緑(利益が増える / favorable)。
   ダークモード対応必須(CSS変数)
   エラーは各ページの `error`/`setError` state を **`<Toast message={error} onClose={() => setError(null)} />`**
   (`components/Toast.tsx`・画面右下固定・自動消去)で表示する。最上部バナー(`.error-banner`)は
   スクロール時に気づけないため廃止(Issue #4)。新規ページも Toast を使う
 - チャートを追加・変更するときは dataviz スキル(バンドル)を先に読み込み、検証済みパレット
   (`frontend/src/styles.css` の CSS 変数)を使う
+
+## 静的解析
+
+- バックエンドは `backend/Directory.Build.props` で `AnalysisLevel=latest-recommended` + **警告をエラー扱い**。
+  ロケール依存の `ToString`/`Parse`(CA1305)、比較方法未指定の文字列比較(CA1310)などはビルドが通らない。
+  ルールを外すときはリポジトリ直下の `.editorconfig` に**理由のコメントつき**で書く(抑制属性を散らさない)
+- `dotnet format` は既存コードの意図的な桁揃えを崩すため CI では強制しない(`.editorconfig` はエディタ用)
+- フロントは ESLint + Prettier(CI で検査)
 
 ## コメント規約
 
@@ -52,6 +66,7 @@ model: claude-sonnet-5
 ```bash
 cd backend && dotnet test          # 全テスト(ドメイン/アプリ/インフラ/API E2E/アーキテクチャ)
 cd frontend && npm run build       # 型チェック + ビルド
+cd frontend && npm run lint && npm run format:check   # ESLint + Prettier(書式は npm run format で直す)
 cd frontend && npm run test:e2e    # 画面を触った場合(PW_CHROMIUM=/opt/pw-browsers/chromium が必要な環境あり)
 ```
 

@@ -182,13 +182,18 @@ public sealed class BudgetLine
 
     private void SetMonthly(IReadOnlyDictionary<int, Money> monthly)
     {
-        _monthly.Clear();
-        var total = Money.Zero;
+        // 全件を検証してから書き換える(途中で例外になっても既存の金額・月次を壊さない)。
         foreach (var (month, amount) in monthly)
         {
             HalfMonths.Validate(month);
             if (amount.IsNegative)
                 throw new DomainException("金額は0以上で入力してください。");
+        }
+
+        _monthly.Clear();
+        var total = Money.Zero;
+        foreach (var (month, amount) in monthly)
+        {
             if (amount.Value != 0m)
             {
                 _monthly[month] = amount;
