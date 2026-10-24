@@ -1,12 +1,20 @@
 import { defineConfig } from '@playwright/test'
+import { defineBddConfig } from 'playwright-bdd'
 import os from 'node:os'
 import path from 'node:path'
 
 // 実行ごとに独立した SQLite データベースを使う
 const dbPath = path.join(os.tmpdir(), `cm-browser-e2e-${Date.now()}.db`)
 
+// 日本語 Gherkin の .feature からテストを生成する(npx bddgen。npm run test:e2e は生成してから実行する)
+const testDir = defineBddConfig({
+  features: 'e2e/features/*.feature',
+  steps: 'e2e/steps/*.ts',
+  language: 'ja',
+})
+
 export default defineConfig({
-  testDir: './e2e',
+  testDir,
   timeout: 60_000,
   // CI では失敗時のトレースを残す
   use: {

@@ -85,8 +85,8 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "0"
 
-      - name: E2E テストを実行(バックエンド+フロントエンドを自動起動)
-        run: npx playwright test
+      - name: E2E テストを実行(Gherkin からテストを生成し、バックエンド+フロントエンドを自動起動)
+        run: npm run test:e2e
 
       - name: 失敗時のレポートを保存
         if: failure()
