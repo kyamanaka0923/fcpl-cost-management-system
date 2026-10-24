@@ -26,6 +26,7 @@ public sealed class 業務コンテキスト : IDisposable
     public VarianceReportDto? 差異 { get; set; }
     public ProfitSummaryDto? 損益 { get; set; }
     public DivisionBudgetSummaryDto? 部サマリ { get; set; }
+    public string? 部サマリの半期 { get; set; }
 
     /// <summary>「…しようとする」ステップで捕捉した業務エラー。「… を含むエラーになる」で検証する。</summary>
     public Exception? 直前のエラー { get; set; }
