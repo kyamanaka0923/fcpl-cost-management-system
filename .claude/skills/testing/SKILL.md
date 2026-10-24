@@ -1,6 +1,6 @@
 ---
 name: testing
-description: テストの追加・修正・実行の規約。5種類のバックエンドテスト(ドメイン/アプリケーション/インフラ/API E2E/アーキテクチャ)とブラウザE2E(Playwright)の書き方、日本語テスト名の方針、既知の落とし穴。テストを書く・直す作業で必ず読む。
+description: テストの追加・修正・実行の規約。5種類のバックエンドテスト(ドメイン/アプリケーション/インフラ/API E2E/アーキテクチャ)とブラウザE2E(Playwright + playwright-bdd)・日本語 Gherkin シナリオの書き方、日本語テスト名の方針、既知の落とし穴。テストを書く・直す作業で必ず読む。
 model: claude-sonnet-5
 ---
 
@@ -21,9 +21,9 @@ model: claude-sonnet-5
 | Domain.Tests | 不変条件・計算規則 | 純粋単体 |
 | Application.Tests | ユースケース | `UseCaseFixture`(一時SQLite+本物リポジトリ+`FixedClock`。日本語ヘルパ: `課を作成`/`案件を作成`/`承認済み予算を作成`) |
 | Infrastructure.Tests | 永続化往復・スキーマ作り直し | `RepositoryFixture`(一時SQLite)+ `SchemaResetTests` |
-| E2E.Tests | HTTP経由の業務フロー | `WebApplicationFactory<Program>`(`ApiFixture`) |
+| E2E.Tests | HTTP経由の業務フロー | `WebApplicationFactory<Program>`(`ApiFixture`)。`Features/` に Gherkin(Reqnroll) |
 | Architecture.Tests | 依存ルール | NetArchTest |
-| frontend/e2e | ブラウザ操作 | @playwright/test(webServerで両サーバ自動起動) |
+| frontend/e2e | ブラウザ操作 | Gherkin(playwright-bdd)+ @playwright/test(webServerで両サーバ自動起動) |
 
 - 新しいユースケース → Application.Tests に業務フローとして追加
 - 新しいリポジトリ/カラム → Infrastructure.Tests にラウンドトリップを追加
@@ -73,11 +73,20 @@ E2E(API E2E・ブラウザE2E)のテストケースを追加・変更したら�
 - PBT で `BudgetLine.SetMonthly` が検証前に月別金額を書き換えていた不具合を検出・修正済み
   (回帰テスト `不正な月次金額での上書きが拒否されても既存明細の金額と月次は変わらない`)
 
-## Gherkin シナリオ(Reqnroll)
+## Gherkin シナリオ(Reqnroll / playwright-bdd)
 
-業務フローは日本語 Gherkin でも書く(既存の xUnit テストは置き換えず併存)。
-ライブラリは `Reqnroll.xUnit`(SpecFlow の後継。xUnit 2.9 で動く)。置き場所は
-`Application.Tests/Features/`(`UseCaseFixture` を再利用し、CI・ミューテーションテストにそのまま乗る)。
+業務フローは日本語 Gherkin で書く。3か所にある:
+
+| 置き場所 | ライブラリ | 状態の共有 | xUnit/spec との関係 |
+|---|---|---|---|
+| `Application.Tests/Features/` | Reqnroll.xUnit | `業務コンテキスト`(`UseCaseFixture`) | 既存 xUnit と併存(CI・ミューテーションにそのまま乗る) |
+| `E2E.Tests/Features/` | Reqnroll.xUnit | `APIコンテキスト`(`ApiFixture` / `認証ありのApi`) | 既存 xUnit と併存 |
+| `frontend/e2e/features/` | playwright-bdd | フィクスチャ `業務データ`(`e2e/steps/fixtures.ts`) | **旧 journey.spec.ts は置き換え済み**(ブラウザは重いので二重に持たない) |
+
+Reqnroll は `Reqnroll.xUnit`(SpecFlow の後継。xUnit 2.9 で動く)。業務ルールの組み合わせは Application 層、
+HTTP の入口〜出口(ステータス・JSON・認証)は API E2E、画面の操作と表示はブラウザ E2E に書き分ける。
+
+- **`ルール:`(Rule)でシナリオをまとめる**。ルールの中に `背景:` も置ける(ルール内のシナリオだけに効く)
 
 - **キーワード**: 各 .feature 先頭に `# language: ja`(`reqnroll.json` でも ja 指定)。
   機能 / 背景 / シナリオ / シナリオアウトライン / 例 / 前提 / もし / ならば / かつ
@@ -93,13 +102,29 @@ E2E(API E2E・ブラウザE2E)のテストケースを追加・変更したら�
 - **新しいステップを足す前に既存ステップを探して再利用する**(言い回しの揺れでステップを増やさない)
 - 生成されるコードビハインド `*.feature.cs` はビルド時に作られるので gitignore 済み
 - 未定義ステップがあるとそのシナリオは Skipped/Inconclusive になる。全件 Passed で Skipped 0 を確認する
+- **Reqnroll はキーワード種別でステップを照合する**: `[Given]` だけのステップを `もし`/`かつ`(When 扱い)で
+  書くと未定義になる。前提でも操作でも使うものは `[StepDefinition]` にする。`前提 … かつ …` の `かつ` は Given 扱い
+- 表の列を任意にしたいステップは `row.TryGetValue("列名", out var v)` で読む(例: 実績の `備考`、課別内訳の列)
+
+### ブラウザ E2E(playwright-bdd)
+
+- `npm run test:e2e` = `bddgen && playwright test`。`bddgen` が `.features-gen/`(gitignore・ESLint/Prettier 除外)に
+  テストを生成する。CI も `npm run test:e2e`。**`npx playwright test` だけだと古い生成物で走る**
+- **前提は API、もし/ならば は画面**: 部・課・案件・承認済み予算・実績は `業務データ` が `request` フィクスチャで
+  API から作る(Vite の /api プロキシ経由)。画面で登録すること自体を確かめるのは「計画策定」の最初のシナリオだけ
+- 部・課の名前と費目コードは `業務データ.実名()` / `費目コード()` で**シナリオ固有の接尾辞**を付ける(DB を全シナリオで
+  共有し、並列実行するため)。案件は課の中で一意なのでそのまま。シナリオは互いに独立で serial 指定はしない
+- API で作る予算・実績の半期は `今期()`(画面の `currentFiscalHalf` と同じ規則)。月次入力欄は位置で指定する
+- playwright-bdd はキーワード種別を区別しない。同じ処理を「…する」「…している」の両方で書きたいときは
+  ハンドラを変数にして2回登録する。共有ハンドラの引数型は `画面`(fixtures.ts)
+- フィクスチャの第2引数は `use` ではなく `provide` と書く(eslint-plugin-react-hooks が `use` を Hook と誤検知する)
 
 ## 実行方法
 
 ```bash
 cd backend && dotnet test                                  # バックエンド全部
 cd frontend && npm run test:e2e                            # ブラウザE2E
-# このリモート環境では: CI= PW_CHROMIUM=/opt/pw-browsers/chromium npx playwright test
+# このリモート環境では: CI= PW_CHROMIUM=/opt/pw-browsers/chromium npm run test:e2e
 ```
 
 カバレッジ目標: 全体85%以上を維持(現状 89.9%)。CI の実行サマリで確認できる。

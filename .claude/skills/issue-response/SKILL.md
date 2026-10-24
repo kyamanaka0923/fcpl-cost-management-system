@@ -74,7 +74,7 @@ Issue の内容に応じて、着手前に対応スキルを**必ず読む**(再
 ```bash
 cd backend && dotnet test          # 全テスト(ドメイン/アプリ/インフラ/API E2E/アーキテクチャ)
 cd frontend && npm run build       # 型チェック + ビルド
-cd frontend && CI= PW_CHROMIUM=/opt/pw-browsers/chromium npx playwright test   # 画面を触った場合
+cd frontend && CI= PW_CHROMIUM=/opt/pw-browsers/chromium npm run test:e2e   # 画面を触った場合(bddgen + playwright test)
 ```
 
 - テスト名・エラーメッセージ・コミットメッセージは**日本語**
@@ -96,9 +96,8 @@ cd frontend && CI= PW_CHROMIUM=/opt/pw-browsers/chromium npx playwright test   #
 
 ## 既知の落とし穴(実際に踏んだもの)
 
-- **ブラウザ E2E は1つの DB を共有し serial 実行**。重要フロー(計画策定テスト)に検証を足すと、
-  その遅延で無関係の後続アサーションが遅い CI でタイムアウトする。**編集系などの検証は
-  専用の部・課・案件を作る独立テストに切り出す**(既存テストのデータを書き換えない)
+- **ブラウザ E2E は1つの DB を共有するが、シナリオは互いに独立**(Gherkin + playwright-bdd。前提は API で
+  シナリオ固有の部・課を作る)。新しい検証は既存シナリオに継ぎ足さず、**独立したシナリオとして追加する**
 - **`actions_list` の出力が巨大**(>100k字)でツール枠を超える → ファイル保存される。
   `python3 -c "import json; ..."` で `workflow_runs[0]` を抜き出す
 - **GitHub MCP は一時的に切断される**ことがある。`ToolSearch` で必要ツールを都度ロードし直す

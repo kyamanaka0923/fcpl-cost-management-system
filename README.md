@@ -59,8 +59,9 @@
 | | Microsoft.AspNetCore.Mvc.Testing | 10.0.9 | API E2E(WebApplicationFactory で WebApi を起動) |
 | | NetArchTest.Rules | 1.3.2 | アーキテクチャ(層の依存ルール)テスト |
 | | CsCheck | 4.9.1 | プロパティベーステスト(ランダム入力で不変条件を検証) |
-| | Reqnroll.xUnit | 3.3.4 | 日本語 Gherkin の業務シナリオテスト |
+| | Reqnroll.xUnit | 3.3.4 | 日本語 Gherkin の業務シナリオテスト(Application・API E2E) |
 | ブラウザ E2E | Playwright(@playwright/test) | 1.61 | 実ブラウザ(Chromium)での画面操作テスト |
+| | playwright-bdd | 9.2 | ブラウザ E2E を日本語 Gherkin で記述(.feature から Playwright のテストを生成) |
 | カバレッジ | coverlet + ReportGenerator | 6.0.4 / 最新 | 計測と CI 実行サマリへの表示 |
 | ミューテーション | Stryker.NET(dotnet ローカルツール) | 4.16.0 | テストが仕様を検証しているかの測定(Domain・Application) |
 | メトリクス | cloc + scc | 最新 | 行数・複雑度の集計 |
@@ -102,7 +103,7 @@ backend/
     ├── CostManagement.Domain.Tests/    # ドメイン単体テスト(PropertyBased/ にプロパティベーステスト)
     ├── CostManagement.Application.Tests/ # ユースケーステスト(Features/ に Gherkin シナリオ)
     ├── CostManagement.Infrastructure.Tests/ # リポジトリの永続化・スキーマ移行
-    ├── CostManagement.E2E.Tests/       # API E2E(HTTP 経由の業務フロー)
+    ├── CostManagement.E2E.Tests/       # API E2E(HTTP 経由の業務フロー。Features/ に Gherkin シナリオ)
     └── CostManagement.Architecture.Tests/ # 層の依存ルール(NetArchTest)
 
 frontend/                               # React SPA(/api を dev proxy 経由でバックエンドへ)
@@ -110,7 +111,7 @@ frontend/                               # React SPA(/api を dev proxy 経由で
 │   ├── pages/                          #   画面(部・課・予算編集・実績・分析・比較・費目マスタ)
 │   ├── components/                     #   グラフ(自前 SVG)・モーダル・トースト・金額入力
 │   └── api.ts                          #   API クライアントと型
-└── e2e/                                # ブラウザ E2E(Playwright)
+└── e2e/                                # ブラウザ E2E(features/ に Gherkin シナリオ、steps/ にステップ定義)
 
 infra/                                  # AWS SAM テンプレートとデプロイスクリプト
 docker/                                 # 開発・ビルド・テスト共用イメージ
@@ -294,19 +295,24 @@ dotnet test
 
   | フィーチャー | 主なシナリオ |
   |---|---|
-  | 課予算の策定と改定 | 区分合計=明細合計、承認済みは編集不可、改定版の承認で旧版が失効、費目一括と明細の混在禁止 |
-  | 予実差異と損益 | 差異=実績−予算と利益が増えるか減るか、計画にない明細名は予定外、案件別損益と全体損益の整合 |
-  | 部の予実と承認 | 部合計は承認済み課のみ、未承認の課があると部承認不可、部承認と取り消し |
+  | 課予算の策定と改定 | 区分合計=明細合計、月次入力、案件・費目はマスタのものだけ、費目一括と明細の混在禁止、明細名の変更、承認済みは編集不可、改定版の引き継ぎと旧版の失効、半期ごとの独立 |
+  | 予実差異と損益 | 実績の月・備考、差異=実績−予算と利益が増えるか減るか、計画にない明細名は予定外、差異の基準は最新の承認版、案件別損益と全体損益の整合 |
+  | 部の予実と承認 | 部合計は承認済み課のみ、改定版で集計、課コード順の内訳、部サマリと課の予実差異の一致、部承認の条件と取り消し |
+  | 組織と案件と費目のマスタ | 部・課コードの重複禁止、案件コードは課ごとに一意、案件の編集と明細の参照維持、費目の追加 |
 
-さらに**ブラウザ E2E テスト**(Playwright)が `frontend/e2e/` にあります。
-バックエンドとフロントエンドを自動起動し、実際のブラウザで計画策定→実績入力→分析→計画変更を操作します。
-API E2E とブラウザ E2E の各テストケースが何をどの数値で確かめているかは
+  API E2E(`E2E.Tests/Features/*.feature`)も同じく Gherkin で、業務フロー・エラー応答・認証を HTTP 経由で記述しています
+  (既存の xUnit の E2E テストも併存)。
+
+さらに**ブラウザ E2E テスト**(Playwright + playwright-bdd)が `frontend/e2e/` にあります。
+シナリオは日本語 Gherkin(`frontend/e2e/features/*.feature`)で書き、準備(前提)は API で、操作と検証は実際のブラウザで行います。
+バックエンドとフロントエンドを自動起動し、計画策定・実績入力・分析・計画変更・明細入力・マスタ管理を操作します。
+API E2E とブラウザ E2E の各シナリオが何をどの数値で確かめているかは
 [`docs/design/e2e-test-guide.html`](docs/design/e2e-test-guide.html)(ブラウザで開く)にまとめています。
 
 ```bash
 cd frontend
 npx playwright install chromium   # 初回のみ
-npm run test:e2e
+npm run test:e2e                  # bddgen で .feature からテストを生成して実行
 ```
 
 **カバレッジ**: CI(GitHub Actions)がテスト実行時にカバレッジを計測し、
