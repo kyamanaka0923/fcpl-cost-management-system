@@ -74,7 +74,8 @@ Issue の内容に応じて、着手前に対応スキルを**必ず読む**(再
 ```bash
 cd backend && dotnet test          # 全テスト(ドメイン/アプリ/インフラ/API E2E/アーキテクチャ)
 cd frontend && npm run build       # 型チェック + ビルド
-cd frontend && CI= PW_CHROMIUM=/opt/pw-browsers/chromium npm run test:e2e   # 画面を触った場合(bddgen + playwright test)
+cd tests/unit/frontend && npm test   # 画面を触った場合(フロントエンド単独)
+cd tests/e2e/browser && CI= PW_CHROMIUM=/opt/pw-browsers/chromium npm test   # 画面を触った場合(bddgen + playwright test)
 ```
 
 - テスト名・エラーメッセージ・コミットメッセージは**日本語**
@@ -85,7 +86,7 @@ cd frontend && CI= PW_CHROMIUM=/opt/pw-browsers/chromium npm run test:e2e   # �
 - `git push -u origin claude/cost-management-system-qvc368`(ネットワークエラー時のみ指数バックオフ)
 - PR は**明示的に依頼されたときだけ**作成する
 - プッシュ後は `mcp__github__actions_list`(method=list_workflow_runs, resource_id=ci.yml,
-  branch フィルタ)で最新 run を確認 → `list_workflow_jobs` で **backend / frontend /
+  branch フィルタ)で最新 run を確認 → `list_workflow_jobs` で **backend / frontend / frontend-unit /
   browser-e2e / metrics の全ジョブが success** まで見届ける
 - E2E が落ちたら `get_job_logs`(return_content, failed_only)で原因を特定して修正・再プッシュ
 

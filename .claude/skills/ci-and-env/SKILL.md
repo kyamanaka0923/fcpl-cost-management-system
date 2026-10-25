@@ -14,9 +14,10 @@ model: claude-sonnet-5
 |---|---|
 | backend | dotnet test + dorny/test-reporter(Checks)+ ReportGenerator でカバレッジを実行サマリへ + HTML アーティファクト |
 | frontend | npm ci + ESLint(`npm run lint`)+ Prettier(`npm run format:check`)+ tsc + vite build |
-| browser-e2e | Playwright(Chromium導入→バックエンド+Vite自動起動→E2E)。失敗時レポート保存 |
-| metrics | コードメトリクス。cloc(言語別行数)+ scc(行数+複雑度)を backend/src・backend/tests・frontend/src の3区分で実行サマリへ + `code-metrics` アーティファクト。scc は `go install github.com/boyter/scc/v3@latest`(ubuntu ランナーの Go を利用)。**Microsoft.CodeAnalysis.Metrics は Linux 不可 & 旧 Roslyn で現代 C# 非対応のため使わない** |
-| mutation | ミューテーションテスト(Stryker.NET)。`dotnet tool restore` → Domain・Application の各テストプロジェクトで `dotnet tool run dotnet-stryker`。markdown レポートを実行サマリへ + html を `mutation-report` アーティファクトへ。**非ブロッキング**(閾値 break:0 でスコアでは落とさない。Stryker 自体の失敗のみ赤)。設定は各テストプロジェクト直下 `stryker-config.json`、ツールは `backend/.config/dotnet-tools.json`。詳細は testing スキル(Issue #6) |
+| frontend-unit | `tests/unit/frontend` で実行。npm ci(frontend 側は不要)→ ESLint・tsc・Prettier → Vitest(API は MSW でモック) |
+| browser-e2e | `tests/e2e/browser` で実行。frontend と tests/e2e/browser の npm ci → E2E のステップ定義の ESLint・tsc・Prettier → Chromium導入 → バックエンド+Vite自動起動 → E2E(`npm test` = bddgen + playwright test)。失敗時レポート保存 |
+| metrics | コードメトリクス。cloc(言語別行数)+ scc(行数+複雑度)を backend/src・frontend/src・tests/unit・tests/integration・tests/e2e・tests/architecture の区分で実行サマリへ + `code-metrics` アーティファクト。scc は `go install github.com/boyter/scc/v3@latest`(ubuntu ランナーの Go を利用)。**Microsoft.CodeAnalysis.Metrics は Linux 不可 & 旧 Roslyn で現代 C# 非対応のため使わない** |
+| mutation | ミューテーションテスト(Stryker.NET)。`tests` で `dotnet tool restore` → `unit/backend/Domain`・`integration/backend/Application` で `dotnet tool run dotnet-stryker`。markdown レポートを実行サマリへ + html を `mutation-report` アーティファクトへ。**非ブロッキング**(閾値 break:0 でスコアでは落とさない。Stryker 自体の失敗のみ赤)。設定は各テストプロジェクト直下 `stryker-config.json`、ツールは `tests/.config/dotnet-tools.json`。詳細は testing スキル(Issue #6) |
 
 - **依存の自動更新**: Dependabot(`.github/dependabot.yml`)が毎週月曜 09:00 JST に NuGet・npm・Actions・Docker を確認して PR を作る。
   マイナー・パッチはエコシステムごとに1件へまとめ、メジャーは個別 PR。PR は CI を通してからマージする

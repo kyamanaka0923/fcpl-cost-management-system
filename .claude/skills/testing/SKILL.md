@@ -1,6 +1,6 @@
 ---
 name: testing
-description: テストの追加・修正・実行の規約。5種類のバックエンドテスト(ドメイン/アプリケーション/インフラ/API E2E/アーキテクチャ)とブラウザE2E(Playwright + playwright-bdd)・日本語 Gherkin シナリオの書き方、日本語テスト名の方針、既知の落とし穴。テストを書く・直す作業で必ず読む。
+description: テストの追加・修正・実行の規約。tests/ のスコープ別構成(unit/integration/e2e/architecture)、バックエンドテスト(ドメイン/アプリケーション/インフラ/API E2E/アーキテクチャ)、フロントエンド単独テスト(Vitest + MSW)、ブラウザE2E(Playwright + playwright-bdd)・日本語 Gherkin シナリオの書き方、日本語テスト名の方針、既知の落とし穴。テストを書く・直す作業で必ず読む。
 model: claude-sonnet-5
 ---
 
@@ -16,14 +16,64 @@ model: claude-sonnet-5
 
 ## テストの種類と置き場所
 
-| プロジェクト | 対象 | 方式 |
+テストはすべてリポジトリ直下の `tests/` に集約し、**テストスコープで区切る**(`backend/` と `frontend/` には本体のコードだけを置く)。
+スコープの下で技術(backend / frontend / api / browser)を分ける。
+
+| スコープ | 何を通すか | 速さ |
 |---|---|---|
-| Domain.Tests | 不変条件・計算規則 | 純粋単体 |
-| Application.Tests | ユースケース | `UseCaseFixture`(一時SQLite+本物リポジトリ+`FixedClock`。日本語ヘルパ: `課を作成`/`案件を作成`/`承認済み予算を作成`) |
-| Infrastructure.Tests | 永続化往復・スキーマ作り直し | `RepositoryFixture`(一時SQLite)+ `SchemaResetTests` |
-| E2E.Tests | HTTP経由の業務フロー | `WebApplicationFactory<Program>`(`ApiFixture`)。`Features/` に Gherkin(Reqnroll) |
-| Architecture.Tests | 依存ルール | NetArchTest |
-| frontend/e2e | ブラウザ操作 | Gherkin(playwright-bdd)+ @playwright/test(webServerで両サーバ自動起動) |
+| `tests/unit/` | 1つの部品だけ。DB・HTTP・ブラウザを使わない(フロントは jsdom + MSW) | 速い |
+| `tests/integration/` | 本物の SQLite を通す(ユースケース・リポジトリ) | 中 |
+| `tests/e2e/` | システムを外側から操作する(API は HTTP、ブラウザは画面→API→DB) | 遅い |
+| `tests/architecture/` | コードの構造(層の依存ルール)。スコープの軸に乗らないので別枠 | 速い |
+
+**どこに書くか迷ったら、下のスコープから検討する**(速いテストで確かめられることを遅いテストに書かない)。
+画面だけの振る舞い(折りたたみ・入力チェック・送るリクエストの中身・トースト)は `unit/frontend`、
+業務ルールは `integration/backend/Application`(Gherkin)、画面→API→DB のつながりだけを `e2e/browser` に書く。
+
+| 置き場所 | プロジェクト | 対象 | 方式 |
+|---|---|---|---|
+| `tests/unit/backend/Domain` | CostManagement.Domain.Tests | 不変条件・計算規則 | 純粋単体 |
+| `tests/unit/frontend` | (npm パッケージ) | 画面のロジックとコンポーネント | Vitest + Testing Library + MSW(API のモック) |
+| `tests/integration/backend/Application` | CostManagement.Application.Tests | ユースケース | `UseCaseFixture`(一時SQLite+本物リポジトリ+`FixedClock`。日本語ヘルパ: `課を作成`/`案件を作成`/`承認済み予算を作成`) |
+| `tests/integration/backend/Infrastructure` | CostManagement.Infrastructure.Tests | 永続化往復・スキーマ作り直し | `RepositoryFixture`(一時SQLite)+ `SchemaResetTests` |
+| `tests/e2e/api` | CostManagement.E2E.Tests | HTTP経由の業務フロー | `WebApplicationFactory<Program>`(`ApiFixture`)+ Gherkin(Reqnroll) |
+| `tests/architecture/backend` | CostManagement.Architecture.Tests | 依存ルール | NetArchTest |
+| `tests/e2e/browser` | (npm パッケージ) | ブラウザ操作 | Gherkin(playwright-bdd)+ @playwright/test(webServerで両サーバ自動起動) |
+
+**各プロジェクトの中は同じ型で並べる**(新しいファイルもこの型に従って置く):
+
+| 置き場所 | 中身 | 名前空間 |
+|---|---|---|
+| 直下 | xUnit の例示テスト(`*Tests.cs`) | `CostManagement.X.Tests` |
+| `PropertyBased/` | CsCheck の性質テストと生成器 | `….PropertyBased` |
+| `Features/` | Gherkin(`*.feature`) | — |
+| `Steps/` | ステップ定義 | `….Steps` |
+| `Support/` | フィクスチャ・シナリオの状態などの共通部品(`UseCaseFixture`・`業務コンテキスト`・`ApiFixture`・`認証ありのApi`・`APIコンテキスト`) | `….Support`(csproj のグローバル using で全テストから見える) |
+
+ブラウザ(`tests/e2e/browser`)は Node の慣習どおり小文字で `features/`・`steps/`・`support/`。
+フロント単独(`tests/unit/frontend`)は `logic/`(純粋関数)・`components/`・`pages/<画面名>/<観点>.test.tsx`・`support/`。
+
+- テストプロジェクトは `backend/` の外にあるので、`tests/Directory.Build.props` が
+  `backend/Directory.Build.props`(アナライザ・警告のエラー扱い)を取り込む。`.editorconfig` のテスト向け緩和は
+  `[tests/**.cs]`。ソリューション `backend/CostManagement.slnx` が `../tests/...` の各テストプロジェクトを参照するので
+  `cd backend && dotnet test` で全テストが走る
+- `tests/e2e/browser` と `tests/unit/frontend` は独立した npm パッケージ(`frontend/node_modules` は `tests/` から解決できないため)。
+  ブラウザ E2E は画面を `frontend` の Vite 開発サーバ(`webServer` の `cwd: '../../../frontend'`)で起動するので、`frontend` 側の `npm ci` も必要
+
+### フロントエンド単独テスト(tests/unit/frontend)
+
+- テストからは `@app/...` で `frontend/src` を参照する(vitest.config.ts の alias と tsconfig の paths)
+- **React の二重読み込みに注意**: `frontend/src` の画面とテスト側の Testing Library が別々の React を読むと Hooks が壊れる。
+  vitest.config.ts の `resolve.dedupe`(react / react-dom / react-router-dom)と tsconfig の `paths` で、
+  このパッケージの1つの React にそろえている。そのため **react などの版は frontend と同じに保つ**(Dependabot は3パッケージを監視)
+- API は MSW でモックする。決めていない API が呼ばれるとテストが失敗する(`onUnhandledRequest: 'error'`)。
+  予算編集画面は `support/fakeBudgetApi.ts` の `偽の予算API`(明細の登録で合計を計算し直し、混在禁止・承認済みの編集禁止も拒否する
+  メモリ上の偽バックエンド)を使い、保存後の再描画と「送ったリクエストの中身・順序」(`fake.writes`)を確かめる
+- 画面のコードは `fetch('/api/...')` と相対 URL で呼ぶため、`support/setup.ts` が jsdom のページ URL を基準に絶対 URL へ直す
+- テスト対象の計算は画面から純粋関数に切り出す(例: `frontend/src/budgetLines.ts` の `cellAction`・`monthlyTotal`)。
+  境界値は `test.each` の表で並べる。実行日で変わる処理は `vi.setSystemTime` で日付を固定する(TZ は Asia/Tokyo)
+- 純粋関数のテストは先頭に `// @vitest-environment node`(jsdom を用意しない分速い)。入力操作は `userEvent.setup({ delay: null })`
+- Vitest は3系(frontend の vite 6・@vitejs/plugin-react 4 に合わせる)。MSW は2系(3系は TypeScript 5.9 以上が前提)
 
 - 新しいユースケース → Application.Tests に業務フローとして追加
 - 新しいリポジトリ/カラム → Infrastructure.Tests にラウンドトリップを追加
@@ -47,6 +97,9 @@ model: claude-sonnet-5
   ローカルの速いマシンでは通っても遅い CI で落ちる。実績計上のように送信後に入力欄が
   クリアされる画面なら `await expect(欄).toHaveValue('')` で完了を待ってから次へ進む
   (`reuseExistingServer` で残ったサーバを掴むと結果がぶれるので、E2E前に 5173/5100 を掃除する)
+- **予算明細の自動保存の重なり**: 予算編集画面はセルを離れるたびに PUT /lines を送る。サーバは予算を
+  読み込み→明細を足し→保存するため、PUT が重なると後の保存が先の保存を上書きする(同時更新の制御がない)。
+  E2E で複数セルを続けて入力するときは `page.waitForResponse(PUT /lines)` で1セルずつ保存を待つ
 
 E2E(API E2E・ブラウザE2E)のテストケースを追加・変更したら、解説 `docs/design/e2e-test-guide.html` も更新する。
 
@@ -58,11 +111,11 @@ E2E(API E2E・ブラウザE2E)のテストケースを追加・変更したら�
 
 | 置き場所 | クラス | 検証する性質 |
 |---|---|---|
-| Domain.Tests/PropertyBased/ValueObjectPropertyTests.cs | `値オブジェクトの性質` | Money の加減算の法則、FiscalHalf の文字列往復と全順序、費目コードの正規化、月 1..6 |
+| tests/unit/backend/Domain/PropertyBased/ValueObjectPropertyTests.cs | `値オブジェクトの性質` | Money の加減算の法則、FiscalHalf の文字列往復と全順序、費目コードの正規化、月 1..6 |
 | 〃 DepartmentBudgetPropertyTests.cs | `課予算の性質` | **モデルベース**: 任意の編集操作列を集約と単純モデルに適用し成否・状態が一致、拒否された操作は無副作用、不変条件(区分合計=明細合計・月次合計・混在禁止)。承認後の編集拒否、改定の引き継ぎ、Restore 往復 |
 | 〃 ActualEntryPropertyTests.cs | `実績計上の性質` | 計上可否の規則、明細名・備考の正規化、Restore 往復 |
 | 〃 AnalysisServicePropertyTests.cs | `分析サービスの性質` | 差異=実績−予算、区分合計=明細合計、予定外判定、入力順非依存、比較の反対称性、「案件別損益−期間費用=全体損益」、「部合計=課別内訳の合計」 |
-| Application.Tests/UseCasePropertyTests.cs | `ユースケースの性質` | SQLite 往復後も応答どおり読み戻せる、改定を繰り返しても承認版は常に1件、実績合計の反映、部合計は承認済み課のみ |
+| tests/integration/backend/Application/PropertyBased/UseCasePropertyTests.cs | `ユースケースの性質` | SQLite 往復後も応答どおり読み戻せる、改定を繰り返しても承認版は常に1件、実績合計の反映、部合計は承認済み課のみ |
 
 - 生成器は `PropertyBased/DomainGenerators.cs`(`ドメイン生成器`)。案件・費目・明細名は**小さなプール**から選び、
   上書き・衝突・混在が頻繁に起きるようにする。金額は1円単位の整数(decimal の和を厳密比較するため)
@@ -79,9 +132,9 @@ E2E(API E2E・ブラウザE2E)のテストケースを追加・変更したら�
 
 | 置き場所 | ライブラリ | 状態の共有 | xUnit/spec との関係 |
 |---|---|---|---|
-| `Application.Tests/Features/` | Reqnroll.xUnit | `業務コンテキスト`(`UseCaseFixture`) | 既存 xUnit と併存(CI・ミューテーションにそのまま乗る) |
-| `E2E.Tests/Features/` | Reqnroll.xUnit | `APIコンテキスト`(`ApiFixture` / `認証ありのApi`) | 既存 xUnit と併存 |
-| `frontend/e2e/features/` | playwright-bdd | フィクスチャ `業務データ`(`e2e/steps/fixtures.ts`) | **旧 journey.spec.ts は置き換え済み**(ブラウザは重いので二重に持たない) |
+| `tests/integration/backend/Application/Features/` | Reqnroll.xUnit | `業務コンテキスト`(`Support/BusinessContext.cs`) | 既存 xUnit と併存(CI・ミューテーションにそのまま乗る) |
+| `tests/e2e/api/Features/` | Reqnroll.xUnit | `APIコンテキスト`(`Support/ApiContext.cs`) | 既存 xUnit と併存 |
+| `tests/e2e/browser/features/` | playwright-bdd | フィクスチャ `業務データ`(`support/fixtures.ts`) | **旧 journey.spec.ts は置き換え済み**(ブラウザは重いので二重に持たない) |
 
 Reqnroll は `Reqnroll.xUnit`(SpecFlow の後継。xUnit 2.9 で動く)。業務ルールの組み合わせは Application 層、
 HTTP の入口〜出口(ステータス・JSON・認証)は API E2E、画面の操作と表示はブラウザ E2E に書き分ける。
@@ -90,9 +143,9 @@ HTTP の入口〜出口(ステータス・JSON・認証)は API E2E、画面の�
 
 - **キーワード**: 各 .feature 先頭に `# language: ja`(`reqnroll.json` でも ja 指定)。
   機能 / 背景 / シナリオ / シナリオアウトライン / 例 / 前提 / もし / ならば / かつ
-- **状態**: `Features/BusinessContext.cs` の `業務コンテキスト` をコンストラクタ注入で共有。
+- **状態**: `Support/BusinessContext.cs` の `業務コンテキスト` をコンストラクタ注入で共有。
   シナリオ終了時に Dispose され一時DBが消える。部・課・案件はフィーチャー上の**コード(=名称)**で書き、ここで ID に解決
-- **ステップ**: `Features/Steps/`(組織と案件 / 予算 / 実績と分析)。Cucumber Expression で
+- **ステップ**: `Steps/`(組織と案件 / 予算 / 実績と分析)。Cucumber Expression で
   `{string}`(ダブルクォート)・`{int}`・`{long}` を使う。金額は `{long}`。**`(` `)` `/` はステップ文に書かない**
   (Cucumber Expression の任意・択一記法と解釈される)
 - 前提でも操作でも使うステップは `[StepDefinition]`、エラーを期待する操作は「…しようとする」で
@@ -108,23 +161,24 @@ HTTP の入口〜出口(ステータス・JSON・認証)は API E2E、画面の�
 
 ### ブラウザ E2E(playwright-bdd)
 
-- `npm run test:e2e` = `bddgen && playwright test`。`bddgen` が `.features-gen/`(gitignore・ESLint/Prettier 除外)に
-  テストを生成する。CI も `npm run test:e2e`。**`npx playwright test` だけだと古い生成物で走る**
+- `tests/e2e/browser` で `npm test` = `bddgen && playwright test`。`bddgen` が `.features-gen/`(gitignore・ESLint/Prettier 除外)に
+  テストを生成する。CI も `npm test`。**`npx playwright test` だけだと古い生成物で走る**
+- ステップ定義も `npm run lint`(ESLint)・`npm run typecheck`(tsc)・`npm run format:check`(Prettier)で検査する(CI の browser-e2e ジョブ)
 - **前提は API、もし/ならば は画面**: 部・課・案件・承認済み予算・実績は `業務データ` が `request` フィクスチャで
   API から作る(Vite の /api プロキシ経由)。画面で登録すること自体を確かめるのは「計画策定」の最初のシナリオだけ
 - 部・課の名前と費目コードは `業務データ.実名()` / `費目コード()` で**シナリオ固有の接尾辞**を付ける(DB を全シナリオで
   共有し、並列実行するため)。案件は課の中で一意なのでそのまま。シナリオは互いに独立で serial 指定はしない
 - API で作る予算・実績の半期は `今期()`(画面の `currentFiscalHalf` と同じ規則)。月次入力欄は位置で指定する
 - playwright-bdd はキーワード種別を区別しない。同じ処理を「…する」「…している」の両方で書きたいときは
-  ハンドラを変数にして2回登録する。共有ハンドラの引数型は `画面`(fixtures.ts)
-- フィクスチャの第2引数は `use` ではなく `provide` と書く(eslint-plugin-react-hooks が `use` を Hook と誤検知する)
+  ハンドラを変数にして2回登録する。共有ハンドラの引数型は `画面`(support/fixtures.ts)
 
 ## 実行方法
 
 ```bash
-cd backend && dotnet test                                  # バックエンド全部
-cd frontend && npm run test:e2e                            # ブラウザE2E
-# このリモート環境では: CI= PW_CHROMIUM=/opt/pw-browsers/chromium npm run test:e2e
+cd backend && dotnet test                                  # バックエンド全部(slnx が tests/ のテストプロジェクトを含む)
+cd tests/unit/frontend && npm test                         # フロントエンド単独(初回は npm ci。frontend 側は不要)
+cd tests/e2e/browser && npm test                           # ブラウザE2E(初回は frontend と tests/e2e/browser で npm ci)
+# このリモート環境では: CI= PW_CHROMIUM=/opt/pw-browsers/chromium npm test
 ```
 
 カバレッジ目標: 全体85%以上を維持(現状 89.9%)。CI の実行サマリで確認できる。
@@ -133,20 +187,20 @@ cd frontend && npm run test:e2e                            # ブラウザE2E
 
 行カバレッジは「実行したか」しか見ないため、テストが**仕様を実際に検証しているか**は
 Stryker.NET のミューテーションテストで補完する。ツールはローカルツールとして
-`backend/.config/dotnet-tools.json` に固定(`dotnet-stryker` 4.16.0)。
+`tests/.config/dotnet-tools.json` に固定(`dotnet-stryker` 5.0.0)。
 
 - 対象は **Domain・Application 層のみ**(業務ロジックの中核。Infrastructure は SQL 文字列中心で
   ミューテーションの価値が低く遅い、WebApi は薄いホスティングのため除外)
 - 設定は各テストプロジェクト直下の `stryker-config.json`
-  (`CostManagement.Domain.Tests` / `CostManagement.Application.Tests`)。
+  (`tests/unit/backend/Domain` / `tests/integration/backend/Application`)。
   `project` で対象 src を明示(テストプロジェクトが複数 src を参照する場合の曖昧さ回避に必須)。
   レポータは html/json/markdown/cleartext。閾値 high:80 low:60 **break:0(スコアで CI を落とさない)**
 - 実行(各テストプロジェクトのディレクトリで):
 
   ```bash
-  cd backend && dotnet tool restore
-  cd tests/CostManagement.Domain.Tests      && dotnet tool run dotnet-stryker
-  cd tests/CostManagement.Application.Tests && dotnet tool run dotnet-stryker
+  cd tests && dotnet tool restore
+  (cd unit/backend/Domain             && dotnet tool run dotnet-stryker)
+  (cd integration/backend/Application && dotnet tool run dotnet-stryker)
   ```
 
 - 出力は `StrykerOutput/<日時>/reports/`(gitignore 済み)。CI は `mutation` ジョブで

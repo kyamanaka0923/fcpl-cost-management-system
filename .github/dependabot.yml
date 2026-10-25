@@ -5,9 +5,9 @@
 # PR は CI(テスト・ビルド・E2E・ミューテーション)を通ってからマージする。
 version: 2
 updates:
-  # バックエンド(NuGet パッケージ)
+  # バックエンド(NuGet パッケージ。テストプロジェクトと Stryker のツールマニフェストは tests/ 配下)
   - package-ecosystem: nuget
-    directory: /backend
+    directories: [/backend, /tests]
     schedule:
       interval: weekly
       day: monday
@@ -20,9 +20,9 @@ updates:
       nuget-minor-patch:
         update-types: [minor, patch]
 
-  # フロントエンド(npm パッケージ)
+  # フロントエンドと、フロントエンド単独テスト・ブラウザ E2E(npm パッケージ。React などは3つで版をそろえる)
   - package-ecosystem: npm
-    directory: /frontend
+    directories: [/frontend, /tests/unit/frontend, /tests/e2e/browser]
     schedule:
       interval: weekly
       day: monday

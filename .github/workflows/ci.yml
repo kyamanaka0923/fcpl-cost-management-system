@@ -54,12 +54,41 @@ jobs:
           name: coverage-report
           path: CoverageReport
 
+  frontend-unit:
+    name: フロントエンド単独テスト(Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/unit/frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Node.js 22 をセットアップ
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/unit/frontend/package-lock.json
+
+      # frontend/src の画面とロジックをこのパッケージの React で動かす(frontend 側の npm ci は不要)
+      - name: 依存関係をインストール
+        run: npm ci
+
+      - name: 静的解析・型チェック・書式チェック
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run format:check
+
+      - name: テストを実行(API は MSW でモック)
+        run: npm test
+
   browser-e2e:
     name: ブラウザE2E(Playwright)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontend
+        working-directory: tests/e2e/browser
     env:
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     steps:
@@ -75,10 +104,20 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: |
+            frontend/package-lock.json
+            tests/e2e/browser/package-lock.json
 
-      - name: 依存関係をインストール
-        run: npm ci
+      - name: 依存関係をインストール(画面の開発サーバ用の frontend と、E2E 本体の tests/e2e/browser)
+        run: |
+          npm ci --prefix ../../../frontend
+          npm ci
+
+      - name: 静的解析・型チェック・書式チェック(E2E のステップ定義)
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run format:check
 
       - name: Chromium をインストール
         run: npx playwright install --with-deps chromium
@@ -86,7 +125,7 @@ jobs:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "0"
 
       - name: E2E テストを実行(Gherkin からテストを生成し、バックエンド+フロントエンドを自動起動)
-        run: npm run test:e2e
+        run: npm test
 
       - name: 失敗時のレポートを保存
         if: failure()
@@ -94,8 +133,8 @@ jobs:
         with:
           name: playwright-report
           path: |
-            frontend/playwright-report
-            frontend/test-results
+            tests/e2e/browser/playwright-report
+            tests/e2e/browser/test-results
 
   frontend:
     name: フロントエンド(静的解析・型チェック・ビルド)
@@ -140,7 +179,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: tests
     steps:
       - uses: actions/checkout@v7
 
@@ -155,9 +194,9 @@ jobs:
       - name: ミューテーションテストを実行(Domain + Application)
         run: |
           status=0
-          for proj in Domain Application; do
-            echo "::group::Stryker ${proj}"
-            (cd "tests/CostManagement.${proj}.Tests" && dotnet tool run dotnet-stryker) || status=1
+          for dir in unit/backend/Domain integration/backend/Application; do
+            echo "::group::Stryker ${dir}"
+            (cd "${dir}" && dotnet tool run dotnet-stryker) || status=1
             echo "::endgroup::"
           done
           exit $status
@@ -170,8 +209,9 @@ jobs:
             echo
             echo 'ミュータント(意図的なコード改変)をテストが検出できた割合。スコアが低い箇所は「テストが通っても仕様を守れていない」可能性がある。対象は Domain・Application 層(閾値は high:80 / low:60、CIは非ブロッキング)。'
             echo
-            for proj in Domain Application; do
-              md=$(ls -t "tests/CostManagement.${proj}.Tests"/StrykerOutput/*/reports/mutation-report.md 2>/dev/null | head -1)
+            for dir in unit/backend/Domain integration/backend/Application; do
+              proj=$(basename "$dir")
+              md=$(ls -t "${dir}"/StrykerOutput/*/reports/mutation-report.md 2>/dev/null | head -1)
               if [ -n "$md" ]; then
                 echo "### ${proj} 層"
                 echo
@@ -191,7 +231,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: mutation-report
-          path: backend/tests/*/StrykerOutput/*/reports/mutation-report.html
+          path: tests/*/backend/*/StrykerOutput/*/reports/mutation-report.html
 
   metrics:
     name: コードメトリクス(行数・複雑度)
@@ -205,12 +245,12 @@ jobs:
       - name: scc をインストール(クロスプラットフォームのメトリクス集計)
         run: go install github.com/boyter/scc/v3@latest
 
-      - name: 行数(cloc)と複雑度(scc)を3区分で集計
+      - name: 行数(cloc)と複雑度(scc)を区分ごとに集計
         run: |
           export PATH="$PATH:$(go env GOPATH)/bin"
           OUT=metrics-report.md
           : > "$OUT"
-          EXCLUDES="bin,obj,dist,node_modules"
+          EXCLUDES="bin,obj,dist,node_modules,.features-gen,StrykerOutput"
           区分() {
             local label="$1" dir="$2"
             {
@@ -235,8 +275,11 @@ jobs:
             echo
           } >> "$OUT"
           区分 'バックエンド 本体' backend/src
-          区分 'バックエンド テスト' backend/tests
           区分 'フロントエンド' frontend/src
+          区分 'テスト(単体)' tests/unit
+          区分 'テスト(結合)' tests/integration
+          区分 'テスト(E2E)' tests/e2e
+          区分 'テスト(アーキテクチャ)' tests/architecture
           cat "$OUT" >> "$GITHUB_STEP_SUMMARY"
 
       - name: メトリクスレポートを保存(アーティファクト)

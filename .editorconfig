@@ -44,7 +44,7 @@ dotnet_diagnostic.CA1822.severity = none
 # 名前空間 "Shared" は VB の予約語と衝突するという警告。C# のみのプロジェクトなので対象外
 dotnet_diagnostic.CA1716.severity = none
 
-[backend/tests/**.cs]
+[tests/**.cs]
 # テスト名は日本語の文で、区切りに "_" を使うことがある
 dotnet_diagnostic.CA1707.severity = none
 # xUnit のテストクラスの Dispose は一時 DB の後始末だけで、ファイナライザを持つ派生型は作らない
