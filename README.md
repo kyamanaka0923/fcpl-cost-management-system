@@ -31,7 +31,7 @@
 
 ## 技術スタック
 
-バージョンは `*.csproj` / `frontend/package-lock.json` / `backend/.config/dotnet-tools.json` の実値です。
+バージョンは `*.csproj` / `frontend/package-lock.json` / `tests/unit/frontend/package-lock.json` / `tests/e2e/browser/package-lock.json` / `tests/.config/dotnet-tools.json` の実値です。
 
 ### アプリケーション
 
@@ -60,10 +60,13 @@
 | | NetArchTest.Rules | 1.3.2 | アーキテクチャ(層の依存ルール)テスト |
 | | CsCheck | 4.9.1 | プロパティベーステスト(ランダム入力で不変条件を検証) |
 | | Reqnroll.xUnit | 3.3.4 | 日本語 Gherkin の業務シナリオテスト(Application・API E2E) |
-| ブラウザ E2E | Playwright(@playwright/test) | 1.61 | 実ブラウザ(Chromium)での画面操作テスト |
+| フロント単独テスト | Vitest | 3.2 | 画面とロジックの単独テスト(jsdom。ブラウザを起動しない) |
+| | Testing Library(React)+ user-event | 16.3 / 14.6 | 利用者と同じ操作で画面を動かして検証 |
+| | MSW(Mock Service Worker) | 2.15 | API を HTTP の層でモック |
+| ブラウザ E2E | Playwright(@playwright/test) | 1.64 | 実ブラウザ(Chromium)での画面操作テスト |
 | | playwright-bdd | 9.2 | ブラウザ E2E を日本語 Gherkin で記述(.feature から Playwright のテストを生成) |
-| カバレッジ | coverlet + ReportGenerator | 6.0.4 / 最新 | 計測と CI 実行サマリへの表示 |
-| ミューテーション | Stryker.NET(dotnet ローカルツール) | 4.16.0 | テストが仕様を検証しているかの測定(Domain・Application) |
+| カバレッジ | coverlet + ReportGenerator | 10.1.0 / 最新 | 計測と CI 実行サマリへの表示 |
+| ミューテーション | Stryker.NET(dotnet ローカルツール) | 5.0.0 | テストが仕様を検証しているかの測定(Domain・Application) |
 | メトリクス | cloc + scc | 最新 | 行数・複雑度の集計 |
 | 静的解析(フロント) | ESLint + typescript-eslint + eslint-plugin-react-hooks | 9.39 / 8.71 / 7.1 | TypeScript の推奨ルールと React Hooks の規則(`npm run lint`) |
 | フォーマッタ(フロント) | Prettier(+ eslint-config-prettier) | 3.9 | 書式の統一(`npm run format` / `npm run format:check`) |
@@ -99,20 +102,15 @@ backend/
 │   ├── CostManagement.Application/     # ユースケース(入力ポート)・DTO
 │   ├── CostManagement.Infrastructure/  # 出力アダプタ: Dapper + SQLite リポジトリ実装
 │   └── CostManagement.WebApi/          # 入力アダプタ: HTTP API(Minimal API。Lambda でも動く)
-└── tests/
-    ├── CostManagement.Domain.Tests/    # ドメイン単体テスト(PropertyBased/ にプロパティベーステスト)
-    ├── CostManagement.Application.Tests/ # ユースケーステスト(Features/ に Gherkin シナリオ)
-    ├── CostManagement.Infrastructure.Tests/ # リポジトリの永続化・スキーマ移行
-    ├── CostManagement.E2E.Tests/       # API E2E(HTTP 経由の業務フロー。Features/ に Gherkin シナリオ)
-    └── CostManagement.Architecture.Tests/ # 層の依存ルール(NetArchTest)
+└── CostManagement.slnx                 # ソリューション(../tests/ の .NET テストプロジェクトも含む)
 
 frontend/                               # React SPA(/api を dev proxy 経由でバックエンドへ)
-├── src/
-│   ├── pages/                          #   画面(部・課・予算編集・実績・分析・比較・費目マスタ)
-│   ├── components/                     #   グラフ(自前 SVG)・モーダル・トースト・金額入力
-│   └── api.ts                          #   API クライアントと型
-└── e2e/                                # ブラウザ E2E(features/ に Gherkin シナリオ、steps/ にステップ定義)
+└── src/
+    ├── pages/                          #   画面(部・課・予算編集・実績・分析・比較・費目マスタ)
+    ├── components/                     #   グラフ(自前 SVG)・モーダル・トースト・金額入力
+    └── api.ts                          #   API クライアントと型
 
+tests/                                  # テスト(unit / integration / e2e / architecture のスコープ別。詳細は「テスト」の節)
 infra/                                  # AWS SAM テンプレートとデプロイスクリプト
 docker/                                 # 開発・ビルド・テスト共用イメージ
 docs/                                   # マニュアル・設計・要件・ADR・解説 HTML(docs/design/)・OpenAPI 定義(docs/api/)
@@ -268,51 +266,125 @@ npm run format         # Prettier で整形(確認だけなら npm run format:ch
 
 ### テスト
 
+テストはすべてリポジトリ直下の `tests/` に置き、**テストのレベル(スコープ)でフォルダを分けて**います。
+テスト名はすべて日本語の文で、テスト一覧がそのまま仕様書として読めるようにしています。
+速いテストで確かめられることは速いテストに書き、遅い E2E は部品のつながりの確認に絞ります。
+
 ```bash
-cd backend
-dotnet test
+cd backend && dotnet test               # .NET のテストすべて(単体・結合・API E2E・アーキテクチャ)
+cd tests/unit/frontend && npm test      # フロントエンド単独テスト(初回は npm ci)
+cd tests/e2e/browser && npm test        # ブラウザ E2E(初回は frontend と tests/e2e/browser で npm ci、npx playwright install chromium)
 ```
 
-テストは5種類あります(テスト名はすべて日本語で、テスト一覧が仕様書として読めるようにしています)。
+#### tests/ のフォルダ構成
 
-- **ドメイン単体テスト**(`tests/CostManagement.Domain.Tests`) — 集約の不変条件、差異・損益の計算規則
-- **アプリケーション層テスト**(`tests/CostManagement.Application.Tests`) — ユースケース単位の検証。
-  本物のリポジトリ実装+一時 SQLite を使い、予算の策定→改定→承認、実績計上、分析の業務ルールを確認
-- **インフラ層テスト**(`tests/CostManagement.Infrastructure.Tests`) — リポジトリの永続化往復
-  (保存した集約が同じ状態で復元されること)と、旧スキーマの破棄・作り直しの冪等性の検証
-- **API E2E テスト**(`tests/CostManagement.E2E.Tests`) — WebApplicationFactory で WebApi を
-  まるごと起動し、計画策定→実績入力→分析→計画変更の一連の業務フローを HTTP 経由で検証
-- **アーキテクチャテスト**(`tests/CostManagement.Architecture.Tests`) — NetArchTest による
-  ヘキサゴナルアーキテクチャの依存ルール検証(層依存・ポート&アダプタ配置・ドメイン規約)
+```
+tests/
+├── unit/                     レベル: 単体        1つの部品だけ。DB・HTTP・ブラウザを使わない(速い)
+│   ├── backend/Domain/         ドメイン(集約・値オブジェクト・ドメインサービス)
+│   └── frontend/               画面のロジックとコンポーネント(独立した npm パッケージ)
+├── integration/              レベル: 結合        本物の SQLite を通す
+│   └── backend/
+│       ├── Application/        ユースケース(アプリケーション層 + 本物のリポジトリ)
+│       └── Infrastructure/     リポジトリの永続化往復・スキーマの作り直し
+├── e2e/                      レベル: E2E         システムを外側から操作する(遅い)
+│   ├── api/                    HTTP 経由で WebApi 全体(プロジェクト名は CostManagement.E2E.Tests)
+│   └── browser/                画面 → API → DB(独立した npm パッケージ)
+├── architecture/             レベル: 構造        動作ではなくコードの構造を検査する(スコープの軸に乗らないので別枠)
+│   └── backend/                ヘキサゴナルアーキテクチャの層の依存ルール
+├── Directory.Build.props     backend/Directory.Build.props(アナライザ設定・警告のエラー扱い)を取り込む
+└── .config/dotnet-tools.json Stryker.NET(ミューテーションテスト)のツールマニフェスト
+```
 
-書き方として、上記に加えて次の2つを併用しています。
+.NET のテストプロジェクトの中は同じ型で並べます。
 
-- **プロパティベーステスト**(CsCheck) — ランダムに生成した入力で不変条件を検証
-  (`Domain.Tests/PropertyBased/`、`Application.Tests/UseCasePropertyTests.cs`)。
-  区分合計 = 明細合計、「案件別損益 − 期間費用 = 全体損益」、「部合計 = 課別内訳の合計」など
-- **Gherkin シナリオ**(Reqnroll) — 業務フローを日本語の 機能/シナリオ/前提/もし/ならば で記述
-  (`Application.Tests/Features/*.feature`)。業務担当者もそのまま読めます
+| 置き場所 | 中身 |
+|---|---|
+| 直下 | xUnit の例示テスト(`*Tests.cs`) |
+| `PropertyBased/` | CsCheck のプロパティベーステストと入力の生成器 |
+| `Features/` | 日本語 Gherkin のシナリオ(`*.feature`) |
+| `Steps/` | Gherkin のステップ定義 |
+| `Support/` | フィクスチャ・シナリオの状態などの共通部品 |
 
-  | フィーチャー | 主なシナリオ |
-  |---|---|
-  | 課予算の策定と改定 | 区分合計=明細合計、月次入力、案件・費目はマスタのものだけ、費目一括と明細の混在禁止、明細名の変更、承認済みは編集不可、改定版の引き継ぎと旧版の失効、半期ごとの独立 |
-  | 予実差異と損益 | 実績の月・備考、差異=実績−予算と利益が増えるか減るか、計画にない明細名は予定外、差異の基準は最新の承認版、案件別損益と全体損益の整合 |
-  | 部の予実と承認 | 部合計は承認済み課のみ、改定版で集計、課コード順の内訳、部サマリと課の予実差異の一致、部承認の条件と取り消し |
-  | 組織と案件と費目のマスタ | 部・課コードの重複禁止、案件コードは課ごとに一意、案件の編集と明細の参照維持、費目の追加 |
+npm パッケージ(`unit/frontend`・`e2e/browser`)は Node の慣習どおり小文字で、
+`unit/frontend` は `logic/`(純粋関数)・`components/`・`pages/<画面名>/`・`support/`、
+`e2e/browser` は `features/`・`steps/`・`support/` です。
 
-  API E2E(`E2E.Tests/Features/*.feature`)も同じく Gherkin で、業務フロー・エラー応答・認証を HTTP 経由で記述しています
-  (既存の xUnit の E2E テストも併存)。
+#### 観点1: テストのレベルとスコープ
 
-さらに**ブラウザ E2E テスト**(Playwright + playwright-bdd)が `frontend/e2e/` にあります。
-シナリオは日本語 Gherkin(`frontend/e2e/features/*.feature`)で書き、準備(前提)は API で、操作と検証は実際のブラウザで行います。
-バックエンドとフロントエンドを自動起動し、計画策定・実績入力・分析・計画変更・明細入力・マスタ管理を操作します。
-API E2E とブラウザ E2E の各シナリオが何をどの数値で確かめているかは
-[`docs/design/e2e-test-guide.html`](docs/design/e2e-test-guide.html)(ブラウザで開く)にまとめています。
+| フォルダ | レベル | 確かめる範囲 | 本物を使うもの | 置き換えるもの |
+|---|---|---|---|---|
+| `unit/backend/Domain` | 単体 | 集約の不変条件、差異・損益・部集計の計算規則 | ドメインのクラスだけ | (依存がない) |
+| `unit/frontend` | 単体 | 表示の書式、会計半期の境界、予算明細の計算、金額入力・トースト、予算編集画面と実績入力画面の操作と送るリクエスト | `frontend/src` の画面とロジック、React | API(MSW のモック)、ブラウザ(jsdom) |
+| `integration/backend/Application` | 結合 | ユースケースと業務ルール(予算の策定→改定→承認、実績計上、分析、部承認、マスタ) | アプリケーション層・ドメイン・リポジトリ・SQLite | 時計(`FixedClock`) |
+| `integration/backend/Infrastructure` | 結合 | 保存した集約が同じ状態で戻ること、旧スキーマの破棄と作り直しの冪等性 | リポジトリ・SQLite | — |
+| `e2e/api` | E2E | ルーティング・JSON 変換・エラーの HTTP ステータス・認証・OpenAPI 定義との一致 | WebApi 全体・SQLite | ネットワーク(プロセス内の TestServer)、Cognito(テスト用の鍵で署名したトークン) |
+| `e2e/browser` | E2E | 画面の操作が API を通して保存され、ほかの画面に反映されること | ブラウザ・画面・WebApi・SQLite のすべて | (モックなし) |
+| `architecture/backend` | 構造 | 層の依存の向き、ポートとアダプタの置き場所、ドメインの規約 | コンパイル済みのアセンブリ | — |
+
+画面だけの振る舞い(折りたたみ・入力チェック・送るリクエストの中身・トースト)は `unit/frontend`、
+業務ルールは `integration/backend/Application`、画面→API→DB のつながりだけを `e2e/browser` で確かめます。
+
+#### 観点2: テスト仕様の源泉
+
+要件の大元は [要件定義書](docs/REQUIREMENTS.md)(FR-1〜FR-10・NFR)と、
+設計判断を記録した [ADR](docs/adr/README.md) です。テストはそれを、次のどこかに**実行できる形で**書き下ろしています。
+
+| フォルダ | 仕様が書かれている場所 | 形式 |
+|---|---|---|
+| `unit/backend/Domain` | テストコード(`*Tests.cs`、`PropertyBased/*.cs`) | **コード**。テスト名が日本語の仕様文。不変条件は CsCheck の「任意の入力で成り立つ性質」として書く |
+| `unit/frontend` | テストコード(`**/*.test.ts(x)`) | **コード**。テスト名が日本語の仕様文。境界値は `test.each` の表で並べる |
+| `integration/backend/Application` | `Features/*.feature`(4フィーチャー・52シナリオ)+ テストコード | **テキスト(日本語 Gherkin)が主**。機能 / ルール / シナリオ / 前提 / もし / ならば で書き、業務担当者もそのまま読める。xUnit・CsCheck のコードも併存 |
+| `integration/backend/Infrastructure` | テストコード(`*Tests.cs`) | **コード** |
+| `e2e/api` | `Features/*.feature`(3フィーチャー・19シナリオ)+ テストコード + [`docs/api/openapi.json`](docs/api/openapi.json) | **テキスト(日本語 Gherkin)**と、API の契約である **OpenAPI 定義(JSON)**。OpenAPI 定義は実装から生成した結果と一致することをテストで確かめる。xUnit のコードも併存 |
+| `e2e/browser` | `features/*.feature`(4フィーチャー・10シナリオ) | **テキスト(日本語 Gherkin)のみ**。`steps/` は画面の操作方法の実装で、仕様は持たない |
+| `architecture/backend` | テストコード(`ArchitectureTests.cs`) | **コード**(NetArchTest のルール)。根拠は [ADR-0001](docs/adr/0001-hexagonal-ddd.md) と [設計書](docs/DESIGN.md) |
+
+シナリオ数はシナリオアウトラインを例の行ごとに数えています。
+
+Gherkin のフィーチャーと主なシナリオは次のとおりです。
+
+| 置き場所 | フィーチャー | 主なシナリオ |
+|---|---|---|
+| `integration/backend/Application` | 課予算の策定と改定 | 区分合計=明細合計、月次入力、案件・費目はマスタのものだけ、費目一括と明細の混在禁止、明細名の変更、承認済みは編集不可、改定版の引き継ぎと旧版の失効、半期ごとの独立 |
+| | 予実差異と損益 | 実績の月・備考、差異=実績−予算と利益が増えるか減るか、計画にない明細名は予定外、差異の基準は最新の承認版、案件別損益と全体損益の整合 |
+| | 部の予実と承認 | 部合計は承認済み課のみ、改定版で集計、課コード順の内訳、部サマリと課の予実差異の一致、部承認の条件と取り消し |
+| | 組織と案件と費目のマスタ | 部・課コードの重複禁止、案件コードは課ごとに一意、案件の編集と明細の参照維持、費目の追加 |
+| `e2e/api` | API による業務フロー / API のエラー応答 / API の認証 | 計画策定から部承認までを HTTP で通す、404・400 とエラーメッセージ、正しいアクセストークンのときだけ呼べる |
+| `e2e/browser` | 計画策定 / 実績と分析 / 予算明細の入力 / マスタ管理 | 部・課の登録から承認まで、実績計上と予実差異・損益・版の比較、月次入力と明細の保存、費目マスタの反映と案件の編集 |
+
+API E2E とブラウザ E2E の各シナリオが何をどの数値で確かめているかの解説は
+[`docs/design/e2e-test-guide.html`](docs/design/e2e-test-guide.html)(ブラウザで開く)にまとめています(解説であり、仕様の源泉は `.feature` です)。
+
+#### 観点3: 実行環境と技術スタック
+
+| フォルダ | 実行環境 | テストの技術 | DB・外部 | CI のジョブ |
+|---|---|---|---|---|
+| `unit/backend/Domain` | .NET 10 SDK(プロセス内) | xUnit 2.9 + CsCheck 4.9 | 使わない | backend |
+| `unit/frontend` | Node.js 22(jsdom。ブラウザは起動しない) | Vitest 3.2 + @testing-library/react 16.3 + user-event 14.6 + MSW 2.15 | 使わない(API は MSW)。frontend 側の `npm ci` も不要 | frontend-unit |
+| `integration/backend/Application` | .NET 10 SDK(プロセス内) | xUnit 2.9 + Reqnroll 3.3(Gherkin)+ CsCheck 4.9 | テストごとに一時 SQLite ファイルを作って消す(`UseCaseFixture`) | backend |
+| `integration/backend/Infrastructure` | .NET 10 SDK(プロセス内) | xUnit 2.9 + Dapper(本体と同じ) | テストごとに一時 SQLite ファイル | backend |
+| `e2e/api` | .NET 10 SDK(プロセス内に WebApi を起動。ポートは使わない) | xUnit 2.9 + Reqnroll 3.3 + `WebApplicationFactory`(Microsoft.AspNetCore.Mvc.Testing 10.0) | シナリオごとに一時 SQLite ファイル | backend |
+| `e2e/browser` | Node.js 22 + Chromium + .NET 10 SDK。`playwright.config.ts` がバックエンド(`dotnet run`、:5100)と Vite 開発サーバ(:5173)を自動起動 | Playwright 1.64 + playwright-bdd 9.2(`.feature` からテストを生成) | 実行1回ごとに一時 SQLite を1つ作り全シナリオで共有(名前に接尾辞を付けて衝突を避ける)。準備(前提)は API で行う | browser-e2e |
+| `architecture/backend` | .NET 10 SDK(プロセス内) | xUnit 2.9 + NetArchTest 1.3 | 使わない | backend |
+
+- .NET のテストは `backend/CostManagement.slnx` に含まれているので、`cd backend && dotnet test` ですべて走ります
+- `unit/frontend` は `frontend/src` を `@app/...` で参照し、React などはこのパッケージのものに1つにそろえて動かします
+  (`resolve.dedupe`)。そのため **React などの版は `frontend` と同じに保ちます**
+- `e2e/browser` は画面に `frontend` の Vite 開発サーバを使うので、`frontend` 側の `npm ci` も必要です
 
 ```bash
-cd frontend
+# フロントエンド単独テスト
+cd tests/unit/frontend
+npm ci                            # 初回のみ(frontend 側の npm ci は不要)
+npm test
+
+# ブラウザ E2E
+(cd frontend && npm ci)           # 画面の開発サーバ用(初回のみ)
+cd tests/e2e/browser
+npm ci                            # 初回のみ
 npx playwright install chromium   # 初回のみ
-npm run test:e2e                  # bddgen で .feature からテストを生成して実行
+npm test                          # bddgen で .feature からテストを生成して実行
 ```
 
 **カバレッジ**: CI(GitHub Actions)がテスト実行時にカバレッジを計測し、
@@ -321,7 +393,7 @@ npm run test:e2e                  # bddgen で .feature からテストを生成
 ローカルでは `dotnet test --collect:"XPlat Code Coverage"` で計測できます。
 
 **コードメトリクス**: CI の `metrics` ジョブが **cloc(言語別の行数)** と
-**scc(行数＋複雑度)** を `backend/src` / `backend/tests` / `frontend/src` の3区分で集計し、
+**scc(行数＋複雑度)** を `backend/src` / `frontend/src` / `tests/unit` / `tests/integration` / `tests/e2e` / `tests/architecture` の区分で集計し、
 各実行の Summary ページに表示します(レポートは `code-metrics` アーティファクト)。
 
 **ミューテーションテスト**: CI の `mutation` ジョブが **Stryker.NET** で Domain・Application 層の
@@ -331,9 +403,9 @@ npm run test:e2e                  # bddgen で .feature からテストを生成
 (スコアでは CI を落とさない非ブロッキング運用)。ローカルでは:
 
 ```bash
-cd backend && dotnet tool restore
-cd tests/CostManagement.Domain.Tests      && dotnet tool run dotnet-stryker
-cd tests/CostManagement.Application.Tests && dotnet tool run dotnet-stryker
+cd tests && dotnet tool restore
+(cd unit/backend/Domain             && dotnet tool run dotnet-stryker)
+(cd integration/backend/Application && dotnet tool run dotnet-stryker)
 ```
 
 ## AWS へのデプロイ(サーバーレス構成)

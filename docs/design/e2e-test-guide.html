@@ -250,7 +250,7 @@
         <li><a href="#s4-2">計画策定</a></li>
         <li><a href="#s4-3">実績と分析</a></li>
         <li><a href="#s4-4">予算明細の入力</a></li>
-        <li><a href="#s4-5">マスタとエラー表示</a></li>
+        <li><a href="#s4-5">マスタ管理</a></li>
       </ol>
     </li>
     <li><a href="#s5">読み方と注意点</a></li>
@@ -262,12 +262,12 @@
 
 <header class="doc-head">
   <h1>E2Eテスト ガイド</h1>
-  <p class="sub">総合原価管理システムの E2E テストを日本語 Gherkin(機能 / シナリオ / 前提 / もし / ならば)で書いたシナリオ 34 件(API E2E 19 件・ブラウザE2E 15 件)が、何を、どの数値で確かめているか。</p>
+  <p class="sub">総合原価管理システムの E2E テストを日本語 Gherkin(機能 / シナリオ / 前提 / もし / ならば)で書いたシナリオ 29 件(API E2E 19 件・ブラウザE2E 10 件)が、何を、どの数値で確かめているか。</p>
   <dl class="meta-grid">
-    <div><dt>API E2E</dt><dd>backend/tests/CostManagement.E2E.Tests/Features/*.feature</dd></div>
-    <div><dt>ブラウザE2E</dt><dd>frontend/e2e/features/*.feature</dd></div>
-    <div><dt>ステップ定義</dt><dd>E2E.Tests/Features/Steps/・frontend/e2e/steps/</dd></div>
-    <div><dt>件数</dt><dd>19 件 + 15 件 = 34 件</dd></div>
+    <div><dt>API E2E</dt><dd>tests/e2e/api/Features/*.feature</dd></div>
+    <div><dt>ブラウザE2E</dt><dd>tests/e2e/browser/features/*.feature</dd></div>
+    <div><dt>ステップ定義</dt><dd>tests/e2e/api/Steps/・tests/e2e/browser/steps/</dd></div>
+    <div><dt>件数</dt><dd>19 件 + 10 件 = 29 件</dd></div>
   </dl>
 </header>
 
@@ -281,7 +281,7 @@
   <thead><tr><th>種類</th><th>フィーチャー</th><th>件数</th><th>何を通して確かめるか</th></tr></thead>
   <tbody>
     <tr><td><span class="badge b-svc">API E2E</span></td><td><code>APIによる業務フロー</code><br><code>APIのエラー応答</code><br><code>APIの認証</code></td><td>5<br>6<br>8</td><td>HTTP リクエストを送り、ルーティング・JSON 変換・エラーの HTTP ステータス変換・認証・DB 保存までを通しで確認する(Reqnroll)</td></tr>
-    <tr><td><span class="badge b-agg">ブラウザE2E</span></td><td><code>計画策定</code><br><code>実績と分析</code><br><code>予算明細の入力</code><br><code>マスタとエラー表示</code></td><td>3<br>3<br>5<br>4</td><td>実際のブラウザ(Chromium)で画面を操作し、表示まで含めて確認する(playwright-bdd)</td></tr>
+    <tr><td><span class="badge b-agg">ブラウザE2E</span></td><td><code>計画策定</code><br><code>実績と分析</code><br><code>予算明細の入力</code><br><code>マスタ管理</code></td><td>3<br>3<br>2<br>2</td><td>実際のブラウザ(Chromium)で画面を操作し、画面→API→DB のつながりを確認する(playwright-bdd)</td></tr>
   </tbody>
 </table>
 </div>
@@ -295,8 +295,8 @@
     <p>API E2E は「HTTP のつながりと数値の正しさ」、ブラウザE2E は「画面の操作と表示」を確認します。代表的な業務の流れをたどるのが役目で、ルールの細かい組み合わせまでは網羅しません。</p>
   </div>
   <div class="card">
-    <div class="card-title"><span class="name">それ以外</span><span class="jp">業務ルールの網羅</span></div>
-    <p>業務ルールの細かい組み合わせは、Application 層の Gherkin シナリオ(<code>Application.Tests/Features/*.feature</code>)、xUnit のテスト、プロパティベーステスト(CsCheck)が受け持ちます。</p>
+    <div class="card-title"><span class="name">それ以外</span><span class="jp">業務ルールと画面の細部</span></div>
+    <p>業務ルールの細かい組み合わせは、結合テストの Gherkin シナリオ(<code>tests/integration/backend/Application/Features/*.feature</code>)、xUnit のテスト、プロパティベーステスト(CsCheck)が受け持ちます。画面だけの細かい振る舞い(折りたたみ・入力チェック・送るリクエストの中身・トースト)は、フロントエンド単独テスト(<code>tests/unit/frontend</code>。API は MSW でモック)が受け持ちます。</p>
   </div>
 </div>
 
@@ -396,9 +396,9 @@
 
 <h3 id="s4-1">4.1 仕組み</h3>
 <ul>
-  <li><strong>書き方</strong>: playwright-bdd で <code>.feature</code> から Playwright のテストを生成します(<code>npx bddgen</code>。<code>npm run test:e2e</code> は生成してから実行します)。生成先の <code>.features-gen/</code> は gitignore 済みです。</li>
+  <li><strong>書き方</strong>: playwright-bdd で <code>.feature</code> から Playwright のテストを生成します(<code>npx bddgen</code>。<code>npm test</code> は生成してから実行します)。<code>tests/e2e/browser</code> は独立した npm パッケージで、画面は <code>frontend</code> の Vite 開発サーバを起動して使います。生成先の <code>.features-gen/</code> は gitignore 済みです。</li>
   <li><strong>前提は API、操作と検証は画面</strong>: 「前提 部 … に課 … がある」「課 … の今期の予算が次の明細で承認されている」などの準備は、画面を通さずに API で行います。「もし」「ならば」だけを画面で操作・確認するので、シナリオが短く、互いに独立します。部と課の登録そのものは「計画策定」の最初のシナリオで画面から確かめています。</li>
-  <li><strong>起動</strong>: <code>playwright.config.ts</code> の <code>webServer</code> で、バックエンド(<code>dotnet run</code>、ポート 5100)とフロントエンド(Vite、ポート 5173)を自動で起動します。</li>
+  <li><strong>起動</strong>: <code>tests/e2e/browser/playwright.config.ts</code> の <code>webServer</code> で、バックエンド(<code>dotnet run</code>、ポート 5100)とフロントエンド(Vite、ポート 5173)を自動で起動します。</li>
   <li><strong>DB とデータの衝突回避</strong>: 実行 1 回ごとに一時 SQLite を 1 つ使い、全シナリオで共有します。部・課の名前と費目コードにはシナリオ固有の接尾辞を付けるので(フィクスチャ <code>業務データ</code>)、並列に実行しても、同じ DB で再実行しても重複しません。</li>
   <li><strong>半期</strong>: 画面の初期半期は実行日で決まります(4〜9 月は上期、10〜3 月は下期)。API で準備する予算・実績も同じ規則で「今期」に作ります。</li>
   <li><strong>要素の見つけ方</strong>: ラベル(<code>getByLabel</code>)やボタン名(<code>getByRole</code>)など、利用者に見える名前で探します。</li>
@@ -430,16 +430,13 @@
 </div>
 
 <h3 id="s4-4">4.4 予算明細の入力(<code>予算明細の入力.feature</code>)</h3>
-<p>背景で課を API で用意し、画面で「当初予算」のドラフトを作っておきます。</p>
+<p>背景で課を API で用意し、画面で「当初予算」のドラフトを作っておきます。入力が API を通して保存され、サーバが計算した合計が画面に戻ることを確かめます。</p>
 <div class="table-wrap">
 <table>
   <thead><tr><th>シナリオ</th><th>確認すること</th></tr></thead>
   <tbody>
     <tr><td>明細を月ごとに入力すると半期合計に反映される</td><td>月次入力ダイアログで 1 か月目 100 万・2 か月目 50 万を入れると、半期合計 <strong>¥1,500,000</strong> が自動計算される。保存後、行に月次バッジが付き、売上高タイルも 150 万。</td></tr>
     <tr><td>費目を明細名で細分すると、費目の小計と期間費用は明細の合計になる</td><td>ライセンス費に明細 AWS 30 万・GitHub 20 万を追加すると、小計と期間費用タイルが <strong>50 万</strong>。</td></tr>
-    <tr><td>費目の明細は折りたたんでも小計は残り、展開で元に戻る</td><td>費目ごとの折りたたみ・展開と、すべて折りたたむ・すべて展開(明細のない費目の追加欄も畳まれる)。</td></tr>
-    <tr><td>明細名を変更しても金額は保持され、明細を削除すると費目の合計が減る</td><td>AWS → AWS本番 に改名しても期間費用は 50 万のまま。GitHub を削除すると 30 万に減る。</td></tr>
-    <tr><td>費目一括で入力した後でも明細に切り替えられる</td><td>ライセンス費を費目一括で 40 万入れた後に明細「AWS」25 万を追加すると、期間費用は <strong>25 万</strong>に置き換わる。</td></tr>
   </tbody>
 </table>
 </div>
@@ -448,15 +445,17 @@
   <p><strong>月次入力が実行日に左右されない理由</strong>: 画面の初期半期は実行日で決まるため、月次の入力欄は「4月」などの月名ではなく、半期内の位置(1 か月目・2 か月目)で指定しています。</p>
 </div>
 
-<h3 id="s4-5">4.5 マスタとエラー表示(<code>マスタとエラー表示.feature</code>)</h3>
+<div class="note">
+  <p><strong>フロントエンド単独テストに移した検証</strong>: 明細の折りたたみ・展開、明細名の変更と削除、費目一括から明細への切り替え(費目一括の削除→明細の登録の順序まで)、エラーのトーストは、<code>tests/unit/frontend/pages/予算編集画面/</code> で確かめています。「別の課なら同じ案件コードを使える」は業務ルールなので、結合テストの Gherkin「組織と案件と費目のマスタ」で確かめています。</p>
+</div>
+
+<h3 id="s4-5">4.5 マスタ管理(<code>マスタ管理.feature</code>)</h3>
 <div class="table-wrap">
 <table>
   <thead><tr><th>シナリオ</th><th>確認すること</th></tr></thead>
   <tbody>
     <tr><td>費目マスタ画面で追加した費目が予算編集の期間費用に現れる</td><td>費目マスタ画面で追加した費目(旅費交通費)が、課の予算編集の期間費用に出る。予算編集画面には費目を追加するフォームがない。</td></tr>
-    <tr><td>別の課では同じ案件コードを登録できる</td><td>課「開発1課」と同じ案件コードを、課「開発2課」の予算編集画面で登録してもエラーにならない(コードの一意性は課ごと)。</td></tr>
     <tr><td>登録済みの案件のコードと名称を後から変更できる</td><td>PJE-1「編集前案件」→ PJE-2「編集後案件」に変更でき、エラーが出ない。</td></tr>
-    <tr><td>操作に失敗するとトーストで通知され、手動で閉じられる</td><td>同じ課で案件コードを重複させると、画面の隅にエラーのトーストが出て「案件コード」を含む。×ボタンで閉じられる。</td></tr>
   </tbody>
 </table>
 </div>
@@ -477,7 +476,8 @@
 <table>
   <thead><tr><th>確認していない範囲</th><th>内容</th><th>どこで確認しているか</th></tr></thead>
   <tbody>
-    <tr><td>ブラウザE2E</td><td>実績の削除</td><td>Application 層のテスト</td></tr>
+    <tr><td>ブラウザE2E</td><td>実績の削除</td><td>Application 層のテスト、フロントエンド単独「実績入力画面」</td></tr>
+    <tr><td>ブラウザE2E</td><td>入力チェック(明細名・金額が空、明細名を空にしての変更)とエラーのトースト</td><td>フロントエンド単独「予算編集画面」「実績入力画面」「トースト」</td></tr>
     <tr><td>ブラウザE2E</td><td>計画にない明細名の実績(予定外)の表示</td><td>Gherkin「予実差異と損益」(Application 層)</td></tr>
     <tr><td>ブラウザE2E</td><td>部承認ができないときのエラー表示</td><td>API E2E、Gherkin「部の予実と承認」(Application 層)</td></tr>
     <tr><td>API E2E</td><td>月次入力・期間費用の明細名</td><td>Gherkin「課予算の策定と改定」(Application 層)、ブラウザE2E「予算明細の入力」</td></tr>
@@ -490,15 +490,17 @@
 
 <h4>API E2E</h4>
 <pre><code>cd backend
-dotnet test tests/CostManagement.E2E.Tests</code></pre>
+dotnet test ../tests/e2e/api</code></pre>
 
 <h4>ブラウザE2E</h4>
-<pre><code>cd frontend
+<pre><code>(cd frontend && npm ci)           # 画面の開発サーバ用(初回のみ)
+cd tests/e2e/browser
+npm ci                            # 初回のみ
 npx playwright install chromium   # 初回のみ
-npm run test:e2e                  # bddgen で .feature からテストを生成して実行
+npm test                          # bddgen で .feature からテストを生成して実行
 
 # Claude のリモート環境では同梱の Chromium を使う
-CI= PW_CHROMIUM=/opt/pw-browsers/chromium npm run test:e2e</code></pre>
+CI= PW_CHROMIUM=/opt/pw-browsers/chromium npm test</code></pre>
 
 <p class="src">E2E のシナリオを追加・変更したら、このガイドも更新してください。</p>
 
