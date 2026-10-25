@@ -16,6 +16,18 @@ import {
   type CostElement,
   type Project,
 } from '../api'
+import {
+  cellAction,
+  detailedElementCodes,
+  findLine as findBudgetLine,
+  monthlyTotal,
+  parseNewDetail,
+  periodDetailsFor as periodDetailsOf,
+  periodSubtotal as periodSubtotalOf,
+  projectAmount as projectAmountOf,
+  projectProfit as projectProfitOf,
+  toMonthlyAmounts,
+} from '../budgetLines'
 import MoneyInput from '../components/MoneyInput'
 import Modal from '../components/Modal'
 import Toast from '../components/Toast'
@@ -95,6 +107,7 @@ export default function BudgetEditPage() {
 
   if (!departmentId || !budgetId) return null
   const editable = budget?.status === 'Draft'
+  const lines = budget?.lines ?? []
   const elementName = (code: string | null) =>
     elements.find((e) => e.code === code)?.name ?? code ?? ''
 
@@ -113,15 +126,14 @@ export default function BudgetEditPage() {
     remove: () => Promise<BudgetDetail>,
   ) => {
     if (!(key in edits)) return
-    const raw = edits[key].trim()
-    const num = raw === '' ? 0 : Number(raw)
-    if (Number.isNaN(num) || num < 0 || num === current) {
+    const action = cellAction(edits[key], current)
+    if (action.kind === 'none') {
       clearEdit(key)
       return
     }
     setError(null)
     try {
-      setBudget(await (num > 0 ? upsert(num) : remove()))
+      setBudget(await (action.kind === 'upsert' ? upsert(action.amount) : remove()))
       clearEdit(key)
     } catch (err) {
       setError((err as Error).message)
@@ -138,7 +150,7 @@ export default function BudgetEditPage() {
   // ---- 案件別(売上高・加工費・外注費) ----
   const projectKey = (projectId: string, category: BudgetCategory) => `${category}-${projectId}`
   const projectAmount = (projectId: string, category: BudgetCategory): number =>
-    budget?.lines.find((l) => l.category === category && l.projectId === projectId)?.amount ?? 0
+    projectAmountOf(lines, projectId, category)
   const onProjectBlur = (projectId: string, category: BudgetCategory) =>
     saveCell(
       projectKey(projectId, category),
@@ -146,10 +158,7 @@ export default function BudgetEditPage() {
       (amount) => api.upsertBudgetLine(budgetId, { category, projectId, amount }),
       () => api.removeBudgetLine(budgetId, category, projectId, null),
     )
-  const projectProfit = (projectId: string): number =>
-    projectAmount(projectId, 'Revenue') -
-    projectAmount(projectId, 'Processing') -
-    projectAmount(projectId, 'Outsourcing')
+  const projectProfit = (projectId: string): number => projectProfitOf(lines, projectId)
   // 案件粗利率 = 損益 ÷ 売上高。売上高が0なら「—」。
   const projectMargin = (projectId: string): number | null =>
     marginRate(projectProfit(projectId), projectAmount(projectId, 'Revenue'))
@@ -168,16 +177,9 @@ export default function BudgetEditPage() {
       () => api.removeBudgetLine(budgetId, 'PeriodCost', null, code),
     )
 
-  // 費目に属する全明細(費目一括 + 明細名つき)。
-  const periodLinesFor = (code: string): BudgetLine[] =>
-    budget?.lines.filter((l) => l.category === 'PeriodCost' && l.elementCode === code) ?? []
-  // 費目内の明細名つきの明細(名前順)。
-  const periodDetailsFor = (code: string): BudgetLine[] =>
-    periodLinesFor(code)
-      .filter((l) => l.periodDetail != null)
-      .sort((a, b) => (a.periodDetail ?? '').localeCompare(b.periodDetail ?? ''))
-  const periodSubtotal = (code: string): number =>
-    periodLinesFor(code).reduce((sum, l) => sum + l.amount, 0)
+  // 費目内の明細名つきの明細(名前順)と、費目の小計(費目一括 + 明細)。
+  const periodDetailsFor = (code: string): BudgetLine[] => periodDetailsOf(lines, code)
+  const periodSubtotal = (code: string): number => periodSubtotalOf(lines, code)
 
   // 明細名つきの1明細の金額セル。
   const periodDetailKey = (code: string, detail: string) => `PeriodCost-${code}::${detail}`
@@ -199,18 +201,10 @@ export default function BudgetEditPage() {
   const toggleCollapse = (code: string) =>
     setCollapsedElements((prev) => ({ ...prev, [code]: !(prev[code] ?? false) }))
 
-  // 明細を持つ費目コードの一覧。
-  const detailedElementCodes = (): string[] => [
-    ...new Set(
-      (budget?.lines ?? [])
-        .filter((l) => l.category === 'PeriodCost' && l.periodDetail != null)
-        .map((l) => l.elementCode!),
-    ),
-  ]
   // 折りたたみ対象の費目コード。編集中は全費目(明細追加行を畳めるように)、
   // 閲覧時は明細のある費目のみ。
   const collapsibleCodes = (): string[] =>
-    editable ? elements.map((e) => e.code) : detailedElementCodes()
+    editable ? elements.map((e) => e.code) : detailedElementCodes(lines)
   // 全費目を展開する(折りたたみ状態をクリア)。
   const expandAllPeriod = () => setCollapsedElements({})
   // 折りたたみ対象の全費目を折りたたむ。
@@ -263,13 +257,12 @@ export default function BudgetEditPage() {
   }
 
   const addPeriodDetail = async (code: string) => {
-    const name = (detailName[code] ?? '').trim()
-    const raw = (detailAmount[code] ?? '').trim()
-    const amount = raw === '' ? 0 : Number(raw)
-    if (name === '' || Number.isNaN(amount) || amount <= 0) {
+    const input = parseNewDetail(detailName[code], detailAmount[code])
+    if (!input) {
       setError('明細名と金額(1以上)を入力してください。')
       return
     }
+    const { name, amount } = input
     setAddingDetail(true)
     setError(null)
     try {
@@ -300,14 +293,7 @@ export default function BudgetEditPage() {
     projectId: string | null,
     elementCode: string | null,
     periodDetail: string | null = null,
-  ): BudgetLine | undefined =>
-    budget?.lines.find(
-      (l) =>
-        l.category === category &&
-        (l.projectId ?? null) === projectId &&
-        (l.elementCode ?? null) === elementCode &&
-        (l.periodDetail ?? null) === periodDetail,
-    )
+  ): BudgetLine | undefined => findBudgetLine(lines, category, projectId, elementCode, periodDetail)
 
   const openMonthly = (
     category: BudgetCategory,
@@ -326,23 +312,14 @@ export default function BudgetEditPage() {
     setError(null)
   }
 
-  const monthlyDialogTotal = halfMonths(half).reduce((sum, { index }) => {
-    const raw = (monthlyEdits[index] ?? '').trim()
-    const n = raw === '' ? 0 : Number(raw)
-    return sum + (Number.isNaN(n) ? 0 : n)
-  }, 0)
+  const monthlyDialogTotal = monthlyTotal(half, monthlyEdits)
 
   const saveMonthly = async () => {
     if (!monthlyTarget) return
     setSavingMonthly(true)
     setError(null)
     try {
-      const monthlyAmounts: Record<number, number> = {}
-      for (const { index } of halfMonths(half)) {
-        const raw = (monthlyEdits[index] ?? '').trim()
-        const n = raw === '' ? 0 : Number(raw)
-        if (!Number.isNaN(n) && n > 0) monthlyAmounts[index] = n
-      }
+      const monthlyAmounts = toMonthlyAmounts(half, monthlyEdits)
       const { category, projectId, elementCode, periodDetail } = monthlyTarget
       const updated =
         Object.keys(monthlyAmounts).length === 0
