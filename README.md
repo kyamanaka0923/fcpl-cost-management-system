@@ -241,6 +241,12 @@ VS Code でのリモート開発は、拡張機能「Dev Containers」を入れ�
 (`backend: test`、`full: backend + frontend` など)から実行できます。
 デバッグ実行は `.vscode/launch.json` の構成(`full: backend デバッグ + frontend` など)を使います。
 
+devcontainer は、AI エージェント(Claude Code)を安全に動かすための守りを持っています(ADR-0015)。
+
+- **外への通信は許可リストだけ**: 起動のたびに `docker/init-firewall.sh` が、GitHub・Anthropic・npm・NuGet・Playwright・VS Code の拡張機能の宛先以外を止めます。ほかの宛先が要るときは、このスクリプトの `ALLOWED_DOMAINS` に足してコンテナを作り直します
+- **sudo はファイアウォールと volume の持ち主の直しだけ**: `apt install` などはできません。道具が要るときは `docker/dev.Dockerfile` に足します(docker compose で使うイメージは、これまでどおり sudo を制限しません)
+- Claude Code は devcontainer の Feature で入り、設定と会話の記録は named volume(`fcpl-claude-config`)に残ります
+
 ### バックエンド(ローカルに SDK がある場合)
 
 ビルドでは .NET アナライザの推奨ルールが働き、**警告はエラーとして扱われます**(`backend/Directory.Build.props`)。

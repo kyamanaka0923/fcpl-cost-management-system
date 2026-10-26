@@ -35,6 +35,7 @@ model: claude-sonnet-5
 
 ## 開発環境
 
+- **devcontainer の守り(ADR-0015 フェーズ7)**: 起動時に `docker/init-firewall.sh` が外への通信を許可リストに絞る(`ALLOWED_DOMAINS`。GitHub は api.github.com/meta の IP の範囲)。sudo は `SUDO_POLICY=firewall-only` で、ファイアウォールと `devcontainer-fix-owner.sh` だけ。宛先や道具を足すのは工場の変更(`factory/` の PR)。docker compose のイメージは `SUDO_POLICY=full`(既定)のまま。許可リストにない宛先は即座に拒否される(`curl: (7) ... Connection refused` に似た失敗になる)ので、通信の失敗はまずこれを疑う
 - **ローカル**: `docker compose up backend frontend` / `docker compose run --rm backend-test`。
   VS Code は Dev Containers(`.devcontainer/`、イメージは `docker/dev.Dockerfile` を共用、
   非rootユーザー vscode、NuGet/node_modules は named volume)

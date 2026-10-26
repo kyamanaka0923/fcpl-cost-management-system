@@ -2,21 +2,36 @@
   "name": "総合原価管理システム (.NET 10 + Node 22)",
   "build": {
     "dockerfile": "../docker/dev.Dockerfile",
-    "context": ".."
+    "context": "..",
+    // sudo をファイアウォールと volume の持ち主の直しだけにする(エージェントがファイアウォールを外せないように。ADR-0015 フェーズ7)
+    "args": { "SUDO_POLICY": "firewall-only" }
   },
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+  },
+  // ファイアウォール(iptables)を設定するための権限
+  "runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW"],
   "remoteUser": "vscode",
   "workspaceFolder": "/workspace",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
   "mounts": [
     "source=fcpl-nuget-cache,target=/home/vscode/.nuget/packages,type=volume",
-    "source=fcpl-frontend-node-modules,target=/workspace/frontend/node_modules,type=volume"
+    "source=fcpl-frontend-node-modules,target=/workspace/frontend/node_modules,type=volume",
+    // Claude Code の設定と会話の記録を、コンテナを作り直しても残す
+    "source=fcpl-claude-config,target=/home/vscode/.claude,type=volume"
   ],
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
+  },
   "forwardPorts": [5100, 5173],
   "portsAttributes": {
     "5100": { "label": "WebApi (ASP.NET Core)" },
     "5173": { "label": "Frontend (Vite)" }
   },
-  "postCreateCommand": "sudo chown -R vscode /home/vscode/.nuget/packages /workspace/frontend/node_modules && dotnet restore backend && npm --prefix frontend install",
+  "postCreateCommand": "sudo /usr/local/bin/devcontainer-fix-owner.sh && dotnet restore backend && npm --prefix frontend install",
+  // 外への通信を許可リストに絞る(docker/init-firewall.sh)。起動のたびに設定する
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
+  "waitFor": "postStartCommand",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -24,7 +39,6 @@
         "ms-azuretools.vscode-docker",
         "Anthropic.claude-code",
         "mhutchie.git-graph",
-        "bierner.markdown-mermaid",
         "bierner.markdown-mermaid"
       ],
       "settings": {
