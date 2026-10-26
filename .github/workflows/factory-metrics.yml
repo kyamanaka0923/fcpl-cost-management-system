@@ -1,0 +1,32 @@
+name: 工場の週報
+
+# 工場の計測値(WIP・流れの時間・介入)を集め、「工場の週報」Issue(factory-report ラベル)にコメントで足す(導入計画 §6・§17.5)。
+# 中身は tools/factory/metrics-cli.mjs。手で動かすときは Actions の画面から「Run workflow」。
+on:
+  schedule:
+    - cron: '0 0 * * 1' # 毎週月曜 00:00 UTC = 09:00 JST
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 集計する期間(日)
+        default: '7'
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  report:
+    name: 週報を作る
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: 集めて週報の Issue に足す
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DAYS: ${{ inputs.days || '7' }}
+        run: node tools/factory/metrics-cli.mjs --days "$DAYS" --post
