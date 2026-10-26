@@ -37,46 +37,57 @@ label "intervention"   "E99695" "人の介入があった(原因を記録して�
 
 # main のルールセット。承認数は 0(判定者が 1 人で、作者は自分の PR を承認できないため)。
 # 承認 = 人がマージすること。必須チェックは各ワークフローのジョブ名(name:)。
-ruleset_json="$(cat <<'JSON'
-{
-  "name": "工場のゲート(main)",
-  "target": "branch",
-  "enforcement": "active",
-  "bypass_actors": [],
-  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
-  "rules": [
-    { "type": "deletion" },
-    { "type": "non_fast_forward" },
-    { "type": "pull_request",
-      "parameters": {
-        "required_approving_review_count": 0,
-        "dismiss_stale_reviews_on_push": false,
-        "require_code_owner_review": false,
-        "require_last_push_approval": false,
-        "required_review_thread_resolution": false
+# まだ main で一度も動いていないジョブを必須にすると、そのジョブを足す PR 自身がマージできなくなる。
+# そこで、main の最新コミットで実際に動いたジョブだけを必須にし、残りは表示だけする(ジョブを足した PR をマージしてから再実行する)。
+wanted=(
+  "バックエンド(ビルド・テスト)"
+  "フロントエンド(静的解析・型チェック・ビルド)"
+  "フロントエンド単独テスト(Vitest)"
+  "ブラウザE2E(Playwright)"
+  "工場のフック(ゲートを破る操作を止めるか)"
+)
+ran_on_main="$(gh api --paginate "repos/$repo/commits/main/check-runs?per_page=100" --jq '.check_runs[].name')"
+required=()
+for c in "${wanted[@]}"; do
+  if grep -Fxq "$c" <<<"$ran_on_main"; then
+    required+=("$c")
+  else
+    echo "必須チェックに入れません(main でまだ動いていない): $c"
+  fi
+done
+checks_json="$(printf '%s\n' "${required[@]}" | jq -R '{context: .}' | jq -s '.')"
+
+ruleset_json="$(jq -n --argjson checks "$checks_json" '{
+  name: "工場のゲート(main)",
+  target: "branch",
+  enforcement: "active",
+  bypass_actors: [],
+  conditions: { ref_name: { include: ["~DEFAULT_BRANCH"], exclude: [] } },
+  rules: [
+    { type: "deletion" },
+    { type: "non_fast_forward" },
+    { type: "pull_request",
+      parameters: {
+        required_approving_review_count: 0,
+        dismiss_stale_reviews_on_push: false,
+        require_code_owner_review: false,
+        require_last_push_approval: false,
+        required_review_thread_resolution: false
       } },
-    { "type": "required_status_checks",
-      "parameters": {
-        "strict_required_status_checks_policy": true,
-        "required_status_checks": [
-          { "context": "バックエンド(ビルド・テスト)" },
-          { "context": "フロントエンド(静的解析・型チェック・ビルド)" },
-          { "context": "フロントエンド単独テスト(Vitest)" },
-          { "context": "ブラウザE2E(Playwright)" },
-          { "context": "工場のフック(ゲートを破る操作を止めるか)" }
-        ]
+    { type: "required_status_checks",
+      parameters: {
+        strict_required_status_checks_policy: true,
+        required_status_checks: $checks
       } }
   ]
-}
-JSON
-)"
+}')"
 existing="$(gh api "repos/$repo/rulesets" --jq '.[] | select(.name=="工場のゲート(main)") | .id')"
 if [ -n "$existing" ]; then
   gh api -X PUT "repos/$repo/rulesets/$existing" --input - <<<"$ruleset_json" >/dev/null
-  echo "ルールセットを更新しました(id: $existing)"
+  echo "ルールセットを更新しました(id: $existing、必須チェック ${#required[@]} 件)"
 else
   gh api -X POST "repos/$repo/rulesets" --input - <<<"$ruleset_json" >/dev/null
-  echo "ルールセットを作りました"
+  echo "ルールセットを作りました(必須チェック ${#required[@]} 件)"
 fi
 
 if [ "${1:-}" = "--project" ]; then
