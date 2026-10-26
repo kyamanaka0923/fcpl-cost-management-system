@@ -18,7 +18,20 @@
 | `testing` | テストの追加・修正・実行 | claude-sonnet-5 |
 | `docs-update` | README/MANUAL/DESIGN の同期 | claude-haiku-4-5 |
 | `ci-and-env` | CI・環境・スキーマ移行・プッシュ運用 | claude-sonnet-5 |
-| `issue-response` | GitHub Issue を確認し未対応のものを対応する運用 | claude-opus-5 |
+| `issue-response` | GitHub Issue を確認し、ラインで進めてよい工程を進める運用 | claude-opus-5 |
+| `factory-line` | 作業項目の列とゲートラベルから、進めてよい工程と担当エージェントを決める | claude-opus-5 |
+| `gate-review` | PR のレビューView(事実・理由・問い)とゲートごとの確認観点 | claude-sonnet-5 |
+
+## 工程ごとのエージェント(`.claude/agents/`)
+
+生成と検証を分ける。検証役(reviewer)はファイルを書き換えず、PR へのコメントだけで返す。
+
+| 工程 | 書く | 検証する |
+|---|---|---|
+| [A] ナレッジ | `knowledge-extractor` | 人(ゲート0) |
+| [B] 要件・画面 | `requirements-writer`、`screen-writer`(フェーズ5 以降) | `requirements-reviewer` |
+| [C] 仕様 | `spec-writer` | 人(ゲート2) |
+| [D] 実装 / [E] 検証 | `implementer` | `code-reviewer`、CI |
 
 ## 絶対のルール(スキルより先に知るべき最小限)
 
