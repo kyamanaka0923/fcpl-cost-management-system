@@ -1,0 +1,27 @@
+{
+  "name": "cost-management-browser-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "ブラウザ E2E(日本語 Gherkin + playwright-bdd)。画面は frontend の Vite 開発サーバ、API は backend の WebApi を自動起動して使う。",
+  "scripts": {
+    "test": "bddgen && playwright test",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^22.20.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "playwright": "^1.61.1",
+    "playwright-bdd": "^9.2.1",
+    "prettier": "^3.9.10",
+    "typescript": "~5.8.0",
+    "typescript-eslint": "^8.71.1"
+  }
+}

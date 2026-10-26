@@ -22,6 +22,7 @@ dist/
 # Playwright
 test-results/
 playwright-report/
+.features-gen/
 
 # AWS SAM
 .aws-sam/

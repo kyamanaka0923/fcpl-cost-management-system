@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# 工場(ソフトウェアファクトリー)の GitHub 側の設定を作る(ADR-0015)。
+# ラベル・ルールセットの変更は「人の仕事」なので、エージェントからは実行できない(.claude/hooks/guard.sh が止める)。
+# 人が手元の端末で実行する:
+#   bash tools/factory/setup-github.sh            ラベルと main のルールセット
+#   bash tools/factory/setup-github.sh --project  上に加えて GitHub Projects のボード
+#                                                 (先に `gh auth refresh -s project` が必要)
+# 何度実行してもよい(ラベルは上書き、ルールセットは同名があれば更新)。
+set -euo pipefail
+
+repo="${REPO:-kyamanaka0923/fcpl-cost-management-system}"
+owner="${repo%%/*}"
+
+label() { gh label create "$1" --repo "$repo" --color "$2" --description "$3" --force >/dev/null && echo "ラベル: $1"; }
+
+# 工程(GitHub Projects の列と同じ。Projects を使わないときもラベルで状態が分かるようにする)
+label "stage:準備中"   "C5DEF5" "上流([A]ナレッジ・[B]要件・画面)の下書き中"
+label "stage:着手待ち" "0E8A16" "ゲート1(投入ゲート)を通った。AI は [C] 仕様に着手してよい"
+label "stage:仕様確定" "1D76DB" "ゲート2を通った。AI は [D] 実装に着手してよい"
+label "stage:実装中"   "FBCA04" "[D] 実装・[E] 検証の最中"
+label "stage:判断待ち" "D93F0B" "人の判定待ち(ゲートの判定・問いへの回答)"
+# ゲート(人だけが付ける)
+label "gate0-approved" "5319E7" "ゲート0: ナレッジが出どころと一致している(人だけが付ける)"
+label "gate1-approved" "5319E7" "ゲート1: 要件と画面を承認し、本ラインに投入した(人だけが付ける)"
+label "gate2-approved" "5319E7" "ゲート2: 仕様・テスト計画を承認した。実装してよい(人だけが付ける)"
+# 状態
+label "needs-answer"   "B60205" "要件・仕様の穴。人の回答があるまで止める"
+label "prep"           "BFDADC" "人の判定を楽にする下ごしらえ(判断待ちが上限を超えたとき)"
+# 工場の変更(導入計画 §11.2 の種類)
+label "factory"        "000000" "工場(指示・エージェント・CI・ナレッジの型)の変更"
+label "factory:A"      "444444" "工場の変更 A: 軽微な改善(仕掛かり品はそのまま続行)"
+label "factory:B"      "444444" "工場の変更 B: 検査の強化(警告で入れ、流れ切ってから必須)"
+label "factory:C"      "444444" "工場の変更 C: 工程・成果物の形の変更(流し切るかやり直すかを決める)"
+label "factory:D"      "444444" "工場の変更 D: ナレッジの訂正(マージ済みまで遡る)"
+# 計測
+label "intervention"   "E99695" "人の介入があった(原因を記録して工場を直す)"
+
+# main のルールセット。承認数は 0(判定者が 1 人で、作者は自分の PR を承認できないため)。
+# 承認 = 人がマージすること。必須チェックは各ワークフローのジョブ名(name:)。
+ruleset_json="$(cat <<'JSON'
+{
+  "name": "工場のゲート(main)",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+  "rules": [
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    { "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0,
+        "dismiss_stale_reviews_on_push": false,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": false
+      } },
+    { "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          { "context": "バックエンド(ビルド・テスト)" },
+          { "context": "フロントエンド(静的解析・型チェック・ビルド)" },
+          { "context": "フロントエンド単独テスト(Vitest)" },
+          { "context": "ブラウザE2E(Playwright)" },
+          { "context": "工場のフック(ゲートを破る操作を止めるか)" }
+        ]
+      } }
+  ]
+}
+JSON
+)"
+existing="$(gh api "repos/$repo/rulesets" --jq '.[] | select(.name=="工場のゲート(main)") | .id')"
+if [ -n "$existing" ]; then
+  gh api -X PUT "repos/$repo/rulesets/$existing" --input - <<<"$ruleset_json" >/dev/null
+  echo "ルールセットを更新しました(id: $existing)"
+else
+  gh api -X POST "repos/$repo/rulesets" --input - <<<"$ruleset_json" >/dev/null
+  echo "ルールセットを作りました"
+fi
+
+if [ "${1:-}" = "--project" ]; then
+  # 列 = Status フィールドの選択肢。AGENTS.md の列と同じ並び
+  number="$(gh project create --owner "$owner" --title "工場のライン(原価管理)" --format json --jq '.number')"
+  gh project link "$number" --owner "$owner" --repo "$repo"
+  field="$(gh project field-list "$number" --owner "$owner" --format json --jq '.fields[] | select(.name=="Status") | .id')"
+  echo "Projects のボード #$number を作りました。"
+  echo "Status($field)の選択肢を、画面で次の順に直してください: 準備中 / 着手待ち / 仕様確定 / 実装中 / 人の判断待ち / 完了"
+fi

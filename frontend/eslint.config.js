@@ -7,7 +7,7 @@ import globals from 'globals'
 import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules', 'playwright-report', 'test-results'] },
+  { ignores: ['dist', 'node_modules'] },
   {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
@@ -22,8 +22,8 @@ export default tseslint.config(
     },
   },
   {
-    // E2E テストと設定ファイルは Node.js で動く
-    files: ['e2e/**/*.ts', '*.config.{ts,js}'],
+    // 設定ファイルは Node.js で動く
+    files: ['*.config.{ts,js}'],
     languageOptions: { globals: { ...globals.node } },
   },
   prettier,

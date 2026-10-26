@@ -4,7 +4,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0
 
 # Node.js 22 と開発ツール
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates gnupg git sqlite3 sudo \
+    && apt-get install -y --no-install-recommends curl ca-certificates gnupg git jq sqlite3 sudo \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && apt-get clean \

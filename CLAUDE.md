@@ -1,7 +1,10 @@
 # CLAUDE.md
 
+@AGENTS.md
+
 総合原価管理システム(予実管理)。.NET 10 ヘキサゴナル + DDD / React 19 / SQLite + Dapper。
 詳細は README.md、設計は docs/DESIGN.md、操作は docs/MANUAL.md。
+**工場(ソフトウェアファクトリー)の共通の指示は AGENTS.md**。ここには Claude Code 固有のことだけを書く。
 
 ## 作業前に必ず該当スキルを読むこと
 
@@ -25,4 +28,5 @@
 - 売上高・加工費・外注費は**案件別明細**(案件は課に属するマスタ、ID参照)。課の区分合計 = 明細合計のみ(直接入力不可)。期間費用は**費目別明細**。費目内は**明細名(自由入力)でさらに細分できる**(例: ライセンス費 → AWS / GitHub。Issue #7)。1費目は「費目一括(明細名なし)」か「明細(明細名あり)」のどちらか一方(混在不可)。費目合計 = 明細の合計。明細名は後から変更可(金額・月次は保持。Issue #8)。実績も明細名を任意で持てる(計画にない明細名は予定外)
 - 承認済み予算は編集不可。変更は改定版(新バージョン)で
 - テスト名・エラーメッセージ・コミットメッセージは日本語
-- ブランチは `claude/cost-management-system-qvc368`。プッシュ後は GitHub Actions の結果を確認
+- ブランチは AGENTS.md の工程別の命名(`knowledge/` `req/` `spec/` `impl/` `prep/` `factory/`)で main から切る。main へ直接プッシュしない。プッシュ後は GitHub Actions の結果を確認
+- **マージ・PR の Ready 化・承認・ゲートラベルの付与はしない**。`.claude/settings.json` と `.claude/hooks/guard.sh` が止める。止められたら回避せず、人に頼む

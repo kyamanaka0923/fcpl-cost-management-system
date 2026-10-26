@@ -1,6 +1,6 @@
 # ADR-0011: テスト戦略(多層テスト + カバレッジ + ミューテーションテスト)
 
-- 状態: Accepted
+- 状態: Accepted(「決定」のうち、テストの種類と置き場所は [ADR-0016](0016-test-scope-layout-and-frontend-unit.md) で置き換えた)
 - 日付: 2026-07(ミューテーションは Issue #6)
 
 ## 背景

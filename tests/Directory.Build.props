@@ -1,0 +1,4 @@
+<Project>
+  <!-- テストプロジェクトは backend/ の外にあるため、バックエンド共通のビルド設定(アナライザ・警告のエラー扱い)を明示的に取り込む。 -->
+  <Import Project="..\backend\Directory.Build.props" />
+</Project>
