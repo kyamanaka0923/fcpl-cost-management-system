@@ -1,0 +1,6 @@
+{
+  "GET /api/cost-elements": {
+    "status": 200,
+    "body": []
+  }
+}

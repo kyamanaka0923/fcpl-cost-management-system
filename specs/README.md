@@ -17,7 +17,7 @@
   API の識別は `operationId` ではなく **メソッドとパス**(`PUT /api/budgets/{budgetId}/lines`)で書く(いまの定義に `operationId` がないため)
 - 処理ルールは、業務ルール([knowledge/business-rules/](../knowledge/business-rules/))をシステムの言葉に置き換えたもの。
   業務ルールにない決まりを足すときは、仕様に書かずに作業を止め、Issue に `needs-answer` を付けて問いを書く
-- 画面の仕様は、画面要件(`requirements/screens/`、フェーズ5)が正。ここには書かない
+- 画面の仕様は、画面要件([`requirements/screens/`](../requirements/screens/README.md))が正。ここには書かない
 
 ## 仕様を書くときの順番
 

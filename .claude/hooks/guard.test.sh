@@ -39,6 +39,13 @@ bash_ block 'gh pr create --base main && git push origin main'
 bash_ block 'git status; git push origin HEAD:main'
 bash_ block 'echo x | git push -f origin impl/1-x'
 
+bash_ block 'bash tools/factory/update-approved-screens.sh'
+bash_ block 'bash tools/factory/screens-docker.sh --update-snapshots=all'
+bash_ block 'cd tests/e2e/screens && npx playwright test -u'
+
+bash_ allow 'bash tools/factory/screens-docker.sh'
+bash_ allow 'cd tests/e2e/browser && npx playwright test --project chromium'
+bash_ allow 'npx playwright test && git push -u origin factory/x'
 bash_ allow 'gh pr create --base main --draft'
 bash_ allow 'gh pr review 26 --comment -b "指摘"'
 bash_ allow 'gh pr checks 26'

@@ -1,0 +1,6 @@
+{
+  "GET /api/cost-elements": {
+    "status": 400,
+    "body": { "error": "費目の一覧を読み込めませんでした。" }
+  }
+}

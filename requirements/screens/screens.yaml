@@ -1,0 +1,22 @@
+# 画面要件の一覧(requirements/screens/README.md)。
+screens:
+  - id: SCR-001
+    title: 費目マスタ
+    route: /cost-elements
+    page: frontend/src/pages/CostElementsPage.tsx
+    requirements: [FR-3.1, FR-3.3]
+    items:
+      - パンくず(部一覧へのリンク)
+      - 費目マスタがシステム共通であることの説明
+      - 費目コードと費目名の表
+      - 費目を追加するフォーム(費目コード・費目名・追加ボタン)
+    operations:
+      - name: 費目を追加する
+        request: POST /api/cost-elements
+    states:
+      - name: 通常
+        shows: 費目の表に人件費とライセンス費の 2 行が出る
+      - name: 空
+        shows: 表の代わりに「費目がありません。下のフォームから追加してください。」が出る
+      - name: エラー
+        shows: 画面右下のトーストに API のエラーメッセージが出て、表の代わりに「費目がありません。」が出る

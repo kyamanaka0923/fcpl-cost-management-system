@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 工場のゲートの検査(ADR-0015 フェーズ4)。リポジトリ直下で実行する。
 //   node tools/factory/cli.mjs <検査名>
-// 検査名: ears | ambiguity | coverage | knowledge | role | gate | premises | factory-version
+// 検査名: ears | ambiguity | coverage | knowledge | screens | role | gate | premises | factory-version
 // PR の検査(role・gate・premises・factory-version)は、次の環境変数を使う(.github/workflows/factory.yml が渡す)。
 //   FACTORY_BRANCH  PR のブランチ名。空なら PR ではない(main への push)ので何もしない
 //   FACTORY_BASE    PR の base のコミット(main)
@@ -26,6 +26,7 @@ import { audit, matrixMarkdown } from './checks/coverage.mjs';
 import { checkBusinessRule, checkRequirementRules } from './checks/knowledge.mjs';
 import { checkFactoryVersion, checkGate, checkRole } from './checks/branch.mjs';
 import { checkPremises } from './checks/premises.mjs';
+import { checkScreens } from './checks/screens.mjs';
 
 const root = process.cwd();
 const env = process.env;
@@ -83,6 +84,16 @@ const CHECKS = {
         ...checkRequirementRules(loadRequirements(root), loadBusinessRules(root)),
       ],
     };
+  },
+
+  screens: () => {
+    const readOrNull = (rel) => (existsSync(join(root, rel)) ? read(root, rel) : null);
+    const migrated = loadRequirements(root);
+    const legacy = read(root, 'docs/REQUIREMENTS.md');
+    const exists = (id) => migrated.has(id) || legacy.includes(`| ${id} |`);
+    const openapi = JSON.parse(read(root, 'docs/api/openapi.json'));
+    const fixtures = walk(root, 'requirements/screens/fixtures', (f) => f.endsWith('.json'));
+    return { errors: checkScreens(readOrNull('requirements/screens/screens.yaml'), readOrNull, fixtures, openapi, exists) };
   },
 
   role: () => ({ errors: checkRole(env.FACTORY_BRANCH, changedFiles()), pr: true }),

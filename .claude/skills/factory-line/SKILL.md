@@ -17,7 +17,7 @@ gh issue view <n> --json number,title,labels,state --jq '{number,title,state,lab
 | Issue の状態 | 進めてよい工程 | 使うエージェント | ブランチ |
 |---|---|---|---|
 | `stage:準備中`、`gate0-approved` なし | [A] ナレッジ | `knowledge-extractor` | `knowledge/<n>-…` |
-| `stage:準備中`、`gate0-approved` あり | [B] 要件・画面 | `requirements-writer` → `requirements-reviewer`(画面はフェーズ5 以降 `screen-writer`) | `req/<n>-…` |
+| `stage:準備中`、`gate0-approved` あり | [B] 要件・画面 | `requirements-writer`(画面は `screen-writer`)→ `requirements-reviewer`。承認する画面の画像は人が撮る | `req/<n>-…` |
 | `stage:着手待ち`(`gate1-approved`) | [C] 仕様 | `spec-writer` | `spec/<n>-…` |
 | `stage:仕様確定`(`gate2-approved`) | [D] 実装 → [E] 検証 | `implementer` → `code-reviewer` | `impl/<n>-…` |
 | `stage:実装中` | [D] の続き(CI の失敗・レビューの指摘への対応) | `implementer` | 同じ PR |

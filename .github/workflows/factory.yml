@@ -40,6 +40,40 @@ jobs:
         run: npm test
         working-directory: tools/factory
 
+  screen-diff:
+    name: 画面の差分(承認した画面との比較)
+    runs-on: ubuntu-latest
+    # 承認した画面はこのコンテナで撮る(tools/factory/update-approved-screens.sh)。版は tests/e2e/screens/package.json と同じにする
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --ipc=host
+    env:
+      CI: 1
+      HOME: /root
+    steps:
+      - uses: actions/checkout@v7
+      - name: 画面の依存を入れる
+        run: npm ci --no-audit --no-fund
+        working-directory: frontend
+      - name: 検査の依存を入れる
+        run: npm ci --no-audit --no-fund
+        working-directory: tests/e2e/screens
+      - name: 型チェック
+        run: npm run typecheck
+        working-directory: tests/e2e/screens
+      - name: fixtures で開いた画面を、承認した画面と比べる
+        run: npx playwright test
+        working-directory: tests/e2e/screens
+      - name: 差分のレポートを保存
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: screen-diff-report
+          path: |
+            tests/e2e/screens/playwright-report
+            tests/e2e/screens/test-results
+          if-no-files-found: ignore
+
   check:
     name: ${{ matrix.title }}
     runs-on: ubuntu-latest
@@ -51,6 +85,7 @@ jobs:
           - { check: ambiguity, title: "曖昧語の検査" }
           - { check: coverage, title: "要件とシナリオの網羅" }
           - { check: knowledge, title: "ナレッジの出どころと確定" }
+          - { check: screens, title: "画面要件と fixtures" }
           - { check: role, title: "工程の持ち場(role-guard)" }
           - { check: gate, title: "ゲートラベルの確認(gate-check)" }
           - { check: premises, title: "前提の版(upstream-approved)" }

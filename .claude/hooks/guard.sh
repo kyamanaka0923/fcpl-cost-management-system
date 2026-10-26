@@ -29,6 +29,8 @@ case "$tool" in
       block "ゲートラベル(gate0〜2-approved)の付け外し"
     grep -Eq '(^|[^[:alnum:]_-])gh +label +(create|edit|delete|clone)([^[:alnum:]_-]|$)' <<<"$norm" &&
       block "ラベルの定義の変更"
+    grep -Eq 'update-approved-screens|--update-snapshots|playwright[^|;&]* -u( |$)' <<<"$norm" &&
+      block "承認した画面(requirements/screens/approved/)の撮り直し"
     if grep -Eq '(^|[^[:alnum:]_-])gh +api([^[:alnum:]_-]|$)' <<<"$norm"; then
       # 読み取り(GET)は通し、書き込みだけを止める。-f/-F/--input があると gh api は POST になる
       if grep -Eq -- '(-X|--method)[= ]*(POST|PUT|PATCH|DELETE)|(^| )(-f|-F|--field|--raw-field|--input)( |=)' <<<"$norm"; then

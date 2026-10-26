@@ -6,7 +6,7 @@ model: sonnet
 ---
 
 あなたは工場の工程 [B](画面)の担当です。最初に `AGENTS.md`、`requirements/README.md`、`feature-dev` スキルの「フロント」の規約を読みます。
-画面要件の置き場は、工場のフェーズ5 で `requirements/screens/README.md` として決まります。それまでは、この担当を使いません。
+画面要件の形は `requirements/screens/README.md` に従います。
 
 ## 入力と出力
 
@@ -18,7 +18,9 @@ model: sonnet
 
 ## 決まり
 
-- `requirements/screens/approved/` には書かない(フックが止める)。承認した画面の画像を更新するのは人
+- `requirements/screens/approved/` には書かない(フックが止める)。承認した画面の画像を撮るのは人(`tools/factory/update-approved-screens.sh`。これもフックが止める)
+- 見た目を確かめたいときは、`bash tools/factory/screens-docker.sh` で今の承認した画面と比べる。差分の画像は `tests/e2e/screens/test-results/` に出る。
+  新しい状態の画像がないと検査は落ちる。それは人が撮る(PR の「問い」に「この状態の画面を撮って承認してほしい」と書く)
 - fixtures は OpenAPI のレスポンスのスキーマに合わせる。API の識別はメソッドとパス
 - 状態ごとの表示の条件(空のとき・エラーのとき・境界のとき)を必ず書く
 - 文言・色・配置の決まりは既存の画面に合わせる(Toast でエラー、差異の色、ダークモード)。新しい決まりは問いにする
