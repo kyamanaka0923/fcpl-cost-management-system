@@ -40,10 +40,12 @@ case "$tool" in
           block "API での PR のマージ"
       fi
     fi
-    if grep -Eq '(^|[^[:alnum:]_-])git +push([^[:alnum:]_-]|$)' <<<"$norm"; then
-      grep -Eq -- '( |^)(--force|-f|--force-with-lease)([= ]|$)|( |:)\+' <<<"$norm" &&
+    # git push の引数だけを見る。&& ; | でつないだ別のコマンド(gh pr create --base main など)の main や -f に反応しない
+    push_segs="$(sed -E 's/(&&|\|\||;|\|)/\n/g' <<<"$norm" | grep -E '(^|[^[:alnum:]_-])git +push([^[:alnum:]_-]|$)' || true)"
+    if [ -n "$push_segs" ]; then
+      grep -Eq -- '( |^)(--force|-f|--force-with-lease)([= ]|$)|( |:)\+' <<<"$push_segs" &&
         block "強制 push"
-      grep -Eq '(^|[ :])(refs/heads/)?main( |$)' <<<"$norm" &&
+      grep -Eq '(^|[ :])(refs/heads/)?main( |$)' <<<"$push_segs" &&
         block "main への push"
     fi
     ;;
