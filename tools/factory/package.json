@@ -1,0 +1,15 @@
+{
+  "name": "factory-tools",
+  "private": true,
+  "description": "工場のゲートの検査(ADR-0015)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "yaml": "2.8.1"
+  }
+}
