@@ -10,6 +10,8 @@
 | `test/` | 検査のテスト(`npm test` = `node --test`)。正例と反例を両方置く |
 | `ambiguity-words.txt` | 曖昧語の一覧 |
 | `premises.sh` | 前提の記録を作る(`.factory/premises/README.md`) |
+| `metrics-cli.mjs`、`lib/metrics.mjs` | 工場の週報(WIP・流れの時間・介入)を作る。`--post` で「工場の週報」Issue に足す |
+| `intervention-cli.mjs`、`lib/intervention.mjs` | 介入の記録(`/intervention <種類> <原因>`)を確かめて `intervention` ラベルを付ける |
 | `screens-docker.sh` | 画面の差分の検査を、CI と同じ Playwright のコンテナで動かす |
 | `update-approved-screens.sh` | 承認する画面の画像を撮り直す(人が実行する。エージェントはフックで止まる) |
 | `setup-github.sh` | ラベルとルールセットを作る(人が実行する。エージェントはフックで止まる) |
@@ -34,6 +36,18 @@ CI(`.github/workflows/factory.yml`)のジョブ名が、そのまま main のル
 - 持ち場・ゲートラベル・前提の版・工場の版の 4 つは PR だけの検査。main への push では何もしない
 - ゲートラベルは Issue に付くので、付けても PR の検査は動き直さない。付けたあとで「ゲートラベルの確認」を再実行する
 - Dependabot のブランチ(`dependabot/…`)は、持ち場と工場の版の検査から外す
+
+## 計測(週報と介入の記録)
+
+| ワークフロー | いつ | すること |
+|---|---|---|
+| `factory-metrics.yml`(工場の週報) | 毎週月曜 09:00 JST と手動 | 直近 7 日の WIP・流れの時間(起票 → ゲート0〜2 → 完了の中央値)・マージした PR・介入を集め、`factory-report` ラベルの Issue にコメントで足す(なければ作る) |
+| `factory-intervention.yml`(介入の記録) | Issue・PR に `/intervention` で始まるコメントが付いたとき | 形を確かめて `intervention` ラベルを付ける。形が違えば書き方を返し、手直しなら「工場の改善」の起票を促す |
+
+- WIP の上限(判断待ち 5 件まで・未回答の問い 10 件まで・着手待ち 2 件以上)は `lib/metrics.mjs` の `WIP_LIMITS`。超えたら週報に ⚠️ が出る
+- 介入として数えるのは、リポジトリの関係者(OWNER・MEMBER・COLLABORATOR)のコメントだけ
+- 費用(Claude の利用量)は自動では集めない。週報の「手で記入する」欄に書く
+- 手元で見るだけなら `node tools/factory/metrics-cli.mjs --days 30`(投稿しない)
 
 ## 手元で動かす
 

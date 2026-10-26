@@ -1,0 +1,32 @@
+name: 介入の記録
+
+# 人が Issue・PR に「/intervention <種類> <原因> [メモ]」とコメントしたら、形を確かめて intervention ラベルを付ける(導入計画 §6)。
+# 形が違えば書き方を返信し、手直しなら「工場の改善」の起票を促す。数えるのは週報(factory-metrics.yml)。
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  record:
+    name: 介入の記録を確かめる
+    # public リポジトリなので、リポジトリの関係者のコメントだけを扱う
+    if: >-
+      startsWith(github.event.comment.body, '/intervention') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: 記録を読んでラベルを付ける
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BODY: ${{ github.event.comment.body }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: node tools/factory/intervention-cli.mjs

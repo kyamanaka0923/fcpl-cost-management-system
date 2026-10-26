@@ -74,3 +74,5 @@ bash tools/factory/premises.sh <n> <spec|impl> <読んだ要件・仕様・業�
 | `stage:着手待ち` | 2 件以上を保つ | 上流([A][B])の作業を優先する |
 
 `prep` の作業: 判断待ちの PR のレビューView を見直す、問いを選択肢の形に直す、テストを足す(`prep/<n>-…` ブランチ、`prep` ラベル)。
+
+いまの件数は `node tools/factory/metrics-cli.mjs` で見られる(毎週月曜 09:00 JST に「工場の週報」Issue にも出る)。上限は `tools/factory/lib/metrics.mjs` の `WIP_LIMITS`。
