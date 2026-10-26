@@ -9,6 +9,12 @@ model: claude-sonnet-5
 **利用モデル**: 通常の機能追加は `claude-sonnet-5`。
 ドメインモデル自体を変える場合は先に domain-design スキル(`claude-opus-4-8`)を適用。
 
+## 工場の中での位置
+
+このスキルは工程 [D] 実装(`implementer` エージェント)で使う。着手してよいのは、Issue が `stage:仕様確定`(`gate2-approved`)のときだけ
+(`factory-line` スキル)。作るものは承認済みの仕様(`specs/rules/`・`docs/api/openapi.json`)と要件の `.feature` で決まっている。
+仕様にないことを決めなければ進めないときは、作業を止めて Issue に `needs-answer` を付ける。`requirements/`・`knowledge/`・`specs/` は変えない。
+
 ## 実装順序(この順で層を通す)
 
 1. **Domain** (`backend/src/CostManagement.Domain`) — 集約/値オブジェクト/ドメインサービス + ドメインテスト
@@ -71,5 +77,6 @@ cd tests/unit/frontend && npm test  # 画面を触った場合(フロントエ�
 cd tests/e2e/browser && npm test    # 画面を触った場合(PW_CHROMIUM=/opt/pw-browsers/chromium が必要な環境あり)
 ```
 
-- コミットメッセージは日本語で「何を・なぜ」。ブランチは `claude/cost-management-system-qvc368`
-  (指示がある場合はそれに従う)。プッシュ後は GitHub Actions の結果を確認する(ci-and-env スキル)
+- コミットメッセージは日本語で「何を・なぜ」。ブランチは `impl/<Issue番号>-<名前>`(main から切る)。
+  前提を `.factory/premises/ISSUE-<n>.yml` に書く(`bash tools/factory/premises.sh`)。
+  プッシュ後は GitHub Actions の結果を確認する(ci-and-env スキル)。マージは人がする

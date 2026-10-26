@@ -22,9 +22,12 @@ model: claude-sonnet-5
 - **依存の自動更新**: Dependabot(`.github/dependabot.yml`)が毎週月曜 09:00 JST に NuGet・npm・Actions・Docker を確認して PR を作る。
   マイナー・パッチはエコシステムごとに1件へまとめ、メジャーは個別 PR。PR は CI を通してからマージする
   (メジャー更新は破壊的変更の確認が必要。例: React・Vite・xUnit のメジャー)
-- トリガ: push(main, claude/**)と pull_request。README 冒頭に CI バッジあり
-- **プッシュしたら必ず GitHub MCP(`actions_list`/`actions_get`)で結果を確認する**。
-  実行は約1〜2分。認証なし curl は private リポジトリに使えない(404になる)
+- トリガ: push(main)と pull_request。README 冒頭に CI バッジあり
+- **工場のゲート(`.github/workflows/factory.yml`)**: 工場の検査(いまはフックの確認 `guard-hook`。フェーズ4 で足す)。
+  ジョブ名(`name:`)が main のルールセットの必須チェックになる。ジョブを足したら、その PR をマージしたあとで、
+  人が `bash tools/factory/setup-github.sh` を実行して必須チェックに加える(main で動いたジョブだけが加わる)
+- **プッシュしたら必ず `gh pr checks <番号> --watch` で結果を確認する**。実行は約1〜5分(ミューテーションが最も遅い)。
+  失敗したら `gh run view <run-id> --log-failed`
 - カバレッジは backend ジョブの Summary ページに表示。目標 85% 以上
 - playwright パッケージはブラウザを postinstall でダウンロードするため、
   ブラウザ不要のジョブでは `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` を維持する
@@ -77,6 +80,9 @@ model: claude-sonnet-5
 
 ## プッシュ運用
 
-- ブランチ: `claude/cost-management-system-qvc368`(main へ直接プッシュしない)
+- ブランチ: 工程別の命名(`knowledge/` `req/` `spec/` `impl/` `prep/` `factory/`。`AGENTS.md`)で main から切る。main へ直接プッシュしない(ルールセットとフックが止める)
 - `git push -u origin <branch>`。ネットワークエラー時のみ指数バックオフで最大4回リトライ
-- PR は明示的に依頼されたときだけ作成する
+- 工程の成果物は PR で出す(`.github/pull_request_template.md`)。**マージは人がする**
+- プッシュと `gh pr create --base main` は別のコマンドにする。フックはコマンドの文字列で判定するので、
+  コミットメッセージやヒアドキュメントに「git push」と「main」が両方あると止まることがある(本文はファイルに書いて渡す)
+- 工場の設定(`.claude/`・`AGENTS.md`・`.github/workflows/`・`tools/factory/`)を変えたら `.factory/CHANGELOG.md` に 1 行足す
