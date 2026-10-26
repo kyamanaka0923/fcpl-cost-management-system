@@ -10,6 +10,8 @@
 | `test/` | 検査のテスト(`npm test` = `node --test`)。正例と反例を両方置く |
 | `ambiguity-words.txt` | 曖昧語の一覧 |
 | `premises.sh` | 前提の記録を作る(`.factory/premises/README.md`) |
+| `screens-docker.sh` | 画面の差分の検査を、CI と同じ Playwright のコンテナで動かす |
+| `update-approved-screens.sh` | 承認する画面の画像を撮り直す(人が実行する。エージェントはフックで止まる) |
 | `setup-github.sh` | ラベルとルールセットを作る(人が実行する。エージェントはフックで止まる) |
 
 ## 検査
@@ -22,12 +24,14 @@ CI(`.github/workflows/factory.yml`)のジョブ名が、そのまま main のル
 | 曖昧語の検査 | `ambiguity` | 要件・業務ルール・`.feature` の `ルール:` 行 | 曖昧語が 1 つでもある |
 | 要件とシナリオの網羅 | `coverage` | 要件 ↔ シナリオのトレーサビリティ(実行サマリと成果物 `coverage-matrix` に出す) | シナリオのない要件、孤児のタグ、`ルール:` の文が要件文と違う、1 ルールに 2 要件 |
 | ナレッジの出どころと確定 | `knowledge` | 業務ルールの frontmatter と `sources`、要件が参照する業務ルール | 出どころがない・索引にない、未確定の業務ルールを要件が参照している |
+| 画面要件と fixtures | `screens` | `requirements/screens/screens.yaml` の形、fixtures の body が OpenAPI の応答のスキーマに合うか | 項目の欠け、fixtures がない・余っている、スキーマに合わない、OpenAPI にない API |
 | 工程の持ち場(role-guard) | `role` | PR のブランチ名と、変えたファイル | 命名に合わないブランチ、工程の持ち場の外の変更 |
 | ゲートラベルの確認(gate-check) | `gate` | `req/`・`spec/`・`impl/` の PR の Issue のラベル | 前のゲートのラベル(gate0〜2-approved)がない |
 | 前提の版(upstream-approved) | `premises` | `spec/`・`impl/` の PR の `.factory/premises/ISSUE-<n>.yml` | 前提の記録がない、前提のファイルが main で変わった・main にない |
 | 工場の版の更新(factory-version) | `factory-version` | `.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/` の変更 | `.factory/CHANGELOG.md` を変えていない |
 
-- 下の 4 つは PR だけの検査。main への push では何もしない
+- このほかに、ジョブ「画面の差分(承認した画面との比較)」が `tests/e2e/screens` の Playwright を Playwright のコンテナで動かす(`requirements/screens/README.md`)
+- 持ち場・ゲートラベル・前提の版・工場の版の 4 つは PR だけの検査。main への push では何もしない
 - ゲートラベルは Issue に付くので、付けても PR の検査は動き直さない。付けたあとで「ゲートラベルの確認」を再実行する
 - Dependabot のブランチ(`dependabot/…`)は、持ち場と工場の版の検査から外す
 

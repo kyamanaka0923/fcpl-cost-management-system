@@ -29,7 +29,7 @@
 | 工程 | 書く | 検証する |
 |---|---|---|
 | [A] ナレッジ | `knowledge-extractor` | 人(ゲート0) |
-| [B] 要件・画面 | `requirements-writer`、`screen-writer`(フェーズ5 以降) | `requirements-reviewer` |
+| [B] 要件・画面 | `requirements-writer`、`screen-writer` | `requirements-reviewer` |
 | [C] 仕様 | `spec-writer` | 人(ゲート2) |
 | [D] 実装 / [E] 検証 | `implementer` | `code-reviewer`、CI |
 

@@ -114,6 +114,8 @@ model: claude-sonnet-5
   読み込み→明細を足し→保存するため、PUT が重なると後の保存が先の保存を上書きする(同時更新の制御がない)。
   E2E で複数セルを続けて入力するときは `page.waitForResponse(PUT /lines)` で1セルずつ保存を待つ
 
+**画面の差分の検査**(`tests/e2e/screens`): 画面要件(`requirements/screens/screens.yaml`)の状態ごとに、fixtures で API を返して画面を開き、承認した画面(`requirements/screens/approved/`)と比べる。バックエンドは起動しない。CI と同じコンテナで `bash tools/factory/screens-docker.sh` で動かす(手元の Chromium では描画が違うので比べない)。承認した画面の撮り直しは人の仕事(フックが止める)。
+
 E2E(API E2E・ブラウザE2E)のテストケースを追加・変更したら、解説 `docs/design/e2e-test-guide.html` も更新する。
 
 ## プロパティベーステスト(CsCheck)

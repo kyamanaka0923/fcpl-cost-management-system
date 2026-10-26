@@ -10,7 +10,7 @@
 requirements/
   README.md            この文書
   <領域>/FR-x.y.md     要件 1 件 = 1 ファイル
-  screens/             画面要件(フェーズ5 で作る)
+  screens/             画面要件(screens/README.md)
 ```
 
 | 領域 | 章 | 中身 |
@@ -64,7 +64,7 @@ title: 明細の金額は 0 以上
 priority: Must              # Must | Should | Could(MoSCoW)
 status: 有効                # 有効 | 廃止
 business_rules: [BR-BUD-007]  # 使う業務ルール。status: 確定 のものだけ
-screens: []                 # 関係する画面(SCR-…)。フェーズ5 以降
+screens: []                 # 関係する画面(SCR-…。requirements/screens/screens.yaml)
 issues: [46]                # この要件を作った・変えた作業項目
 ---
 

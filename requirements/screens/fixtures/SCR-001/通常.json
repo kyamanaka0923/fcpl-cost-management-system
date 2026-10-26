@@ -1,0 +1,9 @@
+{
+  "GET /api/cost-elements": {
+    "status": 200,
+    "body": [
+      { "code": "PERSONNEL", "name": "人件費" },
+      { "code": "LICENSE", "name": "ライセンス費" }
+    ]
+  }
+}
