@@ -17,6 +17,7 @@
 | SRC-ISSUE-8 | Issue #8 期間費用 明細の名称変更 | クローズ済み | GitHub Issue #8 |
 | SRC-ISSUE-9 | Issue #9 編集UIの統一 | クローズ済み | GitHub Issue #9 |
 | SRC-CODE | 実装(ドメイン層の不変条件とエラーメッセージ) | 2026-10-26 の main | `backend/src/CostManagement.Domain/`、`backend/src/CostManagement.Application/` |
+| SRC-ANS-OQ-001〜003 | 未確定事項への回答(工場長・Outcome Owner) | 2026-10-26 | [open-questions.md](open-questions.md) と PR #44 のやりとり |
 | SRC-FACTORY | ソフトウェアファクトリーの文書(PROC-DEV-001 v2.7・導入計画・概要) | 2026-10-25 | リポジトリ外(作者の保管庫) |
 
 - 既存の文書(REQUIREMENTS.md・要件変更依頼)は改訂せず、出どころとして参照する。要件を `requirements/` に移したら、移行元の行に印を付ける
