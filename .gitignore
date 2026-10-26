@@ -33,3 +33,6 @@ StrykerOutput/
 
 # Reqnroll(Gherkin のコードビハインドはビルド時に生成される)
 *.feature.cs
+
+# 工場の網羅監査の出力(tools/factory/cli.mjs coverage)
+/coverage-matrix.md

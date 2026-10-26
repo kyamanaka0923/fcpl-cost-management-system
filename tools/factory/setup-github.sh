@@ -45,6 +45,15 @@ wanted=(
   "フロントエンド単独テスト(Vitest)"
   "ブラウザE2E(Playwright)"
   "工場のフック(ゲートを破る操作を止めるか)"
+  "工場の検査スクリプトのテスト"
+  "要件の書式(EARS)"
+  "曖昧語の検査"
+  "要件とシナリオの網羅"
+  "ナレッジの出どころと確定"
+  "工程の持ち場(role-guard)"
+  "ゲートラベルの確認(gate-check)"
+  "前提の版(upstream-approved)"
+  "工場の版の更新(factory-version)"
 )
 ran_on_main="$(gh api --paginate "repos/$repo/commits/main/check-runs?per_page=100" --jq '.check_runs[].name')"
 required=()

@@ -23,7 +23,7 @@ model: claude-sonnet-5
   マイナー・パッチはエコシステムごとに1件へまとめ、メジャーは個別 PR。PR は CI を通してからマージする
   (メジャー更新は破壊的変更の確認が必要。例: React・Vite・xUnit のメジャー)
 - トリガ: push(main)と pull_request。README 冒頭に CI バッジあり
-- **工場のゲート(`.github/workflows/factory.yml`)**: 工場の検査(いまはフックの確認 `guard-hook`。フェーズ4 で足す)。
+- **工場のゲート(`.github/workflows/factory.yml`)**: フックの確認、検査スクリプトのテスト、ゲートの検査 8 つ(matrix。中身は `tools/factory/cli.mjs`、一覧は `tools/factory/README.md`)。ゲートラベルを付けたあとは「ゲートラベルの確認」を再実行する(Issue のラベルでは PR の検査が動かないため)。
   ジョブ名(`name:`)が main のルールセットの必須チェックになる。ジョブを足したら、その PR をマージしたあとで、
   人が `bash tools/factory/setup-github.sh` を実行して必須チェックに加える(main で動いたジョブだけが加わる)
 - **プッシュしたら必ず `gh pr checks <番号> --watch` で結果を確認する**。実行は約1〜5分(ミューテーションが最も遅い)。

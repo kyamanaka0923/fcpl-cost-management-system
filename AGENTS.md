@@ -29,7 +29,8 @@
 | 工場の変更 | `.claude/`、`AGENTS.md`、`.github/`、`tools/factory/`、`.factory/` | `factory/<名前>` |
 
 - 1 作業項目 → 1 ブランチ → 1 PR。main に直接 push しない
-- ブランチの種類ごとに触ってよい場所が決まっている(CI の `role-guard` が検査する)
+- ブランチの種類ごとに触ってよい場所が決まっている(CI の「工程の持ち場(role-guard)」が検査する。一覧は `tools/factory/checks/branch.mjs` の `ROLES`)。
+  命名に合わないブランチの PR は CI で落ちる(Dependabot の `dependabot/…` だけは例外)
 
 ## 守ること
 
