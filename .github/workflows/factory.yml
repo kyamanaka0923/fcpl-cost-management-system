@@ -1,0 +1,20 @@
+name: 工場のゲート
+
+# 工場(ソフトウェアファクトリー)のゲートを機械で確かめる検査(ADR-0015)。
+# フェーズごとに検査を足していく。各ジョブは main のルールセットで必須チェックにする。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  guard-hook:
+    name: 工場のフック(ゲートを破る操作を止めるか)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: guard.sh の確認を実行
+        run: bash .claude/hooks/guard.test.sh

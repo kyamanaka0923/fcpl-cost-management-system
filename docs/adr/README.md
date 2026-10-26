@@ -21,10 +21,12 @@
 | [0008](0008-project-guid-reference.md) | 案件は GUID 参照・コードは課ごとに一意で編集可能にする | Accepted |
 | [0009](0009-monthly-input-half-aggregation.md) | 明細ごとの月次入力を許容し集計は半期粒度のままにする | Accepted |
 | [0010](0010-serverless-deployment.md) | クラウドはサーバーレス構成(Lambda + EFS + S3 + CloudFront)で提供する | Accepted |
-| [0011](0011-testing-strategy-and-mutation.md) | テスト戦略(多層テスト + カバレッジ + ミューテーションテスト) | Accepted |
+| [0011](0011-testing-strategy-and-mutation.md) | テスト戦略(多層テスト + カバレッジ + ミューテーションテスト) | Accepted(置き場所は ADR-0016 で置き換え) |
 | [0012](0012-frontend-svg-and-toast.md) | フロントは自前 SVG 描画・エラーは固定トースト通知 | Accepted |
 | [0013](0013-period-cost-detail-lines.md) | 期間費用は費目内を明細名で細分できる(費目一括との排他) | Accepted |
 | [0014](0014-cognito-authentication.md) | 認証は Amazon Cognito(Hosted UI + PKCE)と API の JWT 検証で行う | Accepted |
+| [0015](0015-software-factory.md) | ソフトウェアファクトリーを導入し、ゲートをハーネスで強制する | Accepted |
+| [0016](0016-test-scope-layout-and-frontend-unit.md) | テストをスコープ別の tests/ にまとめ、フロントエンド単独テストを加える | Accepted |
 
 ## 状態の凡例
 
