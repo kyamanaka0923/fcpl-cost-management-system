@@ -1,0 +1,54 @@
+name: 工場の改善
+description: 人の介入(回答・差し戻し・手直し)の原因を、工場の側で直す作業項目
+title: "[工場] "
+labels: ["factory"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        成果物を手で直したときは、その成果物ではなく、**ナレッジ・要件・仕様・工場のどこが悪かったか**を直します(AGENTS.md「手で直さない」)。
+        変更の種類(A〜D)のラベル `factory:A`〜`factory:D` も付けてください。ブランチは `factory/<名前>`(ナレッジの訂正は `knowledge/<n>-…`)。
+  - type: textarea
+    id: intervention
+    attributes:
+      label: 介入の記録
+      description: どの PR・Issue で、何をしたか(回答・差し戻し・手直し・CI の承認)
+      placeholder: "#47 で、エージェントが金額の端数を四捨五入する実装をしたので差し戻した"
+    validations:
+      required: true
+  - type: dropdown
+    id: cause
+    attributes:
+      label: 原因の場所
+      description: 介入が要った原因はどこにあったか
+      options:
+        - ナレッジ(業務ルール・用語が足りない、間違っている)
+        - 要件(EARS の穴・曖昧さ)
+        - 仕様(処理ルール・API・テスト計画の穴)
+        - 工場(指示・エージェント・スキル・CI・フック)
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 変更の種類
+      description: 導入計画 §11.2。種類で、仕掛かり品の扱いが変わる
+      options:
+        - A 軽微な改善(仕掛かり品はそのまま続行)
+        - B 検査の強化(警告で入れ、仕掛かり品が流れ切ってから必須にする)
+        - C 工程・成果物の形の変更(仕掛かり品を流し切るか、やり直すかを決める)
+        - D ナレッジの訂正(マージ済みの成果物まで遡って直す)
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: 直す場所と直し方
+      description: どのファイル(knowledge/・requirements/・specs/・AGENTS.md・.claude/・.github/・tools/factory/)を、どう直すか
+    validations:
+      required: true
+  - type: textarea
+    id: wip
+    attributes:
+      label: 仕掛かり品の扱い
+      description: いま流れている作業項目(Issue 番号)をどうするか。種類 A なら「そのまま続行」でよい

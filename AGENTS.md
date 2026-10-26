@@ -21,9 +21,9 @@
 
 | 工程 | 書く場所 | ブランチ |
 |---|---|---|
-| [A] ナレッジ | `knowledge/`(用語・業務ルール・未確定事項・出どころ) | `knowledge/<Issue番号>-<名前>` |
-| [B] 要件・画面 | `requirements/`(EARS)、`.feature` の `ルール:` と `@FR-x.y`、`requirements/screens/` | `req/<n>-…` |
-| [C] 仕様 | `specs/`、`docs/api/openapi.json`、テスト計画 | `spec/<n>-…` |
+| [A] ナレッジ | [`knowledge/`](knowledge/README.md)(用語・業務ルール・未確定事項・出どころ) | `knowledge/<Issue番号>-<名前>` |
+| [B] 要件・画面 | [`requirements/`](requirements/README.md)(EARS)、`.feature` の `ルール:` と `@FR-x.y`、`requirements/screens/` | `req/<n>-…` |
+| [C] 仕様 | [`specs/`](specs/README.md)、`docs/api/openapi.json`、テスト計画 | `spec/<n>-…` |
 | [D] 実装 | `backend/`、`frontend/`、`tests/` | `impl/<n>-…` |
 | 下ごしらえ | レビューView、テスト強化、ナレッジの穴の洗い出し | `prep/<n>-…` |
 | 工場の変更 | `.claude/`、`AGENTS.md`、`.github/`、`tools/factory/`、`.factory/` | `factory/<名前>` |

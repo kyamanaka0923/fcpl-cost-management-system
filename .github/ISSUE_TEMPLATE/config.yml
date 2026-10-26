@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 工場の流れと決まり(AGENTS.md)
+    url: https://github.com/kyamanaka0923/fcpl-cost-management-system/blob/main/AGENTS.md
+    about: 作業項目がどの工程を通るか、エージェントが守ることはここに書いてある

@@ -1,0 +1,60 @@
+name: 作業項目(機能の追加・変更・不具合)
+description: 工場のラインに流す作業項目。まず上流([A] ナレッジ・[B] 要件・画面)で下書きする
+title: ""
+labels: ["stage:準備中"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        工場のラインに流す作業項目です(AGENTS.md)。起票すると `stage:準備中` になります。
+        ここに書くのは**要求**です。要件(EARS)と受け入れ条件(Gherkin)は、工程 [B] で `requirements/` と `.feature` に書きます。
+        分からないことは推測で埋めず、「上流で決めること」に問いとして書いてください。
+  - type: textarea
+    id: request
+    attributes:
+      label: 要求
+      description: 誰が・何に困っていて・何ができるようになりたいか。いまの振る舞いとの違い
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 受け入れ条件(案)
+      description: 「〜すると、〜になる」の形で、外から確かめられる結果を箇条書きで。工程 [B] で EARS と Gherkin にする
+      placeholder: |
+        - 金額に 100.5 を入れて保存すると、保存は拒否される
+        - 拒否されたとき、既存の明細は変わらない
+    validations:
+      required: true
+  - type: textarea
+    id: knowledge
+    attributes:
+      label: 使うナレッジ
+      description: knowledge/ の業務ルール(BR-…)・用語。足りないものは「ナレッジに足す」と書く
+      placeholder: |
+        - BR-BUD-007(明細は金額のみ)
+        - ナレッジに足す: …
+    validations:
+      required: true
+  - type: textarea
+    id: requirements
+    attributes:
+      label: 関係する要件
+      description: 変える・足す要件の ID(requirements/ または docs/REQUIREMENTS.md の FR-…)
+      placeholder: "- FR-4.8(金額は 0 以上)"
+  - type: textarea
+    id: questions
+    attributes:
+      label: 上流で決めること
+      description: 決まっていないこと。knowledge/open-questions.md に問いとして出す。金額・税の計算、権限、個人情報は仮決めしない
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: 対象外
+      description: この作業項目ではやらないこと
+  - type: textarea
+    id: related
+    attributes:
+      label: 関係する画面・API
+      description: 画面(SCR-…またはルート)、API(メソッドとパス。docs/api/openapi.json)、経緯
+      placeholder: "- PUT /api/budgets/{budgetId}/lines"
