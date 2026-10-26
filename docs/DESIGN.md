@@ -7,6 +7,7 @@
 - [2. C4 モデル](#2-c4-モデル)
 - [3. ドメインモデル クラス図](#3-ドメインモデル-クラス図)
 - [4. ドメインサービス クラス図](#4-ドメインサービス-クラス図)
+- [5. 開発の置き場(工場)](#5-開発の置き場工場)
 
 ---
 
@@ -481,3 +482,55 @@ classDiagram
 - 部承認(DivisionBudgetApproval): (部, 半期) ごとの承認レコード。配下の全課が承認済み予算を
   持つときのみ承認可能(条件判定は Application 層)。取り消し可。課の承認フローとは独立で、
   部承認後に課が改定しても部承認は残る
+
+---
+
+## 5. 開発の置き場(工場)
+
+工場(ADR-0015)で、どの成果物がどこにあり、どの検査とゲートを通って main に入るかを示します。
+エージェントは成果物を書き、CI が機械で確かめ、人がマージしてゲートを通します。
+
+```mermaid
+flowchart TB
+  subgraph upstream[上流]
+    K["knowledge/<br/>用語集・業務ルール BR・未確定事項"]
+    R["requirements/<br/>要件 FR(EARS)"]
+    S["requirements/screens/<br/>screens.yaml・fixtures・承認した画面"]
+    F[".feature の ルール: と @FR タグ<br/>受け入れ条件"]
+  end
+  subgraph mainline[本ライン]
+    P["specs/<br/>処理ルール SPEC・テスト計画"]
+    O["docs/api/openapi.json<br/>WebAPI 仕様"]
+    X["backend/・frontend/・tests/<br/>実装とテスト"]
+    PR[".factory/premises/<br/>前提にした版"]
+  end
+  K -->|業務ルールを参照| R
+  R -->|要件文を写す| F
+  R --> S
+  R -->|満たし方を決める| P
+  P --> X
+  O --> X
+  S -->|fixtures の型| O
+  PR -.->|main の版と比べる| R
+  PR -.-> P
+
+  subgraph ci[CI の検査 factory.yml]
+    C1[ナレッジの出どころと確定]
+    C2[要件の書式 EARS・曖昧語]
+    C3[要件とシナリオの網羅]
+    C4[画面要件と fixtures・画面の差分]
+    C5[工程の持ち場・ゲートラベル・前提の版・工場の版]
+  end
+  K --- C1
+  R --- C2
+  F --- C3
+  S --- C4
+  X --- C5
+```
+
+| ゲート | 承認するもの | 承認の印 |
+|---|---|---|
+| ゲート0 | ナレッジが出どころと一致している | `knowledge/` の PR のマージ + Issue に `gate0-approved` |
+| ゲート1 | 要件と画面(投入) | `req/` の PR のマージ + `gate1-approved`、列を `stage:着手待ち` へ |
+| ゲート2 | 仕様とテスト計画 | `spec/` の PR のマージ + `gate2-approved`、列を `stage:仕様確定` へ |
+| ゲート3 | 実装 | `impl/` の PR のマージ(CI の必須チェックがすべて成功) |
