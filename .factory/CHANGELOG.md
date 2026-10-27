@@ -28,4 +28,5 @@ ADR-0015 のフェーズごとに入れている。導入中は仕掛かり品�
 | #51 | B | フェーズ5: 画面要件(`requirements/screens/`)と最初の画面 SCR-001、検査「画面要件と fixtures」「画面の差分」、承認した画面の撮り直しをフックで止める |
 | #52 | C | フェーズ6: 計測(介入の記録 `/intervention`、工場の週報、WIP の上限の知らせ) |
 | #53 | D | OQ-003 の作業項目の番号を #46 に直す(ナレッジの訂正) |
-| (この PR) | B | フェーズ7: devcontainer のファイアウォール(許可リスト)、sudo の制限、Claude Code の Feature と設定の volume |
+| #54 | B | フェーズ7: devcontainer のファイアウォール(許可リスト)、sudo の制限、Claude Code の Feature と設定の volume |
+| (この PR) | A | フェーズ8-1: README・DESIGN に工場の節を足す(ドキュメントの同期) |

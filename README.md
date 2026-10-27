@@ -28,6 +28,53 @@
 設計の詳細は **[設計ドキュメント](docs/DESIGN.md)**(コンテキストマップ / C4 モデル / クラス図)を参照してください。
 要件は **[要件定義書](docs/REQUIREMENTS.md)**(機能要件 / 非機能要件 / アーキテクチャ制約)、
 設計判断の経緯は **[アーキテクチャ決定記録(ADR)](docs/adr/README.md)** にまとめています。
+開発は AI エージェントと人の分担で進めています(**[開発の進め方(工場)](#開発の進め方工場)**)。
+
+## 開発の進め方(工場)
+
+このリポジトリは、AI エージェント(Claude Code)が書き、人が「何を作るか」と「出してよいか」を決める
+**工場(ソフトウェアファクトリー)**の形で開発しています。決定は [ADR-0015](docs/adr/0015-software-factory.md)、
+エージェントへの共通の指示は [AGENTS.md](AGENTS.md) です。
+
+```mermaid
+flowchart LR
+  I[Issue<br/>作業項目] --> A["[A] ナレッジ<br/>knowledge/"]
+  A --> G0{{ゲート0}}
+  G0 --> B["[B] 要件・画面<br/>requirements/"]
+  B --> G1{{ゲート1}}
+  G1 --> C["[C] 仕様<br/>specs/・OpenAPI"]
+  C --> G2{{ゲート2}}
+  G2 --> D["[D] 実装<br/>backend/・frontend/・tests/"]
+  D --> E["[E] 検証<br/>CI・レビューのエージェント"]
+  E --> G3{{ゲート3}}
+  G3 --> M[main]
+```
+
+- **すべてのゲートで、人が PR を main にマージするまで次の工程に進みません。** ゲート0〜2 を通ったことは、
+  人が Issue に付けるゲートラベル(`gate0-approved` など)で表します
+- 工程ごとにブランチを分けます(`knowledge/<n>-…` `req/<n>-…` `spec/<n>-…` `impl/<n>-…` `prep/<n>-…` `factory/…`)。
+  ブランチごとに触ってよい場所が決まっていて、CI が検査します
+- エージェントはマージ・承認・ゲートラベルの付与ができません(`.claude/settings.json` とフック `.claude/hooks/guard.sh`、main のルールセットが止めます)
+
+| 置き場 | 中身 |
+|---|---|
+| [knowledge/](knowledge/README.md) | 業務の知識の正: 用語集・業務ルール(`BR-…`。出どころ必須)・未確定事項・レビューの観点 |
+| [requirements/](requirements/README.md) | 要件(EARS。1 件 1 ファイル)。触った機能から [要件定義書](docs/REQUIREMENTS.md) より移していく。受け入れ条件は `.feature` の `ルール:` と `@FR-x.y` タグ |
+| [requirements/screens/](requirements/screens/README.md) | 画面要件: 画面ごとの状態・fixtures・**人が承認した画面の画像** |
+| [specs/](specs/README.md) | 仕様: 処理ルール(`SPEC-…`)・テスト計画。WebAPI 仕様は [docs/api/openapi.json](docs/api/openapi.json) |
+| `.claude/agents/`・`.claude/skills/` | 工程ごとのエージェント(書く役と確かめる役を分ける)と手順 |
+| [tools/factory/](tools/factory/README.md) | ゲートの検査(EARS・曖昧語・網羅・持ち場・ゲートラベル・前提の版・画面の差分など)と週報 |
+| `.factory/` | 工場の版(`VERSION`・`CHANGELOG.md`)と、作業ごとの前提の記録 |
+
+人(判定する人)がすること:
+
+| すること | どうやって |
+|---|---|
+| ゲートの承認 | PR を読んで GitHub で **Merge pull request**。ゲート0〜2 は、Issue にゲートラベルを付けて列(`stage:…`)を進める |
+| 問いへの回答 | `needs-answer` の Issue や PR の「問い」に答える |
+| 画面の承認 | `bash tools/factory/update-approved-screens.sh` で撮り、画像を確かめてコミットする |
+| 介入の記録 | 手を出したら `/intervention <種類> <原因>` とコメントする。毎週月曜に「工場の週報」Issue に集計が出る |
+| GitHub の設定 | 検査を足したあとで `bash tools/factory/setup-github.sh`(ラベルと必須チェック) |
 
 ## 技術スタック
 
@@ -78,7 +125,7 @@
 | 区分 | 技術 | 内容 |
 |---|---|---|
 | 開発環境 | Docker / docker compose / VS Code Dev Containers | `docker/dev.Dockerfile`(.NET 10 SDK + Node.js 22)を共用 |
-| CI | GitHub Actions(ubuntu-latest) | 5 ジョブ: バックエンド(ビルド・テスト・カバレッジ)/ フロントエンド(ESLint・Prettier・型チェック・ビルド)/ ブラウザE2E / ミューテーションテスト / コードメトリクス |
+| CI | GitHub Actions(ubuntu-latest) | `ci.yml`: バックエンド(ビルド・テスト・カバレッジ)/ フロントエンド(ESLint・Prettier・型チェック・ビルド)/ フロントエンド単独テスト / ブラウザE2E / ミューテーションテスト / コードメトリクス。`factory.yml`: 工場のゲートの検査(フック・検査スクリプトのテスト・画面の差分と 9 つの検査。[tools/factory/](tools/factory/README.md))。`factory-metrics.yml`・`factory-intervention.yml`: 週報と介入の記録 |
 | 依存の自動更新 | Dependabot | NuGet・npm・GitHub Actions・Docker ベースイメージを毎週月曜 09:00 JST に確認して PR を作成(`.github/dependabot.yml`)。マイナー・パッチはまとめて1件、メジャーは個別 |
 | デプロイ | AWS SAM | Lambda(`provided.al2023`, arm64)+ EFS(SQLite)+ S3 + CloudFront + Cognito + AWS Backup(EFS を日次バックアップ)。詳細は [infra/README.md](infra/README.md) |
 
@@ -334,7 +381,7 @@ npm パッケージ(`unit/frontend`・`e2e/browser`)は Node の慣習どおり�
 #### 観点2: テスト仕様の源泉
 
 要件の大元は [要件定義書](docs/REQUIREMENTS.md)(FR-1〜FR-10・NFR)と、
-設計判断を記録した [ADR](docs/adr/README.md) です。テストはそれを、次のどこかに**実行できる形で**書き下ろしています。
+設計判断を記録した [ADR](docs/adr/README.md) です。工場に移した要件は [requirements/](requirements/README.md) が正で、`.feature` の `ルール:` に要件文と `@FR-x.y` タグを書き、CI の「要件とシナリオの網羅」が要件ごとにシナリオがあるかを確かめます(テストレベルごとの完了基準は [specs/test-plan.md](specs/test-plan.md))。テストはそれを、次のどこかに**実行できる形で**書き下ろしています。
 
 | フォルダ | 仕様が書かれている場所 | 形式 |
 |---|---|---|
