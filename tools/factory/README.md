@@ -5,6 +5,7 @@
 | ファイル | 中身 |
 |---|---|
 | `cli.mjs` | ゲートの検査の入口。`node tools/factory/cli.mjs <検査名>`(リポジトリ直下で実行) |
+| `cli.mjs changes`、`lib/changes.mjs` | 工場の変更の記録(`.factory/changes/`)を確かめて、Issue の番号の順の表を出す(#66) |
 | `checks/` | 検査の中身(入力を引数で受け取る純粋な関数) |
 | `lib/` | 共通の部品(frontmatter・日本語 Gherkin の簡易パーサ・ブランチ名) |
 | `test/` | 検査のテスト(`npm test` = `node --test`)。正例と反例を両方置く |
@@ -31,7 +32,7 @@ CI(`.github/workflows/factory.yml`)のジョブ名が、そのまま main のル
 | ゲートラベルの確認(gate-check) | `gate` | `req/`・`spec/`・`impl/` の PR の Issue のラベル | 前のゲートのラベル(gate0〜2-approved)がない |
 | 前提の版(upstream-approved) | `premises` | `spec/`・`impl/` の PR の `.factory/premises/ISSUE-<n>.yml` | 前提の記録がない、前提のファイルが main で変わった・main にない |
 | 作業項目を途中で閉じない(閉じるキーワード) | `closing` | `knowledge/`・`req/`・`spec/`・`prep/` の PR の本文 | 閉じるキーワード(close・fix・resolve の活用形)+ Issue の参照がある。否定の文の中でも落とす |
-| 工場の版の更新(factory-version) | `factory-version` | `.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/` の変更 | `.factory/CHANGELOG.md` を変えていない |
+| 工場の版の更新(factory-version) | `factory-version` | `.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/` の変更 | 変更の記録 `.factory/changes/<Issue番号>.md` を足していない、記録の frontmatter(`issue`・`kind`)が違う、記録を消した |
 
 - このほかに、ジョブ「画面の差分(承認した画面との比較)」が `tests/e2e/screens` の Playwright を Playwright のコンテナで動かす(`requirements/screens/README.md`)
 - 持ち場・ゲートラベル・前提の版・工場の版・閉じるキーワードの 5 つは PR だけの検査。main への push では何もしない。PR の本文を直すと(`edited`)検査が動き直す
