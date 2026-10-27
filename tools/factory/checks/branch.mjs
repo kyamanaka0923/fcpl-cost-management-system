@@ -1,5 +1,5 @@
 // PR のブランチに対する検査: role-guard(持ち場)・gate-check(ゲートラベル)・factory-version(工場の版)。
-import { issue, parseBranch } from '../lib/common.mjs';
+import { issue, parseBranch, readFrontmatter } from '../lib/common.mjs';
 
 const FR_FILE = /^requirements\/(?!screens\/)[^/]+\/FR-[^/]+\.md$/;
 const FEATURE = /^tests\/.+\.feature$/;
@@ -55,10 +55,48 @@ export function checkGate(branch, issueLabels) {
 /** 工場の版を上げる対象のファイル。 */
 const FACTORY_FILES = ['.claude/', 'AGENTS.md', 'CLAUDE.md', '.github/workflows/', 'tools/factory/'];
 
-/** factory-version: 工場の設定を変えたら、.factory/CHANGELOG.md も変えたか。 */
-export function checkFactoryVersion(branch, changedFiles) {
+/** 変更の記録のファイル(.factory/changes/<Issue番号>.md。1 つの Issue で 2 つ目の PR を出すときは <Issue番号>-<名前>.md)。 */
+export const CHANGE_FILE = /^\.factory\/changes\/(\d+)(?:-[^/]+)?\.md$/;
+
+/** 種類(.factory/CHANGELOG.md の「変更の種類」)。 */
+const KINDS = ['A', 'B', 'C', 'D'];
+
+/**
+ * 変更の記録 1 件を確かめる。frontmatter の issue がファイル名の番号と同じで、kind が A〜D、本文に中身があるか。
+ * @param {string} file リポジトリ直下からのパス
+ * @param {string | null} text ファイルの中身(消したファイルは null)
+ */
+export function checkChangeFile(file, text) {
+  if (text === null) return [issue(file, 0, '変更の記録は消さない(マージ済みの変更の記録になっている)')];
+  const fm = readFrontmatter(text);
+  if (!fm) return [issue(file, 1, 'frontmatter(issue と kind)がない')];
+  if (fm.error) return [issue(file, 1, `frontmatter が読めない: ${fm.error}`)];
+  const errors = [];
+  const n = Number(CHANGE_FILE.exec(file)[1]);
+  if (fm.data.issue !== n) errors.push(issue(file, 1, `issue が ${fm.data.issue ?? 'ない'}。ファイル名の番号 ${n} と同じにする`));
+  if (!KINDS.includes(fm.data.kind)) errors.push(issue(file, 1, `kind が ${fm.data.kind ?? 'ない'}。A〜D のどれかにする(.factory/CHANGELOG.md の「変更の種類」)`));
+  if (fm.body.trim() === '') errors.push(issue(file, fm.bodyStartLine, '本文に、何を変えたかを 1〜2 文で書く'));
+  return errors;
+}
+
+/**
+ * factory-version: 工場の設定を変えたら、変更の記録(.factory/changes/)を足したか。
+ * 記録を 1 件 1 ファイルにして、工場の PR が同時に開いても同じ場所に行を足さない(衝突しない)ようにしている(#66)。
+ * @param {(path: string) => string | null} readChanged PR の head のファイルの中身(消したファイルは null)
+ */
+export function checkFactoryVersion(branch, changedFiles, readChanged = () => null) {
   if (parseBranch(branch)?.role === 'dependabot') return [];
+  const changes = changedFiles.filter((f) => CHANGE_FILE.test(f));
+  const errors = changes.flatMap((f) => checkChangeFile(f, readChanged(f)));
   const touched = changedFiles.filter((f) => FACTORY_FILES.some((p) => f.startsWith(p)));
-  if (touched.length === 0 || changedFiles.includes('.factory/CHANGELOG.md')) return [];
-  return [issue('.factory/CHANGELOG.md', 0, `工場の設定(${touched.slice(0, 3).join('、')}${touched.length > 3 ? ' ほか' : ''})を変えたので、CHANGELOG に 1 行足す(種類 A〜D)`)];
+  if (touched.length > 0 && changes.length === 0) {
+    errors.push(
+      issue(
+        '.factory/changes/',
+        0,
+        `工場の設定(${touched.slice(0, 3).join('、')}${touched.length > 3 ? ' ほか' : ''})を変えたので、変更の記録 .factory/changes/<Issue番号>.md を足す(種類 A〜D。書き方は .factory/changes/README.md)`,
+      ),
+    );
+  }
+  return errors;
 }

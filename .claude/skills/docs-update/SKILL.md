@@ -24,7 +24,7 @@ model: claude-haiku-4-5
 |---|---|---|
 | `AGENTS.md` | 工場の流れ・置き場・守ること(目次) | 工程・置き場・ブランチの命名の変更 |
 | `knowledge/`・`requirements/`・`specs/` の README | 各工程の成果物の形 | 成果物の形の変更(工場の変更の種類 C) |
-| `.factory/CHANGELOG.md` | 工場の版と変更の種類 | 工場の設定を変えたとき毎回 |
+| `.factory/changes/<Issue番号>.md` | 工場の変更の記録(1 件 1 ファイル。`.factory/CHANGELOG.md` は版と変更の種類の説明) | 工場の設定を変えたとき毎回 |
 | `docs/adr/0015-software-factory.md` | 工場の決定と、定義書との違い | 違いが増えたとき |
 
 - 費目マスタの一覧は `DatabaseInitializer` のシードと**突き合わせて**記載する(推測で書かない)

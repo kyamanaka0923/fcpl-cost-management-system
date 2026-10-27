@@ -87,4 +87,4 @@ model: claude-sonnet-5
 - 工程の成果物は PR で出す(`.github/pull_request_template.md`)。**マージは人がする**
 - プッシュと `gh pr create --base main` は別のコマンドにする。フックはコマンドの文字列で判定するので、
   コミットメッセージやヒアドキュメントに「git push」と「main」が両方あると止まることがある(本文はファイルに書いて渡す)
-- 工場の設定(`.claude/`・`AGENTS.md`・`.github/workflows/`・`tools/factory/`)を変えたら `.factory/CHANGELOG.md` に 1 行足す
+- 工場の設定(`.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/`)を変えたら、変更の記録 `.factory/changes/<Issue番号>.md` を 1 ファイル足す(書き方は `.factory/changes/README.md`)。`.factory/CHANGELOG.md` の表には足さない(工場の PR が同時に開くと衝突するため。#66)
