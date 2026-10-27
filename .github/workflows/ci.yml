@@ -139,6 +139,48 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "0"
 
+      # ランナーには日本語のフォントがなく、失敗時のトレースとスクリーンショットで日本語が □ になる(#65)。
+      # apt は毎回 10 秒前後かかるので、フォントのファイルだけを ~/.local/share/fonts にキャッシュする
+      - name: 日本語のフォントのキャッシュを戻す
+        id: font-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.local/share/fonts/ja
+          key: fonts-ja-${{ runner.os }}-ipafont-gothic-v1
+
+      - name: 日本語のフォントを入れる(キャッシュがないときだけ)
+        if: steps.font-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends fonts-ipafont-gothic
+          mkdir -p ~/.local/share/fonts/ja
+          dpkg -L fonts-ipafont-gothic | grep -E '\.ttf$' | xargs -I{} cp -L {} ~/.local/share/fonts/ja/
+
+      - name: 日本語のフォントを使えるようにする
+        run: |
+          fc-cache -f ~/.local/share/fonts
+          fc-list :lang=ja family | grep . || { echo "::error::日本語のフォントが見つかりません"; exit 1; }
+
+      - name: 日本語の表示を確かめる(一時的。#65 の確認が済んだら消す)
+        run: |
+          mkdir -p test-results
+          node -e "
+            const { chromium } = require('playwright');
+            (async () => {
+              const b = await chromium.launch();
+              const p = await b.newPage({ viewport: { width: 480, height: 120 } });
+              await p.setContent('<p style=\"font:24px sans-serif\">予算編集 — 売上高・加工費・外注費・期間費用</p>');
+              await p.screenshot({ path: 'test-results/font-check.png' });
+              await b.close();
+            })();
+          "
+
+      - name: 日本語の表示の確認の画像を保存(一時的)
+        uses: actions/upload-artifact@v7
+        with:
+          name: font-check
+          path: tests/e2e/browser/test-results/font-check.png
+
       - name: E2E テストを実行(Gherkin からテストを生成し、バックエンド+フロントエンドを自動起動)
         run: npm test
 
