@@ -119,8 +119,23 @@ jobs:
           npm run typecheck
           npm run format:check
 
-      - name: Chromium をインストール
-        run: npx playwright install --with-deps chromium
+      # ブラウザは Playwright の版ごとにキャッシュする。ヘッドレスのテストに要るのはヘッドレスシェルだけなので、
+      # 本体の Chromium(約 190 MiB)は入れない。OS の依存(--with-deps)は ubuntu ランナーに揃っているので入れない
+      # (apt の更新が毎回 15 秒前後かかっていた。足りなければ起動時に Playwright が不足を名指しで落とす)。Issue #63
+      - name: Playwright の版を調べる(ブラウザのキャッシュのキー)
+        id: playwright
+        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Chromium のキャッシュを戻す
+        id: browser-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-headless-shell-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      - name: Chromium をインストール(キャッシュがないときだけ)
+        if: steps.browser-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --only-shell chromium
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "0"
 
