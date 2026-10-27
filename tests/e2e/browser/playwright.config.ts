@@ -11,6 +11,8 @@ const testDir = defineBddConfig({
   features: 'features/*.feature',
   steps: ['steps/*.ts', 'support/*.ts'],
   language: 'ja',
+  // まだ実装のないシナリオ(要件の工程で付ける印。requirements/README.md)は生成しない
+  tags: 'not @未実装',
 })
 
 export default defineConfig({
