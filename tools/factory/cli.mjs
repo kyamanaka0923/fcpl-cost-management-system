@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // 工場のゲートの検査(ADR-0015 フェーズ4)。リポジトリ直下で実行する。
 //   node tools/factory/cli.mjs <検査名>
-// 検査名: ears | ambiguity | coverage | knowledge | screens | role | gate | premises | factory-version
+// 検査名: ears | ambiguity | coverage | knowledge | screens | role | gate | premises | factory-version | closing
 // PR の検査(role・gate・premises・factory-version)は、次の環境変数を使う(.github/workflows/factory.yml が渡す)。
 //   FACTORY_BRANCH  PR のブランチ名。空なら PR ではない(main への push)ので何もしない
 //   FACTORY_BASE    PR の base のコミット(main)
 //   FACTORY_HEAD    PR の head のコミット
 //   GITHUB_REPOSITORY / GH_TOKEN  gate で Issue のラベルを読む
+//   FACTORY_PR_BODY  PR の本文(closing で閉じるキーワードを探す)
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -27,6 +28,7 @@ import { checkBusinessRule, checkRequirementRules } from './checks/knowledge.mjs
 import { checkFactoryVersion, checkGate, checkRole } from './checks/branch.mjs';
 import { checkPremises } from './checks/premises.mjs';
 import { checkScreens } from './checks/screens.mjs';
+import { checkClosingKeywords } from './checks/closing.mjs';
 
 const root = process.cwd();
 const env = process.env;
@@ -111,9 +113,11 @@ const CHECKS = {
   },
 
   'factory-version': () => ({ errors: checkFactoryVersion(env.FACTORY_BRANCH, changedFiles()), pr: true }),
+
+  closing: () => ({ errors: checkClosingKeywords(env.FACTORY_BRANCH, env.FACTORY_PR_BODY ?? ''), pr: true }),
 };
 
-const PR_ONLY = new Set(['role', 'gate', 'premises', 'factory-version']);
+const PR_ONLY = new Set(['role', 'gate', 'premises', 'factory-version', 'closing']);
 
 function main() {
   const name = process.argv[2];

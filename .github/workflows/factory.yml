@@ -8,6 +8,8 @@ on:
   push:
     branches: [main]
   pull_request:
+    # edited: PR の本文を直したら、閉じるキーワードの検査を動かし直す
+    types: [opened, synchronize, reopened, edited]
 
 permissions:
   contents: read
@@ -90,10 +92,12 @@ jobs:
           - { check: gate, title: "ゲートラベルの確認(gate-check)" }
           - { check: premises, title: "前提の版(upstream-approved)" }
           - { check: factory-version, title: "工場の版の更新(factory-version)" }
+          - { check: closing, title: "作業項目を途中で閉じない(閉じるキーワード)" }
     env:
       FACTORY_BRANCH: ${{ github.head_ref }}
       FACTORY_BASE: ${{ github.event.pull_request.base.sha }}
       FACTORY_HEAD: ${{ github.event.pull_request.head.sha }}
+      FACTORY_PR_BODY: ${{ github.event.pull_request.body }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7

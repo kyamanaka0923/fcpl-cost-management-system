@@ -42,6 +42,7 @@
 - **生成と検証を分ける。** 自分が書いたものを自分でレビューしない(レビューは別のエージェント)
 - 作業を始めたら、前提にした要件・仕様・ナレッジのファイルと版を `.factory/premises/ISSUE-<n>.yml` に書く([書き方](.factory/premises/README.md)。`tools/factory/premises.sh` で作る)
 - PR は `.github/pull_request_template.md` の欄(工場の版・前提・レビューView・介入の記録)を埋める
+- 作業項目を閉じるのは `impl/` の PR の `Closes #n` だけ。ほかの工程の PR は `Refs #n` と書き、閉じるキーワード(close・fix・resolve の活用形 + `#番号`)を否定の文の中でも書かない(GitHub は否定を読まない。#57)
 - 人が手を出したこと(回答・差し戻し・手直し・CI の承認)は、人が `/intervention <種類> <原因> [メモ]` とコメントして記録する。エージェントは自分の作業を介入として記録しない。計測は毎週の「工場の週報」Issue(`tools/factory/metrics-cli.mjs`)
 - **マージ・PR の Ready 化・承認・ゲートラベルの付与はしない**(人の仕事)
 
