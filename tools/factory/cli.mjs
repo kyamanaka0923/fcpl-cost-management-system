@@ -35,7 +35,8 @@ const env = process.env;
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 
 function changedFiles() {
-  const out = git('diff', '--name-only', '--no-renames', `${env.FACTORY_BASE}...${env.FACTORY_HEAD}`);
+  // core.quotepath=false: 日本語のファイル名を引用符つきの 8 進数にしない(#60)
+  const out = git('-c', 'core.quotepath=false', 'diff', '--name-only', '--no-renames', `${env.FACTORY_BASE}...${env.FACTORY_HEAD}`);
   return out ? out.split('\n') : [];
 }
 
@@ -71,7 +72,10 @@ const CHECKS = {
   },
 
   coverage: () => {
-    const { errors, matrix } = audit(loadRequirements(root), new Set(loadBusinessRules(root).keys()), featureFiles());
+    const implIssue = /^impl\/(\d+)-/.exec(env.FACTORY_BRANCH ?? '')?.[1];
+    const { errors, matrix } = audit(loadRequirements(root), new Set(loadBusinessRules(root).keys()), featureFiles(), {
+      implIssue: implIssue === undefined ? undefined : Number(implIssue),
+    });
     const md = matrixMarkdown(matrix);
     writeFileSync(join(root, 'coverage-matrix.md'), `# 要件とシナリオのトレーサビリティ\n\n${md}`);
     return { errors, summary: `### 要件とシナリオのトレーサビリティ\n\n${md}` };
