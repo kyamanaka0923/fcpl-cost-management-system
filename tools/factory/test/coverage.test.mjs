@@ -25,7 +25,7 @@ test('要件文どおりのルールの下にシナリオがあれば通り、�
   const { errors, matrix } = audit(reqs(), brs, feature(`  @FR-4.8 @BR-BUD-007\n  ルール: ${SENTENCE}\n\n    シナリオ: -1 円は保存できない\n      もし x\n`));
   assert.deepEqual(errors, []);
   assert.equal(matrix[0].scenarios.length, 1);
-  assert.match(matrixMarkdown(matrix), /\| FR-4.8 \| 金額は 0 以上 \| 有効 \| 1 \| tests\/x.feature:7 \|/);
+  assert.match(matrixMarkdown(matrix), /\| FR-4.8 \| 金額は 0 以上 \| 有効 \| 1 \| 0 \| tests\/x.feature:7 \|/);
 });
 
 test('シナリオのない要件を指摘する', () => {
@@ -53,4 +53,26 @@ test('ルールの文が要件文と違う・1 ルールに 2 要件・シナリ
   assert.match(msgs, /要件文と違う/);
   assert.match(msgs, /1 つの「ルール:」には 1 つの要件/);
   assert.match(msgs, /FR-4.9 の「ルール:」の下にシナリオがない/);
+});
+
+const reqsOf = (issues) =>
+  new Map([['FR-4.8', { file: 'requirements/budget/FR-4.8.md', data: { title: '金額は 0 以上', status: '有効', issues }, sentence: SENTENCE }]]);
+const wipFeature = feature(`  @FR-4.8 @BR-BUD-007 @未実装\n  ルール: ${SENTENCE}\n\n    シナリオ: -1 円は保存できない\n      もし x\n`);
+
+test('@未実装 のシナリオも網羅として数え、マトリクスに未実装の数を出す', () => {
+  const { errors, matrix } = audit(reqsOf([46]), brs, wipFeature);
+  assert.deepEqual(errors, []);
+  assert.equal(matrix[0].scenarios[0].wip, true);
+  assert.match(matrixMarkdown(matrix), /\| FR-4.8 \| 金額は 0 以上 \| 有効 \| 1 \| 1 \| tests\/x.feature:7\(未実装\) \|/);
+});
+
+test('impl/<n> の PR で、Issue #n の要件のシナリオに @未実装 が残っていたら落とす', () => {
+  const { errors } = audit(reqsOf([46]), brs, wipFeature, { implIssue: 46 });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].message, /FR-4.8 は Issue #46 の要件。実装の PR では、このシナリオの @未実装 を外して通す/);
+});
+
+test('ほかの Issue の要件の @未実装 は、impl/<n> の PR でも落とさない', () => {
+  assert.deepEqual(audit(reqsOf([45]), brs, wipFeature, { implIssue: 46 }).errors, []);
+  assert.deepEqual(audit(reqsOf(undefined), brs, wipFeature, { implIssue: 46 }).errors, []);
 });

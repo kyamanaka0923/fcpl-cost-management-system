@@ -24,7 +24,7 @@ CI(`.github/workflows/factory.yml`)のジョブ名が、そのまま main のル
 |---|---|---|---|
 | 要件の書式(EARS) | `ears` | `requirements/<領域>/FR-*.md` の frontmatter、ID とファイル名・領域、要件文の文型 | EARS の 5 文型の 1 文 1 応答でない、項目が欠けている |
 | 曖昧語の検査 | `ambiguity` | 要件・業務ルール・`.feature` の `ルール:` 行 | 曖昧語が 1 つでもある |
-| 要件とシナリオの網羅 | `coverage` | 要件 ↔ シナリオのトレーサビリティ(実行サマリと成果物 `coverage-matrix` に出す) | シナリオのない要件、孤児のタグ、`ルール:` の文が要件文と違う、1 ルールに 2 要件 |
+| 要件とシナリオの網羅 | `coverage` | 要件 ↔ シナリオのトレーサビリティ(実行サマリと成果物 `coverage-matrix` に出す) | シナリオのない要件、孤児のタグ、`ルール:` の文が要件文と違う、1 ルールに 2 要件、`impl/<n>` で Issue #n の要件のシナリオに `@未実装` が残っている |
 | ナレッジの出どころと確定 | `knowledge` | 業務ルールの frontmatter と `sources`、要件が参照する業務ルール | 出どころがない・索引にない、未確定の業務ルールを要件が参照している |
 | 画面要件と fixtures | `screens` | `requirements/screens/screens.yaml` の形、fixtures の body が OpenAPI の応答のスキーマに合うか | 項目の欠け、fixtures がない・余っている、スキーマに合わない、OpenAPI にない API |
 | 工程の持ち場(role-guard) | `role` | PR のブランチ名と、変えたファイル | 命名に合わないブランチ、工程の持ち場の外の変更 |
