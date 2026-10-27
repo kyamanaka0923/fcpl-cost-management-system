@@ -24,6 +24,8 @@ model: claude-sonnet-5
 | 例示テスト | 処理ルール(`specs/rules/SPEC-xxx.md`)の「具体例」の各行 |
 | プロパティベーステスト | 業務ルール(`knowledge/business-rules/`)の不変条件 |
 
+まだ実装のないシナリオには `@未実装` を付け、テストの実行で飛ばす(Reqnroll は `Support/未実装のシナリオ.cs` のフックで Skipped、playwright-bdd は `tags: 'not @未実装'` で生成しない)。実装の PR で外す(`requirements/README.md`)。
+
 レベルごとの母集団と完了基準は `specs/test-plan.md`。シナリオを書くのは [B] 要件(`requirements-writer`)、
 ステップ定義と例示テストを書くのは [D] 実装(`implementer`)。
 

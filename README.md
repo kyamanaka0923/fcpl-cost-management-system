@@ -64,7 +64,7 @@ flowchart LR
 | [specs/](specs/README.md) | 仕様: 処理ルール(`SPEC-…`)・テスト計画。WebAPI 仕様は [docs/api/openapi.json](docs/api/openapi.json) |
 | `.claude/agents/`・`.claude/skills/` | 工程ごとのエージェント(書く役と確かめる役を分ける)と手順 |
 | [tools/factory/](tools/factory/README.md) | ゲートの検査(EARS・曖昧語・網羅・持ち場・ゲートラベル・前提の版・画面の差分など)と週報 |
-| `.factory/` | 工場の版(`VERSION`・`CHANGELOG.md`)と、作業ごとの前提の記録 |
+| `.factory/` | 工場の版(`VERSION`・`CHANGELOG.md`)、工場の変更の記録(`changes/`)、作業ごとの前提の記録 |
 
 人(判定する人)がすること:
 

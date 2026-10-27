@@ -15,7 +15,7 @@ model: claude-sonnet-5
 | backend | dotnet test + dorny/test-reporter(Checks)+ ReportGenerator でカバレッジを実行サマリへ + HTML アーティファクト |
 | frontend | npm ci + ESLint(`npm run lint`)+ Prettier(`npm run format:check`)+ tsc + vite build |
 | frontend-unit | `tests/unit/frontend` で実行。npm ci(frontend 側は不要)→ ESLint・tsc・Prettier → Vitest(API は MSW でモック) |
-| browser-e2e | `tests/e2e/browser` で実行。frontend と tests/e2e/browser の npm ci → E2E のステップ定義の ESLint・tsc・Prettier → Chromium導入 → バックエンド+Vite自動起動 → E2E(`npm test` = bddgen + playwright test)。失敗時レポート保存 |
+| browser-e2e | `tests/e2e/browser` で実行。frontend と tests/e2e/browser の npm ci → E2E のステップ定義の ESLint・tsc・Prettier → Chromium(ヘッドレスシェルのみ。`~/.cache/ms-playwright` を Playwright の版をキーにキャッシュし、ないときだけ `npx playwright install --only-shell chromium`。OS の依存はランナーに揃っているので `--with-deps` は付けない。Issue #63)→ 日本語のフォント(`fonts-ipafont-gothic` のファイルを `~/.local/share/fonts/ja` にキャッシュし、ないときだけ apt で入れる。`fc-list :lang=ja` が空なら落とし、日本語を描いたときに Chromium が使ったフォントを CDP の `CSS.getPlatformFontsForNode` で聞いて IPA ゴシックでなければ落とす。中国語のフォントがあるとそちらが選ばれるので、IPA ゴシックだけを入れる。失敗時のトレースで日本語を □ にしないため。Issue #65)→ バックエンド+Vite自動起動 → E2E(`npm test` = bddgen + playwright test)。失敗時レポート保存 |
 | metrics | コードメトリクス。cloc(言語別行数)+ scc(行数+複雑度)を backend/src・frontend/src・tests/unit・tests/integration・tests/e2e・tests/architecture の区分で実行サマリへ + `code-metrics` アーティファクト。scc は `go install github.com/boyter/scc/v3@latest`(ubuntu ランナーの Go を利用)。**Microsoft.CodeAnalysis.Metrics は Linux 不可 & 旧 Roslyn で現代 C# 非対応のため使わない** |
 | mutation | ミューテーションテスト(Stryker.NET)。`tests` で `dotnet tool restore` → `unit/backend/Domain`・`integration/backend/Application` で `dotnet tool run dotnet-stryker`。markdown レポートを実行サマリへ + html を `mutation-report` アーティファクトへ。**非ブロッキング**(閾値 break:0 でスコアでは落とさない。Stryker 自体の失敗のみ赤)。設定は各テストプロジェクト直下 `stryker-config.json`、ツールは `tests/.config/dotnet-tools.json`。詳細は testing スキル(Issue #6) |
 
@@ -87,4 +87,4 @@ model: claude-sonnet-5
 - 工程の成果物は PR で出す(`.github/pull_request_template.md`)。**マージは人がする**
 - プッシュと `gh pr create --base main` は別のコマンドにする。フックはコマンドの文字列で判定するので、
   コミットメッセージやヒアドキュメントに「git push」と「main」が両方あると止まることがある(本文はファイルに書いて渡す)
-- 工場の設定(`.claude/`・`AGENTS.md`・`.github/workflows/`・`tools/factory/`)を変えたら `.factory/CHANGELOG.md` に 1 行足す
+- 工場の設定(`.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/`)を変えたら、変更の記録 `.factory/changes/<Issue番号>.md` を 1 ファイル足す(書き方は `.factory/changes/README.md`)。`.factory/CHANGELOG.md` の表には足さない(工場の PR が同時に開くと衝突するため。#66)

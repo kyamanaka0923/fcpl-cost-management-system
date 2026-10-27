@@ -5,6 +5,7 @@
 | ファイル | 中身 |
 |---|---|
 | `cli.mjs` | ゲートの検査の入口。`node tools/factory/cli.mjs <検査名>`(リポジトリ直下で実行) |
+| `cli.mjs changes`、`lib/changes.mjs` | 工場の変更の記録(`.factory/changes/`)を確かめて、Issue の番号の順の表を出す(#66) |
 | `checks/` | 検査の中身(入力を引数で受け取る純粋な関数) |
 | `lib/` | 共通の部品(frontmatter・日本語 Gherkin の簡易パーサ・ブランチ名) |
 | `test/` | 検査のテスト(`npm test` = `node --test`)。正例と反例を両方置く |
@@ -24,14 +25,14 @@ CI(`.github/workflows/factory.yml`)のジョブ名が、そのまま main のル
 |---|---|---|---|
 | 要件の書式(EARS) | `ears` | `requirements/<領域>/FR-*.md` の frontmatter、ID とファイル名・領域、要件文の文型 | EARS の 5 文型の 1 文 1 応答でない、項目が欠けている |
 | 曖昧語の検査 | `ambiguity` | 要件・業務ルール・`.feature` の `ルール:` 行 | 曖昧語が 1 つでもある |
-| 要件とシナリオの網羅 | `coverage` | 要件 ↔ シナリオのトレーサビリティ(実行サマリと成果物 `coverage-matrix` に出す) | シナリオのない要件、孤児のタグ、`ルール:` の文が要件文と違う、1 ルールに 2 要件 |
+| 要件とシナリオの網羅 | `coverage` | 要件 ↔ シナリオのトレーサビリティ(実行サマリと成果物 `coverage-matrix` に出す) | シナリオのない要件、孤児のタグ、`ルール:` の文が要件文と違う、1 ルールに 2 要件、`impl/<n>` で Issue #n の要件のシナリオに `@未実装` が残っている |
 | ナレッジの出どころと確定 | `knowledge` | 業務ルールの frontmatter と `sources`、要件が参照する業務ルール | 出どころがない・索引にない、未確定の業務ルールを要件が参照している |
 | 画面要件と fixtures | `screens` | `requirements/screens/screens.yaml` の形、fixtures の body が OpenAPI の応答のスキーマに合うか | 項目の欠け、fixtures がない・余っている、スキーマに合わない、OpenAPI にない API |
 | 工程の持ち場(role-guard) | `role` | PR のブランチ名と、変えたファイル | 命名に合わないブランチ、工程の持ち場の外の変更 |
 | ゲートラベルの確認(gate-check) | `gate` | `req/`・`spec/`・`impl/` の PR の Issue のラベル | 前のゲートのラベル(gate0〜2-approved)がない |
 | 前提の版(upstream-approved) | `premises` | `spec/`・`impl/` の PR の `.factory/premises/ISSUE-<n>.yml` | 前提の記録がない、前提のファイルが main で変わった・main にない |
 | 作業項目を途中で閉じない(閉じるキーワード) | `closing` | `knowledge/`・`req/`・`spec/`・`prep/` の PR の本文 | 閉じるキーワード(close・fix・resolve の活用形)+ Issue の参照がある。否定の文の中でも落とす |
-| 工場の版の更新(factory-version) | `factory-version` | `.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/` の変更 | `.factory/CHANGELOG.md` を変えていない |
+| 工場の版の更新(factory-version) | `factory-version` | `.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/` の変更 | 変更の記録 `.factory/changes/<Issue番号>.md` を足していない、記録の frontmatter(`issue`・`kind`)が違う、記録を消した |
 
 - このほかに、ジョブ「画面の差分(承認した画面との比較)」が `tests/e2e/screens` の Playwright を Playwright のコンテナで動かす(`requirements/screens/README.md`)
 - 持ち場・ゲートラベル・前提の版・工場の版・閉じるキーワードの 5 つは PR だけの検査。main への push では何もしない。PR の本文を直すと(`edited`)検査が動き直す

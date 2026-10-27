@@ -119,10 +119,71 @@ jobs:
           npm run typecheck
           npm run format:check
 
-      - name: Chromium をインストール
-        run: npx playwright install --with-deps chromium
+      # ブラウザは Playwright の版ごとにキャッシュする。ヘッドレスのテストに要るのはヘッドレスシェルだけなので、
+      # 本体の Chromium(約 190 MiB)は入れない。OS の依存(--with-deps)は ubuntu ランナーに揃っているので入れない
+      # (apt の更新が毎回 15 秒前後かかっていた。足りなければ起動時に Playwright が不足を名指しで落とす)。Issue #63
+      - name: Playwright の版を調べる(ブラウザのキャッシュのキー)
+        id: playwright
+        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Chromium のキャッシュを戻す
+        id: browser-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-headless-shell-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      - name: Chromium をインストール(キャッシュがないときだけ)
+        if: steps.browser-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --only-shell chromium
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "0"
+
+      # ランナーには日本語のフォントがなく、失敗時のトレースとスクリーンショットで日本語が □ になる(#65)。
+      # apt は毎回 10 秒前後かかるので、フォントのファイルだけを ~/.local/share/fonts にキャッシュする
+      - name: 日本語のフォントのキャッシュを戻す
+        id: font-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.local/share/fonts/ja
+          key: fonts-ja-${{ runner.os }}-ipafont-gothic-v1
+
+      - name: 日本語のフォントを入れる(キャッシュがないときだけ)
+        if: steps.font-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends fonts-ipafont-gothic
+          mkdir -p ~/.local/share/fonts/ja
+          dpkg -L fonts-ipafont-gothic | grep -E '\.ttf$' | xargs -I{} cp -L {} ~/.local/share/fonts/ja/
+
+      - name: 日本語のフォントを使えるようにする
+        run: |
+          fc-cache -f ~/.local/share/fonts
+          fc-list :lang=ja family | grep . || { echo "::error::日本語のフォントが見つかりません"; exit 1; }
+
+      # fc-list に出ても Chromium が使うとは限らないので、実際に日本語を描いたときのフォントを Chromium に聞く
+      - name: 日本語が Chromium で表示できるかを確かめる
+        run: |
+          node -e "
+            const { chromium } = require('playwright');
+            (async () => {
+              const browser = await chromium.launch();
+              const page = await browser.newPage();
+              await page.setContent('<p>予算編集 売上高 期間費用</p>');
+              const cdp = await page.context().newCDPSession(page);
+              await cdp.send('DOM.enable');
+              await cdp.send('CSS.enable');
+              const { root } = await cdp.send('DOM.getDocument');
+              const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: 'p' });
+              const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+              await browser.close();
+              console.log('日本語の表示に使ったフォント:', fonts.map((f) => f.familyName + '(' + f.glyphCount + ' 字)').join('、'));
+              if (!fonts.some((f) => /IPA/.test(f.familyName))) {
+                console.log('::error::Chromium が日本語を IPA ゴシックで表示していません');
+                process.exit(1);
+              }
+            })();
+          "
 
       - name: E2E テストを実行(Gherkin からテストを生成し、バックエンド+フロントエンドを自動起動)
         run: npm test

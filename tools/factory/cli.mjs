@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // 工場のゲートの検査(ADR-0015 フェーズ4)。リポジトリ直下で実行する。
 //   node tools/factory/cli.mjs <検査名>
-// 検査名: ears | ambiguity | coverage | knowledge | screens | role | gate | premises | factory-version | closing
+// 検査名: ears | ambiguity | coverage | knowledge | screens | role | gate | premises | factory-version | closing | changes
+// changes は、工場の変更の記録(.factory/changes/)を確かめて、一覧の表を出す(#66)。
 // PR の検査(role・gate・premises・factory-version)は、次の環境変数を使う(.github/workflows/factory.yml が渡す)。
 //   FACTORY_BRANCH  PR のブランチ名。空なら PR ではない(main への push)ので何もしない
 //   FACTORY_BASE    PR の base のコミット(main)
@@ -25,7 +26,8 @@ import { checkRequirementFile } from './checks/ears.mjs';
 import { findAmbiguousWords, isAmbiguityTarget } from './checks/ambiguity.mjs';
 import { audit, matrixMarkdown } from './checks/coverage.mjs';
 import { checkBusinessRule, checkRequirementRules } from './checks/knowledge.mjs';
-import { checkFactoryVersion, checkGate, checkRole } from './checks/branch.mjs';
+import { CHANGE_FILE, checkChangeFile, checkFactoryVersion, checkGate, checkRole } from './checks/branch.mjs';
+import { changesMarkdown } from './lib/changes.mjs';
 import { checkPremises } from './checks/premises.mjs';
 import { checkScreens } from './checks/screens.mjs';
 import { checkClosingKeywords } from './checks/closing.mjs';
@@ -35,13 +37,23 @@ const env = process.env;
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 
 function changedFiles() {
-  const out = git('diff', '--name-only', '--no-renames', `${env.FACTORY_BASE}...${env.FACTORY_HEAD}`);
+  // core.quotepath=false: 日本語のファイル名を引用符つきの 8 進数にしない(#60)
+  const out = git('-c', 'core.quotepath=false', 'diff', '--name-only', '--no-renames', `${env.FACTORY_BASE}...${env.FACTORY_HEAD}`);
   return out ? out.split('\n') : [];
 }
 
 function blobOnMain(path) {
   try {
     return git('rev-parse', '-q', '--verify', `${env.FACTORY_BASE}:${path}`);
+  } catch {
+    return null;
+  }
+}
+
+/** PR の head でのファイルの中身。消したファイルは null。 */
+function readAtHead(path) {
+  try {
+    return git('show', `${env.FACTORY_HEAD}:${path}`);
   } catch {
     return null;
   }
@@ -71,7 +83,10 @@ const CHECKS = {
   },
 
   coverage: () => {
-    const { errors, matrix } = audit(loadRequirements(root), new Set(loadBusinessRules(root).keys()), featureFiles());
+    const implIssue = /^impl\/(\d+)-/.exec(env.FACTORY_BRANCH ?? '')?.[1];
+    const { errors, matrix } = audit(loadRequirements(root), new Set(loadBusinessRules(root).keys()), featureFiles(), {
+      implIssue: implIssue === undefined ? undefined : Number(implIssue),
+    });
     const md = matrixMarkdown(matrix);
     writeFileSync(join(root, 'coverage-matrix.md'), `# 要件とシナリオのトレーサビリティ\n\n${md}`);
     return { errors, summary: `### 要件とシナリオのトレーサビリティ\n\n${md}` };
@@ -112,9 +127,16 @@ const CHECKS = {
     return { errors: checkPremises(env.FACTORY_BRANCH, text, blobOnMain), pr: true };
   },
 
-  'factory-version': () => ({ errors: checkFactoryVersion(env.FACTORY_BRANCH, changedFiles()), pr: true }),
+  'factory-version': () => ({ errors: checkFactoryVersion(env.FACTORY_BRANCH, changedFiles(), readAtHead), pr: true }),
 
   closing: () => ({ errors: checkClosingKeywords(env.FACTORY_BRANCH, env.FACTORY_PR_BODY ?? ''), pr: true }),
+
+  changes: () => {
+    const files = walk(root, '.factory/changes', (f) => CHANGE_FILE.test(f)).map((file) => ({ file, text: read(root, file) }));
+    const md = changesMarkdown(files);
+    console.log(md);
+    return { errors: files.flatMap(({ file, text }) => checkChangeFile(file, text)), summary: `### 工場の変更の記録\n\n${md}` };
+  },
 };
 
 const PR_ONLY = new Set(['role', 'gate', 'premises', 'factory-version', 'closing']);
