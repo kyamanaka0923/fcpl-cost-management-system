@@ -161,25 +161,29 @@ jobs:
           fc-cache -f ~/.local/share/fonts
           fc-list :lang=ja family | grep . || { echo "::error::日本語のフォントが見つかりません"; exit 1; }
 
-      - name: 日本語の表示を確かめる(一時的。#65 の確認が済んだら消す)
+      # fc-list に出ても Chromium が使うとは限らないので、実際に日本語を描いたときのフォントを Chromium に聞く
+      - name: 日本語が Chromium で表示できるかを確かめる
         run: |
-          mkdir -p test-results
           node -e "
             const { chromium } = require('playwright');
             (async () => {
-              const b = await chromium.launch();
-              const p = await b.newPage({ viewport: { width: 480, height: 120 } });
-              await p.setContent('<p style=\"font:24px sans-serif\">予算編集 — 売上高・加工費・外注費・期間費用</p>');
-              await p.screenshot({ path: 'test-results/font-check.png' });
-              await b.close();
+              const browser = await chromium.launch();
+              const page = await browser.newPage();
+              await page.setContent('<p>予算編集 売上高 期間費用</p>');
+              const cdp = await page.context().newCDPSession(page);
+              await cdp.send('DOM.enable');
+              await cdp.send('CSS.enable');
+              const { root } = await cdp.send('DOM.getDocument');
+              const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: 'p' });
+              const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+              await browser.close();
+              console.log('日本語の表示に使ったフォント:', fonts.map((f) => f.familyName + '(' + f.glyphCount + ' 字)').join('、'));
+              if (!fonts.some((f) => /IPA/.test(f.familyName))) {
+                console.log('::error::Chromium が日本語を IPA ゴシックで表示していません');
+                process.exit(1);
+              }
             })();
           "
-
-      - name: 日本語の表示の確認の画像を保存(一時的)
-        uses: actions/upload-artifact@v7
-        with:
-          name: font-check
-          path: tests/e2e/browser/test-results/font-check.png
 
       - name: E2E テストを実行(Gherkin からテストを生成し、バックエンド+フロントエンドを自動起動)
         run: npm test
