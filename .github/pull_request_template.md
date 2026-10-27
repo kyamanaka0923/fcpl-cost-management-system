@@ -6,8 +6,11 @@
 ## 工程
 
 <!-- ブランチの種類: knowledge / req / spec / impl / prep / factory -->
+<!-- 作業項目を閉じるのは impl/ の PR(と、工場の改善の Issue を直す factory/ の PR)だけ。
+     ほかの工程は「Refs #番号」と書く。閉じるキーワード(close・fix・resolve の活用形 + #番号)は、
+     「〜は付けない」のような否定の文の中でも書かない(GitHub は否定を読まずに閉じる。CI が落とす) -->
 - 工程:
-- Closes #
+- Refs #
 
 ## 何をしたか
 

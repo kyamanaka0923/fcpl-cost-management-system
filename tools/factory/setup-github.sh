@@ -57,6 +57,7 @@ wanted=(
   "ゲートラベルの確認(gate-check)"
   "前提の版(upstream-approved)"
   "工場の版の更新(factory-version)"
+  "作業項目を途中で閉じない(閉じるキーワード)"
 )
 ran_on_main="$(gh api --paginate "repos/$repo/commits/main/check-runs?per_page=100" --jq '.check_runs[].name')"
 required=()

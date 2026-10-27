@@ -30,10 +30,11 @@ CI(`.github/workflows/factory.yml`)のジョブ名が、そのまま main のル
 | 工程の持ち場(role-guard) | `role` | PR のブランチ名と、変えたファイル | 命名に合わないブランチ、工程の持ち場の外の変更 |
 | ゲートラベルの確認(gate-check) | `gate` | `req/`・`spec/`・`impl/` の PR の Issue のラベル | 前のゲートのラベル(gate0〜2-approved)がない |
 | 前提の版(upstream-approved) | `premises` | `spec/`・`impl/` の PR の `.factory/premises/ISSUE-<n>.yml` | 前提の記録がない、前提のファイルが main で変わった・main にない |
+| 作業項目を途中で閉じない(閉じるキーワード) | `closing` | `knowledge/`・`req/`・`spec/`・`prep/` の PR の本文 | 閉じるキーワード(close・fix・resolve の活用形)+ Issue の参照がある。否定の文の中でも落とす |
 | 工場の版の更新(factory-version) | `factory-version` | `.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/` の変更 | `.factory/CHANGELOG.md` を変えていない |
 
 - このほかに、ジョブ「画面の差分(承認した画面との比較)」が `tests/e2e/screens` の Playwright を Playwright のコンテナで動かす(`requirements/screens/README.md`)
-- 持ち場・ゲートラベル・前提の版・工場の版の 4 つは PR だけの検査。main への push では何もしない
+- 持ち場・ゲートラベル・前提の版・工場の版・閉じるキーワードの 5 つは PR だけの検査。main への push では何もしない。PR の本文を直すと(`edited`)検査が動き直す
 - ゲートラベルは Issue に付くので、付けても PR の検査は動き直さない。付けたあとで「ゲートラベルの確認」を再実行する
 - Dependabot のブランチ(`dependabot/…`)は、持ち場と工場の版の検査から外す
 
