@@ -59,6 +59,18 @@ function readAtHead(path) {
   }
 }
 
+/** main にマージされた PR の head のブランチ名(取れなければ null)。ゲートラベルの裏付けに使う(#77)。 */
+function mergedBranches() {
+  try {
+    const out = execFileSync('gh', ['api', '--paginate', `repos/${env.GITHUB_REPOSITORY}/pulls?state=closed&base=main&per_page=100`, '--jq', '.[] | select(.merged_at) | .head.ref'], {
+      encoding: 'utf8',
+    });
+    return out.split('\n').filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+
 function issueLabels(n) {
   try {
     const out = execFileSync('gh', ['issue', 'view', String(n), '--repo', env.GITHUB_REPOSITORY, '--json', 'labels', '--jq', '[.labels[].name]'], {
@@ -117,7 +129,7 @@ const CHECKS = {
 
   gate: () => {
     const n = /^[a-z]+\/(\d+)-/.exec(env.FACTORY_BRANCH)?.[1];
-    return { errors: checkGate(env.FACTORY_BRANCH, n ? issueLabels(n) : []), pr: true };
+    return { errors: checkGate(env.FACTORY_BRANCH, n ? issueLabels(n) : [], n ? mergedBranches() : []), pr: true };
   },
 
   premises: () => {

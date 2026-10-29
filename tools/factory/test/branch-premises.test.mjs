@@ -46,10 +46,12 @@ test('role-guard: 命名に合わないブランチは落とす', () => {
 });
 
 test('gate-check: 前のゲートのラベルがあれば通り、なければ指摘する', () => {
-  assert.deepEqual(checkGate('impl/46-x', ['stage:仕様確定', 'gate2-approved']), []);
-  assert.match(checkGate('impl/46-x', ['gate1-approved'])[0].message, /gate2-approved が付いていない/);
-  assert.match(checkGate('spec/46-x', [])[0].message, /gate1-approved/);
-  assert.match(checkGate('req/46-x', [])[0].message, /gate0-approved/);
+  const all = ['stage:仕様確定', 'gate0-approved', 'gate1-approved', 'gate2-approved'];
+  const merged = ['knowledge/46-a', 'req/46-b', 'spec/46-c'];
+  assert.deepEqual(checkGate('impl/46-x', all, merged), []);
+  assert.match(checkGate('impl/46-x', ['gate1-approved'], merged)[0].message, /gate0-approved・gate2-approved が付いていない/);
+  assert.match(checkGate('spec/46-x', [], merged)[0].message, /gate0-approved・gate1-approved/);
+  assert.match(checkGate('req/46-x', [], merged)[0].message, /gate0-approved/);
   assert.match(checkGate('req/46-x', null)[0].message, /見つからない/);
   for (const b of ['knowledge/46-x', 'prep/46-x', 'factory/x']) assert.deepEqual(checkGate(b, []), [], b);
 });
@@ -119,4 +121,18 @@ test('upstream-approved: 前提がない・main で変わった・main にない
 
 test('upstream-approved: spec・impl 以外のブランチは見ない', () => {
   for (const b of ['req/46-x', 'knowledge/46-x', 'factory/x']) assert.deepEqual(checkPremises(b, null, blobOnMain), [], b);
+});
+
+test('gate-check: ゲートを飛ばしたラベル(gate2 だけ)では実装に着手できない(#77)', () => {
+  const msgs = checkGate('impl/46-x', ['stage:仕様確定', 'gate2-approved'], ['req/46-b', 'spec/46-c']).map((e) => e.message);
+  assert.equal(msgs.length, 1);
+  assert.match(msgs[0], /gate0-approved・gate1-approved が付いていない/);
+});
+
+test('gate-check: ゲートラベルがあっても、その工程の PR がマージされていなければ落とす(#77)', () => {
+  const labels = ['stage:仕様確定', 'gate0-approved', 'gate1-approved', 'gate2-approved'];
+  const msgs = checkGate('impl/46-x', labels, ['req/46-b', 'spec/47-other']).map((e) => e.message);
+  assert.equal(msgs.length, 1);
+  assert.match(msgs[0], /gate2-approved が付いているが、spec\/46-… の PR が main にマージされていない/);
+  assert.match(checkGate('impl/46-x', labels, null).at(-1).message, /取れなかった/);
 });
