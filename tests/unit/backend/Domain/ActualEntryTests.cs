@@ -78,6 +78,39 @@ public class ActualEntryTests
                 null, new Money(-1m), null, Now));
     }
 
+    [Theory]
+    [InlineData("0", null)]
+    [InlineData("1", null)]
+    [InlineData("2000000", 1)]
+    [InlineData("100.0", null)]
+    public void 計上金額が0以上の1円単位の整数の値なら半期一括でも月別でも計上できる(string text, int? month)
+    {
+        var amount = decimal.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+
+        var entry = ActualEntry.Record(Dept, Half, BudgetCategory.Processing, ProjectA, null,
+            month, new Money(amount), null, Now);
+
+        Assert.Equal(decimal.Floor(amount), entry.Amount.Value);
+        Assert.Equal(month, entry.Month);
+    }
+
+    [Theory]
+    [InlineData("-1", null, "金額は0以上で入力してください。")]
+    [InlineData("-0.5", null, "金額は0以上で入力してください。")]
+    [InlineData("0.1", null, "金額は1円単位の整数で入力してください。")]
+    [InlineData("100.5", null, "金額は1円単位の整数で入力してください。")]
+    [InlineData("100.5", 1, "金額は1円単位の整数で入力してください。")]
+    public void 計上金額が0未満か1円未満の端数つきなら計上を拒否する(string text, int? month, string message)
+    {
+        var amount = decimal.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+
+        var error = Assert.Throws<DomainException>(() =>
+            ActualEntry.Record(Dept, Half, BudgetCategory.Processing, ProjectA, null,
+                month, new Money(amount), null, Now));
+
+        Assert.Equal(message, error.Message);
+    }
+
     [Fact]
     public void 空白の備考はnullに正規化される()
     {

@@ -58,7 +58,7 @@ public class 課予算の性質
         new(l.Category, l.ProjectId?.Value, l.ElementCode?.Value, l.PeriodDetail);
 
     private static bool 月別が妥当(Dictionary<int, decimal> monthly) =>
-        monthly.All(kv => kv.Key is >= 1 and <= HalfMonths.Count && kv.Value >= 0m);
+        monthly.All(kv => kv.Key is >= 1 and <= HalfMonths.Count && 受け付ける金額(kv.Value));
 
     private static 明細モデル 月次の明細(Guid? id, Dictionary<int, decimal> monthly)
     {
@@ -83,7 +83,7 @@ public class 課予算の性質
         {
             case 案件明細を半期一括で登録(var c, var p, var a):
             {
-                if (!c.IsProjectBased() || a < 0m) return false;
+                if (!c.IsProjectBased() || !受け付ける金額(a)) return false;
                 var key = new 明細キー(c, p.Value, null, null);
                 model[key] = new 明細モデル(既存Id(key), a, new Dictionary<int, decimal>());
                 return true;
@@ -98,7 +98,7 @@ public class 課予算の性質
             case 期間費用を半期一括で登録(var e, var a, var d):
             {
                 var detail = 正規化(d);
-                if (a < 0m || 混在になる(e, detail)) return false;
+                if (!受け付ける金額(a) || 混在になる(e, detail)) return false;
                 var key = new 明細キー(BudgetCategory.PeriodCost, null, e.Value, detail);
                 model[key] = new 明細モデル(既存Id(key), a, new Dictionary<int, decimal>());
                 return true;
@@ -185,8 +185,9 @@ public class 課予算の性質
             if (line.Category != BudgetCategory.PeriodCost)
                 Assert.Null(line.PeriodDetail);
 
-            // 金額は0以上。月次なら半期合計 = 月別の合計、月は1..6、0円の月は保持しない
+            // 金額は0以上の1円単位の整数。月次なら半期合計 = 月別の合計、月は1..6、0円の月は保持しない
             Assert.False(line.Amount.IsNegative);
+            Assert.Equal(decimal.Floor(line.Amount.Value), line.Amount.Value);
             Assert.Equal(line.MonthlyAmounts.Count > 0, line.IsMonthly);
             if (line.IsMonthly)
             {

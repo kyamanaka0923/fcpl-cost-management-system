@@ -155,7 +155,7 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         var repo = new DepartmentBudgetRepository(_fx.Factory);
 
         var budget = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
-        budget.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(1_234_567.89m));
+        budget.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(1_234_567m));
         budget.UpsertPeriodCostLine(new CostElementCode("PERSONNEL"), new Money(300_000m));
         budget.Approve(_fx.Now);
         await repo.AddAsync(budget);
@@ -171,7 +171,7 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         var revenueLine = restored.Lines.Single(l => l.Category == BudgetCategory.Revenue);
         Assert.Equal(project.Id, revenueLine.ProjectId);
         Assert.Null(revenueLine.ElementCode);
-        Assert.Equal(1_234_567.89m, revenueLine.Amount.Value); // 小数金額の往復
+        Assert.Equal(1_234_567m, revenueLine.Amount.Value); // 1 円単位の整数の金額の往復(端数は保存できない: BR-BUD-007)
 
         var periodLine = restored.Lines.Single(l => l.Category == BudgetCategory.PeriodCost);
         Assert.Null(periodLine.ProjectId);

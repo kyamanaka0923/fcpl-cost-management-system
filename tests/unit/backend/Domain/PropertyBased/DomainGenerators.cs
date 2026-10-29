@@ -34,10 +34,19 @@ internal static class ドメイン生成器
     /// <summary>金額(円。0 〜 100億、1円単位)。decimal の加減算を厳密に比較できる範囲に収める。</summary>
     public static readonly Gen<decimal> 金額 = Gen.Long[0, 10_000_000_000L].Select(v => (decimal)v);
 
-    /// <summary>負の金額も稀に混ぜる(拒否されることの検証用)。</summary>
+    /// <summary>1 円未満の端数つきの金額(0.01 円刻み。端数は 1〜99 銭。負の値も含む)。</summary>
+    public static readonly Gen<decimal> 金額_端数つき =
+        Gen.Select(Gen.Long[-1_000_000L, 1_000_000L], Gen.Int[1, 99])
+            .Select((yen, sen) => yen + (yen < 0 ? -sen : sen) / 100m);
+
+    /// <summary>負の金額と 1 円未満の端数つきの金額も稀に混ぜる(拒否されることの検証用)。</summary>
     public static readonly Gen<decimal> 金額_負を含む = Gen.Frequency(
-        (9, 金額),
-        (1, Gen.Long[-1_000_000L, -1L].Select(v => (decimal)v)));
+        (8, 金額),
+        (1, Gen.Long[-1_000_000L, -1L].Select(v => (decimal)v)),
+        (1, 金額_端数つき));
+
+    /// <summary>受け付ける金額か(0 以上の 1 円単位の整数。BR-BUD-007)。モデル側の判定に使う。</summary>
+    public static bool 受け付ける金額(decimal value) => value >= 0m && value == decimal.Floor(value);
 
     public static readonly Gen<BudgetCategory> 区分 = Gen.Enum<BudgetCategory>();
     public static readonly Gen<BudgetCategory> 案件区分 = Gen.OneOfConst(案件別区分);
@@ -57,13 +66,15 @@ internal static class ドメイン生成器
                 .GroupBy(p => p.Item1)
                 .ToDictionary(g => g.Key, g => g.Last().Item2));
 
-    /// <summary>月別金額。範囲外の月(0, 7)や負の金額を稀に混ぜる(拒否されることの検証用)。</summary>
+    /// <summary>月別金額。範囲外の月(0, 7)や負の金額・端数つきの金額を稀に混ぜる(拒否されることの検証用)。</summary>
     public static readonly Gen<Dictionary<int, decimal>> 月別金額_不正を含む = Gen.Frequency(
         (8, 月別金額),
         (1, Gen.Select(月別金額, Gen.OneOfConst(0, 7, -1), 金額)
             .Select((m, badMonth, amount) => new Dictionary<int, decimal>(m) { [badMonth] = amount })),
         (1, Gen.Select(月別金額, Gen.Int[1, HalfMonths.Count])
-            .Select((m, month) => new Dictionary<int, decimal>(m) { [month] = -1m })));
+            .Select((m, month) => new Dictionary<int, decimal>(m) { [month] = -1m })),
+        (1, Gen.Select(月別金額, Gen.Int[1, HalfMonths.Count], 金額_端数つき)
+            .Select((m, month, amount) => new Dictionary<int, decimal>(m) { [month] = amount })));
 
     public static IReadOnlyDictionary<int, Money> ToMoney(IReadOnlyDictionary<int, decimal> monthly) =>
         monthly.ToDictionary(kv => kv.Key, kv => new Money(kv.Value));
