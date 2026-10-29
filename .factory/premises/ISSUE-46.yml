@@ -1,7 +1,7 @@
 issue: 46
-stage: spec
+stage: impl
 factory_version: factory-v1
-recorded_at: 2026-10-30T00:32:07+09:00
+recorded_at: 2026-10-30T01:02:23+09:00
 premises:
   - path: requirements/budget/FR-4.8.md
     blob: ecd0e6a4f264351fe8751e6be8aa0f98b1460071
@@ -31,6 +31,14 @@ premises:
     blob: 12a9a9f5abfc51f46604cc60b5ad771e9216e26c
   - path: knowledge/open-questions.md
     blob: 7485003934a7b3b29b9e45ab6b2ae1846467451b
+  - path: specs/rules/SPEC-001.md
+    blob: 5a44d7907d028bdbd416b4eba6fbca12f3b5ac0b
+  - path: specs/rules/SPEC-002.md
+    blob: f01588e27c6567db2ec3064a4ed91977fe63ed23
+  - path: specs/rules/SPEC-003.md
+    blob: 8735923528cf6ab4cde1b7c59761fee51cc9180c
+  - path: specs/test-plan.md
+    blob: a51efdae92acc393050bb069bb225a1c33277b34
   - path: tests/integration/backend/Application/Features/課予算の策定と改定.feature
     blob: f4053e42eec8c0578cd2b2480410adc86da816c1
   - path: tests/integration/backend/Application/Features/予実差異と損益.feature
