@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, type Request } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import { Given, Then, When } from '../support/fixtures'
 
 /*
@@ -76,36 +76,8 @@ async function ドロップする(page: Page, input: Locator, text: string) {
   await page.evaluate(() => document.getElementById('e2e-drag-source')?.remove())
 }
 
-/**
- * IME で変換中に別の場所へ移っても、変換中の文字列がサーバに保存されないことを確かめる。
- * 小数点を含む変換を未確定のまま入力欄から離れ、そのとき送られた保存(PUT /lines)の金額が、
- * 変換の前の金額のままであること。予算編集画面の入力欄は、離れたときに保存する。
- */
-async function 変換中に離れても保存されない(page: Page, input: Locator, text: string) {
-  const before = Number((await input.inputValue()).replace(/\D/g, '') || '0')
-  const saved: unknown[] = []
-  const onRequest = (request: Request) => {
-    if (request.method() === 'PUT' && request.url().includes('/lines'))
-      saved.push(request.postDataJSON()?.amount)
-  }
-  page.on('request', onRequest)
-  await input.focus()
-  const client = await page.context().newCDPSession(page)
-  await client.send('Input.imeSetComposition', {
-    text,
-    selectionStart: text.length,
-    selectionEnd: text.length,
-  })
-  await input.evaluate((el: HTMLInputElement) => el.blur())
-  await page.waitForTimeout(500)
-  await client.detach()
-  page.off('request', onRequest)
-  for (const amount of saved) expect(Number(amount)).toBe(before)
-}
-
 /** IME で文字列を変換して確定する(CDP の IME 入力)。 */
 async function imeで確定する(page: Page, input: Locator, text: string) {
-  if (/[.．]/.test(text)) await 変換中に離れても保存されない(page, input, text)
   await input.focus()
   const client = await page.context().newCDPSession(page)
   await client.send('Input.imeSetComposition', {

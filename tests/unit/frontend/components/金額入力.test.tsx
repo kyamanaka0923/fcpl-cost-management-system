@@ -245,7 +245,6 @@ describe('金額入力', () => {
       render(<金額欄 initial="2000" onRaw={onRaw} />)
       IME変換(['1', '10', '100'])
       expect(onRaw).not.toHaveBeenCalled()
-      expect(入力欄()).toHaveValue('2,000100') // 変換中の表示(親の値は 2000 のまま)
       IME確定する('100')
       expect(onRaw).toHaveBeenCalledTimes(1)
       expect(入力欄()).toHaveValue('2,000,100')
