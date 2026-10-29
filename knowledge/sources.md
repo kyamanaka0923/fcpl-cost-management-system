@@ -23,6 +23,8 @@
 | SRC-ANS-OQ-008 | 未確定事項 OQ-008 への回答(工場長・Outcome Owner。初物検査 #46) | 2026-10-29(JST) | [open-questions.md](open-questions.md) と GitHub Issue #46 のコメント(2026-10-29 11:13 UTC / 20:13 JST) |
 | SRC-ANS-ISSUE-46-1029 | PR #70 の問いへの回答(入り方の範囲・4 つの入り方・BR-BUD-007 への書き写し。工場長・Outcome Owner) | 2026-10-29(JST) | GitHub Issue #46 のコメント(2026-10-29 10:53 UTC / 19:53 JST と 11:13 UTC / 20:13 JST) |
 | SRC-ANS-ISSUE-46-1029B | PR #76 と PR #75 のレビューの問いへの回答(「打鍵」を FR-4.13 の言い方に揃える・小数点を含まない文字列は拒否しない・範囲を選んで小数点を打鍵したとき選んだ範囲を消さず前のまま。工場長・Outcome Owner) | 2026-10-29(JST) | GitHub Issue #46 のコメント(2026-10-29 12:32 UTC / 21:32 JST) |
+| SRC-CODE-DBINIT | 実装(DB の初期化。いまの実装がそうなっていることだけを示す): 新しく行を入れるのは費目(cost_elements)の 2 行(PERSONNEL・LICENSE)だけ。department_budget_lines・department_budget_line_months・actual_entries に新しく行を入れない(department_budget_lines と projects の INSERT は、スキーマの移行で既存の行を写すものだけ) | 2026-10-29 の main(f62d311) | `backend/src/CostManagement.Infrastructure/Persistence/DatabaseInitializer.cs` |
+| SRC-ANS-ISSUE-46-1030 | OQ-005 の確かめ方を変える回答(運用している DB はない。数える相手がないので、端数つきのデータはないとして確かめを終える(案 1)。PR #80 の問い 3 の回答 A は取り消し。工場長・Outcome Owner) | 2026-10-30(JST) | GitHub Issue #46 のコメント(2026-10-29 15:20 UTC / 2026-10-30 00:20 JST) |
 | SRC-FACTORY | ソフトウェアファクトリーの文書(PROC-DEV-001 v2.7・導入計画・概要) | 2026-10-25 | リポジトリ外(作者の保管庫) |
 
 - 既存の文書(REQUIREMENTS.md・要件変更依頼)は改訂せず、出どころとして参照する。要件を `requirements/` に移したら、移行元の行に印を付ける
