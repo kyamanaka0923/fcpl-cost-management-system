@@ -1,5 +1,6 @@
 // PR のブランチに対する検査: role-guard(持ち場)・gate-check(ゲートラベル)・factory-version(工場の版)。
 import { issue, parseBranch, readFrontmatter } from '../lib/common.mjs';
+import { REQUIRED_GATES, checkGateEvidence } from '../lib/gate-labels.mjs';
 
 const FR_FILE = /^requirements\/(?!screens\/)[^/]+\/FR-[^/]+\.md$/;
 const FEATURE = /^tests\/.+\.feature$/;
@@ -38,18 +39,23 @@ export function checkRole(branch, changedFiles) {
     .map((f) => issue(f, 0, `${b.role}/ のブランチでは変えてはいけない場所(AGENTS.md「工程ごとの置き場とブランチ」)`));
 }
 
-/** ブランチの工程が着手するのに要るゲートラベル。 */
-export const REQUIRED_GATE = { req: 'gate0-approved', spec: 'gate1-approved', impl: 'gate2-approved' };
-
-/** gate-check: 着手するのに要るゲートを、Issue が通っているか。 */
-export function checkGate(branch, issueLabels) {
+/**
+ * gate-check: 着手するのに要るゲートを、Issue がすべて通っているか(#77)。
+ * 直前のゲートだけでなく、その工程までのゲートラベルをすべて求め、ゲートラベルの裏付け(その工程の PR がマージ済みか)も見る。
+ * @param {string[] | null} issueLabels Issue のラベル(Issue が見つからなければ null)
+ * @param {string[] | null} mergedBranches main にマージされた PR の head のブランチ名(取れなければ null)
+ */
+export function checkGate(branch, issueLabels, mergedBranches = []) {
   const b = parseBranch(branch);
-  const label = b && REQUIRED_GATE[b.role];
-  if (!label) return [];
+  const required = b && REQUIRED_GATES[b.role];
+  if (!required) return [];
   if (issueLabels === null) return [issue('', 0, `Issue #${b.issue} が見つからない(ブランチ名の番号を確かめる)`)];
-  return issueLabels.includes(label)
-    ? []
-    : [issue('', 0, `Issue #${b.issue} に ${label} が付いていない。${b.role}/ の工程は、前のゲートを人が承認してから始める`)];
+  const missing = required.filter((g) => !issueLabels.includes(g));
+  const errors = missing.length
+    ? [issue('', 0, `Issue #${b.issue} に ${missing.join('・')} が付いていない。${b.role}/ の工程は、${required.join('・')} がすべてそろってから始める(ゲートを飛ばさない)`)]
+    : [];
+  if (mergedBranches === null) return [...errors, issue('', 0, 'マージ済みの PR の一覧を取れなかったので、ゲートラベルの裏付けを確かめられない')];
+  return [...errors, ...checkGateEvidence(b.issue, issueLabels, mergedBranches).map((m) => issue('', 0, `Issue #${b.issue}: ${m}`))];
 }
 
 /** 工場の版を上げる対象のファイル。 */
