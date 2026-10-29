@@ -41,6 +41,33 @@ function 入れる(inputType: string, text: string) {
   fireEvent.change(el, { target: { value: el.value.slice(0, start) + text + el.value.slice(end) } })
 }
 
+/**
+ * IME の確定。本物のブラウザと同じく、変換中の beforeinput は取り消せず(cancelable: false)、
+ * 確定までに変換中の input が文字ごとに出て、最後に compositionend で確定する。
+ */
+function IME確定(text: string) {
+  const el = 入力欄()
+  const before = el.value
+  const start = el.selectionStart ?? before.length
+  const end = el.selectionEnd ?? before.length
+  fireEvent.compositionStart(el, { data: '' })
+  for (let i = 1; i <= text.length; i++) {
+    const composing = text.slice(0, i)
+    el.dispatchEvent(
+      new InputEvent('beforeinput', {
+        inputType: 'insertCompositionText',
+        data: composing,
+        bubbles: true,
+        cancelable: false,
+      }),
+    )
+    fireEvent.change(el, {
+      target: { value: before.slice(0, start) + composing + before.slice(end) },
+    })
+  }
+  fireEvent.compositionEnd(el, { data: text })
+}
+
 /** ブラウザの自動入力。beforeinput を出さず、値だけが差し替わる。 */
 function 自動入力(text: string) {
   fireEvent.change(入力欄(), { target: { value: text } })
@@ -138,7 +165,7 @@ describe('金額入力', () => {
         },
       ],
       ['テキストのドラッグ&ドロップ', (text) => 入れる('insertFromDrop', text)],
-      ['IME の確定', (text) => 入れる('insertCompositionText', text)],
+      ['IME の確定', (text) => IME確定(text)],
       ['ブラウザの自動入力', (text) => 自動入力(text)],
     ]
 
@@ -158,7 +185,10 @@ describe('金額入力', () => {
           render(<金額欄 initial={initial} onRaw={onRaw} />)
           await 入れる方(text)
           expect(入力欄()).toHaveValue(shown)
-          expect(onRaw).not.toHaveBeenCalled()
+          // 親に渡る値に小数点は現れず、最後に親が持つ値は入れようとする前のまま
+          // (IME は変換中の数字が一度渡ってから、確定のときに戻る)
+          for (const [raw] of onRaw.mock.calls) expect(raw).toMatch(/^\d*$/)
+          expect(onRaw.mock.calls.at(-1)?.[0] ?? initial).toBe(initial)
         },
       )
 
@@ -180,6 +210,16 @@ describe('金額入力', () => {
       await user.type(入力欄(), '{Escape}', { initialSelectionStart: 2, initialSelectionEnd: 9 })
       自動入力('3,000,100.5')
       await Promise.resolve()
+      expect([入力欄().selectionStart, 入力欄().selectionEnd]).toEqual([2, 9])
+    })
+
+    test('小数点を含む IME の確定のあと、選んでいた範囲は変換の前のままである', async () => {
+      const user = userEvent.setup({ delay: null })
+      render(<金額欄 initial="3000000" />)
+      await user.type(入力欄(), '{Escape}', { initialSelectionStart: 2, initialSelectionEnd: 9 })
+      IME確定('100.5')
+      await Promise.resolve()
+      expect(入力欄()).toHaveValue('3,000,000')
       expect([入力欄().selectionStart, 入力欄().selectionEnd]).toEqual([2, 9])
     })
   })

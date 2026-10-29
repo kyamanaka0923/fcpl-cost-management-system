@@ -179,6 +179,23 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
     }
 
     [Fact]
+    public async Task 小数点以下が0の金額は値として保存され整数の値で読み戻せる()
+    {
+        // SPEC-001 の具体例 9: 100.0 は受け付ける。TEXT に小数点つきで入る経路の往復を確かめる
+        var dept = await _fx.課を保存();
+        var project = await _fx.案件を保存(dept.Id);
+        var repo = new DepartmentBudgetRepository(_fx.Factory);
+
+        var budget = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
+        budget.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(100.0m));
+        await repo.AddAsync(budget);
+
+        var restored = await repo.FindByIdAsync(budget.Id);
+
+        Assert.Equal(100m, Assert.Single(restored!.Lines).Amount.Value);
+    }
+
+    [Fact]
     public async Task 月次明細は月別金額を保持したままラウンドトリップする()
     {
         var dept = await _fx.課を保存();

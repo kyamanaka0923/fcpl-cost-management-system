@@ -79,18 +79,18 @@ public class ActualEntryTests
     }
 
     [Theory]
-    [InlineData("0", null)]
-    [InlineData("1", null)]
-    [InlineData("2000000", 1)]
-    [InlineData("100.0", null)]
-    public void 計上金額が0以上の1円単位の整数の値なら半期一括でも月別でも計上できる(string text, int? month)
+    [InlineData("0", null, 0)]
+    [InlineData("1", null, 1)]
+    [InlineData("2000000", 1, 2_000_000)]
+    [InlineData("100.0", null, 100)]
+    public void 計上金額が0以上の1円単位の整数の値なら半期一括でも月別でも計上できる(string text, int? month, int expected)
     {
         var amount = decimal.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
 
         var entry = ActualEntry.Record(Dept, Half, BudgetCategory.Processing, ProjectA, null,
             month, new Money(amount), null, Now);
 
-        Assert.Equal(decimal.Floor(amount), entry.Amount.Value);
+        Assert.Equal((decimal)expected, entry.Amount.Value);
         Assert.Equal(month, entry.Month);
     }
 

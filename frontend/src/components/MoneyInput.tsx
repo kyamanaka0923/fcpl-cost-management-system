@@ -1,13 +1,15 @@
-import { useEffect, useLayoutEffect, useRef, type ChangeEvent, type CSSProperties } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type ChangeEvent,
+  type CompositionEvent,
+  type CSSProperties,
+} from 'react'
 
 /** 生の数値文字列(カンマなし)を 3 桁区切りで表示する。空文字はそのまま。 */
 function formatWithCommas(raw: string): string {
-  if (raw === '') return ''
-  const dotIndex = raw.indexOf('.')
-  const intPart = dotIndex === -1 ? raw : raw.slice(0, dotIndex)
-  const decPart = dotIndex === -1 ? '' : raw.slice(dotIndex) // 先頭の '.' を含む
-  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-  return withCommas + decPart
+  return raw.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
 /** 小数点(半角「.」U+002E と全角「．」U+FF0E)。入力欄には入れない(BR-BUD-007、SPEC-002)。 */
@@ -39,8 +41,11 @@ interface MoneyInputProps {
  *
  * 1 円未満の端数を入れさせないため、小数点(「.」「．」)を含む文字列は入り方によらず受け付けない
  * (SPEC-002)。入ろうとする文字列に小数点が 1 つでもあれば、その入力では値も選択範囲も変えない。
- * 打鍵・貼り付け・ドロップ・IME の確定は beforeinput で止め、
- * 入る前に止められない入り方(ブラウザの自動入力など)は change で入力前の状態に戻す。
+ * 打鍵・貼り付け・ドロップは beforeinput で止める。
+ * 入る前に止められない入り方は、change で入力前の状態に戻す。
+ * IME は変換中の beforeinput が取り消せず、確定までに変換中の input が何回も出るので、
+ * 変換の始まりの値と選択範囲を覚えておき、変換中に小数点が現れたら、確定のときに変換の前へ戻す。
+ * ブラウザの自動入力は beforeinput を伴わず、change で戻す。
  */
 export default function MoneyInput({ value, onChange, className, ...rest }: MoneyInputProps) {
   const ref = useRef<HTMLInputElement>(null)
@@ -52,6 +57,13 @@ export default function MoneyInput({ value, onChange, className, ...rest }: Mone
   const caretDigits = useRef<number | null>(null)
   // 直近の入力の前の選択範囲。小数点で入力を取り消すときに、選んでいた範囲ごと元に戻すために持つ。
   const lastSelection = useRef<[number, number]>([0, 0])
+
+  // IME の変換の始まりの値(生の数値文字列)と選択範囲。変換中に小数点が現れたかどうか。
+  const composition = useRef<{
+    raw: string
+    selection: [number, number]
+    hadPoint: boolean
+  } | null>(null)
 
   const rememberSelection = () => {
     const el = ref.current
@@ -78,6 +90,7 @@ export default function MoneyInput({ value, onChange, className, ...rest }: Mone
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const el = e.target
     if (DECIMAL_POINT.test(el.value)) {
+      if (composition.current) composition.current.hadPoint = true
       // 入力の前の値には小数点がないので、小数点は入ろうとした文字列にある。値を戻し、範囲を復元する。
       // (React が制御コンポーネントの値を戻したあとに選択範囲を戻すため、マイクロタスクで行う)
       const [start, end] = lastSelection.current
@@ -88,6 +101,28 @@ export default function MoneyInput({ value, onChange, className, ...rest }: Mone
     const cursor = el.selectionStart ?? el.value.length
     caretDigits.current = el.value.slice(0, cursor).replace(/\D/g, '').length
     onChange(clean(el.value))
+  }
+
+  const handleCompositionStart = () => {
+    const el = ref.current
+    composition.current = {
+      raw: value,
+      selection: [el?.selectionStart ?? 0, el?.selectionEnd ?? 0],
+      hadPoint: false,
+    }
+  }
+
+  const handleCompositionEnd = (e: CompositionEvent<HTMLInputElement>) => {
+    const started = composition.current
+    composition.current = null
+    if (started === null) return
+    if (!started.hadPoint && !DECIMAL_POINT.test(e.data)) return
+    // 変換中の数字がすでに入っていても、小数点を含む変換は、変換の前の値と選択範囲に戻す
+    const el = e.currentTarget
+    const [start, end] = started.selection
+    el.value = formatWithCommas(started.raw)
+    onChange(started.raw)
+    queueMicrotask(() => ref.current?.setSelectionRange(start, end))
   }
 
   useLayoutEffect(() => {
@@ -113,6 +148,8 @@ export default function MoneyInput({ value, onChange, className, ...rest }: Mone
       value={formatWithCommas(value)}
       onChange={handleChange}
       onSelect={rememberSelection}
+      onCompositionStart={handleCompositionStart}
+      onCompositionEnd={handleCompositionEnd}
       {...rest}
     />
   )

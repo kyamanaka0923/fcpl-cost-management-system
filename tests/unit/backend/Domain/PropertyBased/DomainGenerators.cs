@@ -34,10 +34,12 @@ internal static class ドメイン生成器
     /// <summary>金額(円。0 〜 100億、1円単位)。decimal の加減算を厳密に比較できる範囲に収める。</summary>
     public static readonly Gen<decimal> 金額 = Gen.Long[0, 10_000_000_000L].Select(v => (decimal)v);
 
-    /// <summary>1 円未満の端数つきの金額(0.01 円刻み。端数は 1〜99 銭。負の値も含む)。</summary>
+    /// <summary>
+    /// 1 円未満の端数つきの金額(0.01 円刻み。端数は 1〜99 銭)。負の値も含み、-1 と 0 の間(例 -0.5)も作る。
+    /// </summary>
     public static readonly Gen<decimal> 金額_端数つき =
-        Gen.Select(Gen.Long[-1_000_000L, 1_000_000L], Gen.Int[1, 99])
-            .Select((yen, sen) => yen + (yen < 0 ? -sen : sen) / 100m);
+        Gen.Select(Gen.Long[0, 1_000_000L], Gen.Int[1, 99], Gen.Bool)
+            .Select((yen, sen, negative) => (yen + sen / 100m) * (negative ? -1m : 1m));
 
     /// <summary>負の金額と 1 円未満の端数つきの金額も稀に混ぜる(拒否されることの検証用)。</summary>
     public static readonly Gen<decimal> 金額_負を含む = Gen.Frequency(
