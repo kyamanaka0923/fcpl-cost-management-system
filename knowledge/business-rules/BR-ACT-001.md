@@ -3,7 +3,7 @@ id: BR-ACT-001
 title: 実績の計上
 status: 確定
 sources: [SRC-REQ, SRC-ISSUE-5, SRC-ISSUE-7, SRC-CODE, SRC-ANS-OQ-003]
-requirements: [FR-6.1, FR-6.2, FR-6.3, FR-6.4, FR-6.4a, FR-6.5, FR-6.6]
+requirements: [FR-6.1, FR-6.2, FR-6.3, FR-6.4, FR-6.4a, FR-6.5, FR-6.6, FR-6.7, FR-6.8]
 ---
 
 ## ルール
