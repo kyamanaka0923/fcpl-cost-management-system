@@ -10,8 +10,36 @@ permissions:
   checks: write
 
 jobs:
+  # PR では、変えた場所に応じてジョブを飛ばす(#73)。どの場所でどのジョブを動かすかは tools/factory/lib/ci-scope.mjs。
+  # main への push ではすべて動かす。飛ばしたジョブ(skipped)は、必須チェックとしては通ったものとして扱われる。
+  changes:
+    name: 変えた場所の判定(動かすジョブを決める)
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.scope.outputs.backend }}
+      frontend: ${{ steps.scope.outputs.frontend }}
+      frontendUnit: ${{ steps.scope.outputs.frontendUnit }}
+      browser: ${{ steps.scope.outputs.browser }}
+      screens: ${{ steps.scope.outputs.screens }}
+      mutation: ${{ steps.scope.outputs.mutation }}
+      metrics: ${{ steps.scope.outputs.metrics }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # PR の差分(base...head)を取るため
+      - name: 変えたファイルから、動かすジョブを決める
+        id: scope
+        run: node tools/factory/ci-scope-cli.mjs
+        env:
+          # PR でないとき(main への push)は空になり、すべてのジョブを動かす
+          FACTORY_BASE: ${{ github.event.pull_request.base.sha }}
+          FACTORY_HEAD: ${{ github.event.pull_request.head.sha }}
+
   backend:
     name: バックエンド(ビルド・テスト)
+    needs: changes
+    # 判定が失敗・取り消しのときも動かす(飛ばしたジョブは必須チェックを通ってしまうので、取りこぼさない側に倒す)
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.backend == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -56,6 +84,9 @@ jobs:
 
   frontend-unit:
     name: フロントエンド単独テスト(Vitest)
+    needs: changes
+    # 判定が失敗・取り消しのときも動かす(飛ばしたジョブは必須チェックを通ってしまうので、取りこぼさない側に倒す)
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.frontendUnit == 'true') }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -85,6 +116,9 @@ jobs:
 
   browser-e2e:
     name: ブラウザE2E(Playwright)
+    needs: changes
+    # 判定が失敗・取り消しのときも動かす(飛ばしたジョブは必須チェックを通ってしまうので、取りこぼさない側に倒す)
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.browser == 'true') }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -199,6 +233,9 @@ jobs:
 
   frontend:
     name: フロントエンド(静的解析・型チェック・ビルド)
+    needs: changes
+    # 判定が失敗・取り消しのときも動かす(飛ばしたジョブは必須チェックを通ってしまうので、取りこぼさない側に倒す)
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.frontend == 'true') }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -237,6 +274,9 @@ jobs:
 
   mutation:
     name: ミューテーションテスト(Stryker.NET)
+    needs: changes
+    # 判定が失敗・取り消しのときも動かす(飛ばしたジョブは必須チェックを通ってしまうので、取りこぼさない側に倒す)
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.mutation == 'true') }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -296,6 +336,9 @@ jobs:
 
   metrics:
     name: コードメトリクス(行数・複雑度)
+    needs: changes
+    # 判定が失敗・取り消しのときも動かす(飛ばしたジョブは必須チェックを通ってしまうので、取りこぼさない側に倒す)
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.metrics == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
