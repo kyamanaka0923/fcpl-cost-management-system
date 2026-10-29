@@ -35,6 +35,7 @@
 このリポジトリは、AI エージェント(Claude Code)が書き、人が「何を作るか」と「出してよいか」を決める
 **工場(ソフトウェアファクトリー)**の形で開発しています。決定は [ADR-0015](docs/adr/0015-software-factory.md)、
 エージェントへの共通の指示は [AGENTS.md](AGENTS.md) です。
+工場を回す人(要望を出す・問いに答える・ゲートで判定する人)向けの案内は **[工場の回し方](docs/factory/README.md)** です。
 
 ```mermaid
 flowchart LR
@@ -125,7 +126,7 @@ flowchart LR
 | 区分 | 技術 | 内容 |
 |---|---|---|
 | 開発環境 | Docker / docker compose / VS Code Dev Containers | `docker/dev.Dockerfile`(.NET 10 SDK + Node.js 22)を共用 |
-| CI | GitHub Actions(ubuntu-latest) | `ci.yml`: バックエンド(ビルド・テスト・カバレッジ)/ フロントエンド(ESLint・Prettier・型チェック・ビルド)/ フロントエンド単独テスト / ブラウザE2E / ミューテーションテスト / コードメトリクス。`factory.yml`: 工場のゲートの検査(フック・検査スクリプトのテスト・画面の差分と 9 つの検査。[tools/factory/](tools/factory/README.md))。`factory-metrics.yml`・`factory-intervention.yml`: 週報と介入の記録 |
+| CI | GitHub Actions(ubuntu-latest) | `ci.yml`: バックエンド(ビルド・テスト・カバレッジ)/ フロントエンド(ESLint・Prettier・型チェック・ビルド)/ フロントエンド単独テスト / ブラウザE2E / ミューテーションテスト / コードメトリクス。`factory.yml`: 工場のゲートの検査(フック・検査スクリプトのテスト・画面の差分と 10 の検査。[tools/factory/](tools/factory/README.md))。`factory-metrics.yml`・`factory-intervention.yml`: 週報と介入の記録 |
 | 依存の自動更新 | Dependabot | NuGet・npm・GitHub Actions・Docker ベースイメージを毎週月曜 09:00 JST に確認して PR を作成(`.github/dependabot.yml`)。マイナー・パッチはまとめて1件、メジャーは個別 |
 | デプロイ | AWS SAM | Lambda(`provided.al2023`, arm64)+ EFS(SQLite)+ S3 + CloudFront + Cognito + AWS Backup(EFS を日次バックアップ)。詳細は [infra/README.md](infra/README.md) |
 

@@ -26,6 +26,7 @@ model: claude-haiku-4-5
 | `knowledge/`・`requirements/`・`specs/` の README | 各工程の成果物の形 | 成果物の形の変更(工場の変更の種類 C) |
 | `.factory/changes/<Issue番号>.md` | 工場の変更の記録(1 件 1 ファイル。`.factory/CHANGELOG.md` は版と変更の種類の説明) | 工場の設定を変えたとき毎回 |
 | `docs/adr/0015-software-factory.md` | 工場の決定と、定義書との違い | 違いが増えたとき |
+| `docs/factory/README.md` | 工場を回す人のための案内(決まりは写さず、正へのリンクだけ) | 人の作業・頼み方・ゲート後の手順・ハーネス・検査の数・よくあるつまずきが変わったとき。リンク先のファイルを動かしたとき |
 
 - 費目マスタの一覧は `DatabaseInitializer` のシードと**突き合わせて**記載する(推測で書かない)
 - 差異の符号規則(原価=正で利益が減る、売上=正で利益が増える。「有利/不利」という語は使わない)は README・MANUAL・DESIGN の3箇所に
