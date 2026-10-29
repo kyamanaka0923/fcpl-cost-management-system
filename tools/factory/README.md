@@ -5,6 +5,7 @@
 | ファイル | 中身 |
 |---|---|
 | `cli.mjs` | ゲートの検査の入口。`node tools/factory/cli.mjs <検査名>`(リポジトリ直下で実行) |
+| `ci-scope-cli.mjs`、`lib/ci-scope.mjs` | PR で変えた場所から、動かす CI のジョブを決める(#73。`ci.yml` と `factory.yml` の最初のジョブで使う。依存のパッケージなしで動く) |
 | `cli.mjs changes`、`lib/changes.mjs` | 工場の変更の記録(`.factory/changes/`)を確かめて、Issue の番号の順の表を出す(#66) |
 | `checks/` | 検査の中身(入力を引数で受け取る純粋な関数) |
 | `lib/` | 共通の部品(frontmatter・日本語 Gherkin の簡易パーサ・ブランチ名) |
