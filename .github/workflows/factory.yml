@@ -20,7 +20,7 @@ jobs:
   # PR では、変えた場所に応じてジョブを飛ばす(#73)。どの場所でどのジョブを動かすかは tools/factory/lib/ci-scope.mjs。
   # main への push ではすべて動かす。飛ばしたジョブ(skipped)は、必須チェックとしては通ったものとして扱われる。
   changes:
-    name: 変えた場所の判定(動かすジョブを決める)
+    name: 変えた場所の判定(工場のゲート)
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.scope.outputs.backend }}

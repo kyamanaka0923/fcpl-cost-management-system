@@ -21,7 +21,8 @@ model: claude-sonnet-5
 
 - **PR では、変えた場所に応じてジョブを飛ばす(#73)**。最初のジョブ「変えた場所の判定」が `node tools/factory/ci-scope-cli.mjs` で決め、各ジョブの `if:` で飛ばす。
   対応の正は `tools/factory/lib/ci-scope.mjs`(テストは `tools/factory/test/ci-scope.test.mjs`)。main への push ではすべて動かす。
-  ワークフロー全体を `on.pull_request.paths` で絞らない(必須チェックが「待ち」のまま残ってマージできなくなる)。判定が失敗したら、すべて動かす側に倒す
+  ワークフロー全体を `on.pull_request.paths` で絞らない(必須チェックが「待ち」のまま残ってマージできなくなる)。判定が失敗したら、すべて動かす側に倒す。
+  判定のジョブ「変えた場所の判定(CI)」「変えた場所の判定(工場のゲート)」も必須チェックにする(`setup-github.sh` の `wanted`。名前が同じだと区別できないので分けている)
 
   | 変えた場所 | 動かすジョブ |
   |---|---|
