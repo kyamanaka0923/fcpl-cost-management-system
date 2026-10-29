@@ -45,14 +45,13 @@ function 入れる(inputType: string, text: string) {
  * IME の確定。本物のブラウザと同じく、変換中の beforeinput は取り消せず(cancelable: false)、
  * 確定までに変換中の input が文字ごとに出て、最後に compositionend で確定する。
  */
-function IME確定(text: string) {
+function IME変換(steps: string[]) {
   const el = 入力欄()
   const before = el.value
   const start = el.selectionStart ?? before.length
   const end = el.selectionEnd ?? before.length
   fireEvent.compositionStart(el, { data: '' })
-  for (let i = 1; i <= text.length; i++) {
-    const composing = text.slice(0, i)
+  for (const composing of steps) {
     el.dispatchEvent(
       new InputEvent('beforeinput', {
         inputType: 'insertCompositionText',
@@ -65,7 +64,17 @@ function IME確定(text: string) {
       target: { value: before.slice(0, start) + composing + before.slice(end) },
     })
   }
-  fireEvent.compositionEnd(el, { data: text })
+}
+
+/** IME の変換を確定する。 */
+function IME確定する(text: string) {
+  fireEvent.compositionEnd(入力欄(), { data: text })
+}
+
+/** 先頭から 1 文字ずつ変換して、最後に確定する。 */
+function IME確定(text: string) {
+  IME変換([...text].map((_, i) => text.slice(0, i + 1)))
+  IME確定する(text)
 }
 
 /** ブラウザの自動入力。beforeinput を出さず、値だけが差し替わる。 */
@@ -185,10 +194,8 @@ describe('金額入力', () => {
           render(<金額欄 initial={initial} onRaw={onRaw} />)
           await 入れる方(text)
           expect(入力欄()).toHaveValue(shown)
-          // 親に渡る値に小数点は現れず、最後に親が持つ値は入れようとする前のまま
-          // (IME は変換中の数字が一度渡ってから、確定のときに戻る)
-          for (const [raw] of onRaw.mock.calls) expect(raw).toMatch(/^\d*$/)
-          expect(onRaw.mock.calls.at(-1)?.[0] ?? initial).toBe(initial)
+          // 拒否したとき、親は一度も呼ばれない(変換中も、確定のときも)
+          expect(onRaw).not.toHaveBeenCalled()
         },
       )
 
@@ -221,6 +228,27 @@ describe('金額入力', () => {
       await Promise.resolve()
       expect(入力欄()).toHaveValue('3,000,000')
       expect([入力欄().selectionStart, 入力欄().selectionEnd]).toEqual([2, 9])
+    })
+
+    test('変換中に小数点を打ち、消してから小数点なしで確定すると入る', () => {
+      const onRaw = vi.fn()
+      render(<金額欄 onRaw={onRaw} />)
+      IME変換(['1', '10', '100', '100.', '100', '1005'])
+      IME確定する('1005')
+      expect(入力欄()).toHaveValue('1,005')
+      expect(onRaw).toHaveBeenCalledTimes(1)
+      expect(onRaw).toHaveBeenCalledWith('1005')
+    })
+
+    test('変換中は親が呼ばれず、確定のときに 1 回だけ呼ばれる', () => {
+      const onRaw = vi.fn()
+      render(<金額欄 initial="2000" onRaw={onRaw} />)
+      IME変換(['1', '10', '100'])
+      expect(onRaw).not.toHaveBeenCalled()
+      expect(入力欄()).toHaveValue('2,000100') // 変換中の表示(親の値は 2000 のまま)
+      IME確定する('100')
+      expect(onRaw).toHaveBeenCalledTimes(1)
+      expect(入力欄()).toHaveValue('2,000,100')
     })
   })
 })
