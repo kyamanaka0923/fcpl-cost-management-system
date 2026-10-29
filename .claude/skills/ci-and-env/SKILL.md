@@ -19,6 +19,24 @@ model: claude-sonnet-5
 | metrics | コードメトリクス。cloc(言語別行数)+ scc(行数+複雑度)を backend/src・frontend/src・tests/unit・tests/integration・tests/e2e・tests/architecture の区分で実行サマリへ + `code-metrics` アーティファクト。scc は `go install github.com/boyter/scc/v3@latest`(ubuntu ランナーの Go を利用)。**Microsoft.CodeAnalysis.Metrics は Linux 不可 & 旧 Roslyn で現代 C# 非対応のため使わない** |
 | mutation | ミューテーションテスト(Stryker.NET)。`tests` で `dotnet tool restore` → `unit/backend/Domain`・`integration/backend/Application` で `dotnet tool run dotnet-stryker`。markdown レポートを実行サマリへ + html を `mutation-report` アーティファクトへ。**非ブロッキング**(閾値 break:0 でスコアでは落とさない。Stryker 自体の失敗のみ赤)。設定は各テストプロジェクト直下 `stryker-config.json`、ツールは `tests/.config/dotnet-tools.json`。詳細は testing スキル(Issue #6) |
 
+- **PR では、変えた場所に応じてジョブを飛ばす(#73)**。最初のジョブ「変えた場所の判定」が `node tools/factory/ci-scope-cli.mjs` で決め、各ジョブの `if:` で飛ばす。
+  対応の正は `tools/factory/lib/ci-scope.mjs`(テストは `tools/factory/test/ci-scope.test.mjs`)。main への push ではすべて動かす。
+  ワークフロー全体を `on.pull_request.paths` で絞らない(必須チェックが「待ち」のまま残ってマージできなくなる)。判定が失敗したら、すべて動かす側に倒す。
+  判定のジョブ「変えた場所の判定(CI)」「変えた場所の判定(工場のゲート)」も必須チェックにする(`setup-github.sh` の `wanted`。名前が同じだと区別できないので分けている)
+
+  | 変えた場所 | 動かすジョブ |
+  |---|---|
+  | `knowledge/`・`requirements/`(screens 以外)・`specs/`・`docs/`・`.factory/`・`*.md` だけ | なし(工場のゲートの検査だけ) |
+  | Reqnroll の `.feature`(`tests/integration/`・`tests/e2e/api/`) | バックエンド |
+  | `backend/`・`tests/unit/backend/`・`tests/integration/`・`tests/e2e/api/`・`tests/architecture/`・`.editorconfig` | バックエンド・ブラウザE2E・ミューテーション・メトリクス |
+  | `frontend/` | フロントエンド・Vitest・ブラウザE2E・画面の差分・メトリクス |
+  | `tests/unit/frontend/` | Vitest・メトリクス |
+  | `tests/e2e/browser/` | ブラウザE2E |
+  | `requirements/screens/`・`tests/e2e/screens/` | 画面の差分 |
+  | `docs/api/openapi.json` | バックエンド・フロントエンド・画面の差分 |
+  | それ以外(`.github/workflows/`・`tools/factory/`・`.claude/`・`docker/`・`infra/` など) | すべて |
+
+  ジョブを足したら、`ci-scope.mjs` の `SCOPES` と対応、ジョブの `needs: changes` と `if:` も足す
 - **依存の自動更新**: Dependabot(`.github/dependabot.yml`)が毎週月曜 09:00 JST に NuGet・npm・Actions・Docker を確認して PR を作る。
   マイナー・パッチはエコシステムごとに1件へまとめ、メジャーは個別 PR。PR は CI を通してからマージする
   (メジャー更新は破壊的変更の確認が必要。例: React・Vite・xUnit のメジャー)
