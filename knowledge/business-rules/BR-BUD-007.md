@@ -3,7 +3,7 @@ id: BR-BUD-007
 title: 金額は 0 以上の 1 円単位の整数で、明細は金額だけを持つ
 status: 確定
 sources: [SRC-REQ, SRC-ADR-0003, SRC-CODE, SRC-ANS-OQ-003, SRC-ANS-OQ-004, SRC-ANS-OQ-005, SRC-ANS-OQ-006]
-requirements: [FR-4.8]
+requirements: [FR-4.8, FR-4.10, FR-4.11, FR-4.12, FR-6.7, FR-6.8]
 ---
 
 ## ルール
