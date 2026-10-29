@@ -3,7 +3,7 @@ id: BR-BUD-005
 title: 明細の月次入力
 status: 確定
 sources: [SRC-REQ, SRC-ADR-0009, SRC-ISSUE-5, SRC-ANS-OQ-003]
-requirements: [FR-4.6, FR-4.11, FR-4.12]
+requirements: [FR-4.6, FR-4.11, FR-4.12, FR-4.13, FR-4.14]
 ---
 
 ## ルール
