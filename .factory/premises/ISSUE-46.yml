@@ -1,7 +1,7 @@
 issue: 46
 stage: spec
 factory_version: factory-v1
-recorded_at: 2026-10-29T23:33:18+09:00
+recorded_at: 2026-10-30T00:32:07+09:00
 premises:
   - path: requirements/budget/FR-4.8.md
     blob: ecd0e6a4f264351fe8751e6be8aa0f98b1460071
@@ -24,11 +24,13 @@ premises:
   - path: requirements/actual/FR-6.10.md
     blob: 55cce961a44e87de6f0f7ea55d805b59795d5e42
   - path: knowledge/business-rules/BR-BUD-007.md
-    blob: a20a624031f0909f706cc1918ed964464efecd03
+    blob: 8a449ac486a20b1f997c1654455115d067568fff
   - path: knowledge/business-rules/BR-BUD-005.md
     blob: 6427f27fad14624749bf566ab3b1dfabfde4719c
   - path: knowledge/business-rules/BR-ACT-001.md
     blob: 12a9a9f5abfc51f46604cc60b5ad771e9216e26c
+  - path: knowledge/open-questions.md
+    blob: 7485003934a7b3b29b9e45ab6b2ae1846467451b
   - path: tests/integration/backend/Application/Features/課予算の策定と改定.feature
     blob: f4053e42eec8c0578cd2b2480410adc86da816c1
   - path: tests/integration/backend/Application/Features/予実差異と損益.feature
