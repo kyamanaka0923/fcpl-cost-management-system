@@ -1,0 +1,45 @@
+issue: 46
+stage: spec
+factory_version: factory-v1
+recorded_at: 2026-10-30T00:32:07+09:00
+premises:
+  - path: requirements/budget/FR-4.8.md
+    blob: ecd0e6a4f264351fe8751e6be8aa0f98b1460071
+  - path: requirements/budget/FR-4.10.md
+    blob: 5c73406fe9c9f5514bc602dc173a734be6cc0650
+  - path: requirements/budget/FR-4.11.md
+    blob: 34c9945f2f91eaf141d4314f988a6932c9bd0890
+  - path: requirements/budget/FR-4.12.md
+    blob: 93b838e2221c23103d69a42982ec6d7a54c7e159
+  - path: requirements/budget/FR-4.13.md
+    blob: 880d61c494b73dfb52c783244ff3b9e084a5dde0
+  - path: requirements/budget/FR-4.14.md
+    blob: 2f9d3c4c28485ca4ece69c7bae54f0e5cc7b2b4d
+  - path: requirements/actual/FR-6.7.md
+    blob: a15e588f922896915b2188e28f88870bea019d29
+  - path: requirements/actual/FR-6.8.md
+    blob: e18eaf886ceab02630d88764dba47a45f5da961f
+  - path: requirements/actual/FR-6.9.md
+    blob: 34c63fcbbb254caeb53b1e752e0ffa709aee0aa4
+  - path: requirements/actual/FR-6.10.md
+    blob: 55cce961a44e87de6f0f7ea55d805b59795d5e42
+  - path: knowledge/business-rules/BR-BUD-007.md
+    blob: 8a449ac486a20b1f997c1654455115d067568fff
+  - path: knowledge/business-rules/BR-BUD-005.md
+    blob: 6427f27fad14624749bf566ab3b1dfabfde4719c
+  - path: knowledge/business-rules/BR-ACT-001.md
+    blob: 12a9a9f5abfc51f46604cc60b5ad771e9216e26c
+  - path: knowledge/open-questions.md
+    blob: 7485003934a7b3b29b9e45ab6b2ae1846467451b
+  - path: tests/integration/backend/Application/Features/課予算の策定と改定.feature
+    blob: f4053e42eec8c0578cd2b2480410adc86da816c1
+  - path: tests/integration/backend/Application/Features/予実差異と損益.feature
+    blob: ecca1e7b969fb3e473da3d1e5ada192d6a0515dc
+  - path: tests/e2e/api/Features/APIのエラー応答.feature
+    blob: e065ed49e0d11a13249571373f11f705de870669
+  - path: tests/e2e/browser/features/予算明細の入力.feature
+    blob: 7071f92e20c99a4149e8c67efb3114fa7a2d151c
+  - path: tests/e2e/browser/features/実績と分析.feature
+    blob: 0823fe3f47926845a8a9002a8bd4bfb52ce7769c
+  - path: docs/api/openapi.json
+    blob: 922c95b68dd732a5f5b8a1ba01f31de80105fed4
