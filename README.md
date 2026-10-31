@@ -3,7 +3,8 @@
 [![CI](https://github.com/kyamanaka0923/fcpl-cost-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/kyamanaka0923/fcpl-cost-management-system/actions/workflows/ci.yml)
 
 **課(部門)単位の半期予算の策定・実績計上・差異分析**を行うシステムです。
-明細は数量×単価ではなく**金額**で直接管理します。
+明細は数量×単価ではなく**金額**で直接管理します。金額は **0 以上の 1 円単位の整数**で、
+1 円未満の端数は入力欄に入れられず、API にも受け付けられません(400)。
 
 - 組織は **部 > 課** の2階層です。課は必ず1つの部に属し、**部では配下課の予算・予実を合計**して把握できます
   (部自体は予算を策定しない集計ビュー)。部詳細は「予算(計画)」タブ(区分別の予算・計画損益・粗利率と、

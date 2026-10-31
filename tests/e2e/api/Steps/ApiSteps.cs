@@ -75,6 +75,34 @@ public sealed class APIのステップ(APIコンテキスト ctx)
             ctx.予算Id = Id(ctx.応答本文);
     }
 
+    /// <summary>成否を問わず送る(拒否のシナリオ用)。表の 1 行目だけを送る。</summary>
+    [When("API で次の明細を登録しようとする:")]
+    public async Task 明細を登録しようとする(DataTable table)
+    {
+        var row = table.Rows.Single();
+        var project = 空ならnull(row["案件"]) is { } code ? ctx.案件Id(ctx.現在の課!, code) : null;
+        await ctx.送信(Put, $"/api/budgets/{予算Id()}/lines", new
+        {
+            category = 区分(row["区分"]),
+            projectId = project,
+            elementCode = 空ならnull(row["費目"]),
+            amount = 金額(row["金額"]),
+        });
+    }
+
+    /// <summary>月別金額で成否を問わず送る(拒否のシナリオ用)。</summary>
+    [When("API で区分 {string} の案件 {string} を次の月別金額で登録しようとする:")]
+    public async Task 月別金額で登録しようとする(string category, string project, DataTable table)
+    {
+        await ctx.送信(Put, $"/api/budgets/{予算Id()}/lines", new
+        {
+            category = 区分(category),
+            projectId = ctx.案件Id(ctx.現在の課!, project),
+            amount = 0m,
+            monthlyAmounts = table.Rows.ToDictionary(r => int.Parse(r["月"], System.Globalization.CultureInfo.InvariantCulture), r => 金額(r["金額"])),
+        });
+    }
+
     [StepDefinition("API で次の明細を登録する:")]
     public async Task 明細を登録する(DataTable table)
     {
@@ -180,6 +208,22 @@ public sealed class APIのステップ(APIコンテキスト ctx)
                 note = row.TryGetValue("備考", out var note) ? 空ならnull(note) : null,
             }, HttpStatusCode.Created);
         }
+    }
+
+    /// <summary>成否を問わず送る(拒否のシナリオ用)。表の 1 行だけを送る。</summary>
+    [When("API で課 {string} の {string} に次の実績を計上しようとする:")]
+    public async Task 実績を計上しようとする(string department, string half, DataTable table)
+    {
+        var row = table.Rows.Single();
+        var project = 空ならnull(row["案件"]) is { } code ? ctx.案件Id(department, code) : null;
+        await ctx.送信(Post, $"/api/departments/{ctx.課Id(department)}/actuals", new
+        {
+            fiscalHalf = half,
+            category = 区分(row["区分"]),
+            projectId = project,
+            elementCode = 空ならnull(row["費目"]),
+            amount = 金額(row["金額"]),
+        });
     }
 
     [StepDefinition("API で課 {string} の {string} の予実差異を取得する")]
