@@ -20,6 +20,12 @@
       - 未回答の問いの件数: `gh api 'repos/{owner}/{repo}/contents/knowledge/open-questions.md?ref=main' -H 'Accept: application/vnd.github.raw'` で main のファイルを読み、表の `| OQ-<数字>` で始まる行のうち、7 列目(「回答」)が空のものを数える
       - 判断待ちが 5 件を超える、または未回答の問いが 10 件を超える → 進めない(WIP の上限を超えた)。レポートに件数と上限を書き、`prep` の作業(判断待ちの PR のレビューView の見直し、問いを選択肢の形に直す、テストを足す)を人に勧める
       - どちらかの件数を確かめられない → 進めない(確かめられなかった)
+   8. 候補が [B] 要件・画面のとき、要件の土台になる業務ルールが確定しているかを確かめる(要件の `business_rules` には `status: 確定` のルールしか書けない)
+      - 対象の業務ルール: Issue の本文とコメント(`gh issue view <n> --json body,comments`)に出てくる `BR-<英字>-<数字>` の ID と、この Issue の [A] のマージ済み PR(`gh pr list --state merged --search "<n> in:body" --json number,headRefName` のうち `knowledge/<n>-` で始まるもの)が変えた `knowledge/business-rules/` のファイル(`gh pr view <PR> --json files --jq '.files[].path'`)
+      - それぞれ main の版を `gh api 'repos/{owner}/{repo}/contents/knowledge/business-rules/<ID>.md?ref=main' -H 'Accept: application/vnd.github.raw'` で読み、先頭の `status:` を見る
+      - 1 つでも `status: 確定` でない、または main にない → 「ナレッジが未確定」を選ぶ。レポートに、ID ごとの status と、そのルールの「まだ決まっていないこと」に挙がった問い(`OQ-…`)を書く
+      - 対象の業務ルールが 1 つも見つからない → この確認では止めない(要件を書く step が、要るルールを確かめる)
+      - 読めない(`gh` が失敗した)→ 進めない(確かめられなかった)
 4. 工程が決まったら、その工程の PR がまだないかを確かめる
    - `gh pr list --state open --search "<n> in:body" --json number,headRefName,isDraft,url`
    - `git ls-remote --heads origin '<種類>/<n>-*'`(種類は knowledge・req・spec・impl のうち、その工程のもの)
@@ -29,3 +35,4 @@
 
 **進めないとき:**
 - 何もしないで終える。進めない理由(当たった条件と、読んだラベルの一覧)をレポートに書く
+- 「ナレッジが未確定」のときも、この step では Issue にコメントしない(次の step が報告する)

@@ -54,6 +54,7 @@ instructions:
   ci-limit: ../facets/instructions/factory-ci-limit.md
   review-limit-judge: ../facets/instructions/factory-review-limit-judge.md
   ci-limit-judge: ../facets/instructions/factory-ci-limit-judge.md
+  knowledge-gap: ../facets/instructions/factory-knowledge-gap.md
 
 report_formats:
   triage: ../facets/output-contracts/factory-triage.md
@@ -139,6 +140,7 @@ loop_monitors:
       - code-review
       - publish
       - requirements-gap
+      - knowledge-gap
       - review-limit
       - ci-limit
     threshold: 3
@@ -169,6 +171,8 @@ steps:
     rules:
       - condition: 実行環境に origin がない(takt の worktree で動いている)、タスクに Issue 番号がない、または Issue を読めない
         next: ABORT
+      - condition: '[B] の候補だが、要件の土台になる業務ルールが確定していない(ナレッジが未確定)'
+        next: knowledge-gap
       - condition: 進めてよい工程がない(判断待ち・表にない組み合わせ・WIP の上限を超えた・PR が既にあるなど)
         next: COMPLETE
       - condition: 進めてよい工程が1つに決まった
@@ -257,6 +261,8 @@ steps:
         next: screen-write
       - condition: 要件を書き終え、画面の変更は要らない
         next: requirements-review
+      - condition: 要件の土台のナレッジが未確定・足りないので、要件を書かずに止めた
+        next: knowledge-gap
       - condition: 作業を進められない
         next: ABORT
 
@@ -493,6 +499,27 @@ steps:
       - condition: Issue にラベルを付け、問いをコメントした
         next: COMPLETE
       - condition: ラベルかコメントを付けられなかった
+        next: ABORT
+
+  # ナレッジが未確定([B] の土台の業務ルールが status: 確定 でない)。triage か requirements-write から来る。
+  # Issue に問いと人がすること(回答・gate0-approved の外し方)をコメントし、何も入っていないブランチを片付けて終える。
+  # [A] をやり直すには gate0-approved を外す必要があり、それは人の仕事なので、ラベルは変えない。
+  - name: knowledge-gap
+    capabilities: readonly
+    edit: true
+    persona: factory-operator
+    policy: factory-rules
+    knowledge: factory-line
+    instruction: knowledge-gap
+    pass_previous_response: false
+    output_contracts:
+      report:
+        - name: knowledge-gap.md
+          format: escalation
+    rules:
+      - condition: Issue に問いをコメントした(同じ報告が既にあって書かなかった場合を含む)
+        next: COMPLETE
+      - condition: Issue にコメントできなかった
         next: ABORT
 
   # 検証の差し戻しの上限: 残った指摘を Issue にコメントして ABORT。
