@@ -1,0 +1,16 @@
+工程 [B] 要件・画面の検証として、このブランチの差分を逆方向にレビューしてください。ファイルは書き換えません。
+
+**手順:**
+
+1. Report Directory の `triage.md`(Issue の要約)、`requirements-write.md`、あれば `screen-write.md` を読む(報告は手がかりで、判定は実物で行う)
+2. 差分を読む: `git diff "$(git merge-base origin/main HEAD)"`、`git status --porcelain`(未追跡のファイルは中身を開く)
+3. 要件とシナリオだけから、業務ルールと Issue の要求を組み立て直し、元(Issue・`knowledge/` の確定ルール)と比べる。欠落・矛盾・曖昧さ・網羅(シナリオのない要件、存在しない要件を指すタグ、数値で決まっていない境界)を探す
+4. 画面要件の差分があれば、要件との対応、状態ごとの表示の条件、fixtures と `docs/api/openapi.json` の一致、`requirements/screens/approved/` を触っていないことを確かめる
+5. `requirements-write.md` の「画面の変更は要らない」の判断が、書いた要件から見て正しいかを確かめる。画面の変更が要るのに画面要件の差分がないときは、対象「画面」の指摘にする
+6. `knowledge/review-viewpoints.md` の「共通」と「この業務に特有のもの」を1つずつ確かめる
+7. 持ち場(`req/` の `ROLES`)の外のファイルが変わっていないかを確かめる
+8. 2回目以降は、前回の `requirements-review.md` の指摘が直ったかを1件ずつ確かめる
+
+**指摘の対象:**
+- 指摘ごとに、対象を「要件」か「画面」で書く。直す場所が `requirements/screens/` なら「画面」、それ以外なら「要件」
+- 指摘ありのとき、差し戻し先を決める。対象「要件」の指摘が1件でもあれば「要件」、対象「画面」の指摘だけなら「画面」
