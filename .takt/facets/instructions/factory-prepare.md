@@ -4,7 +4,7 @@ Report Directory の `triage.md` を読み、決まった工程の着手の準�
 
 1. `triage.md` の Issue 番号・工程・(続きなら)既存の PR とブランチを確かめる。`gh issue view <n> --json state,labels` で、判定のときから列とゲートラベルが変わっていないことを確かめる。変わっていたら準備せずに止める
 2. 作業ツリーがきれいか確かめる(`git status --porcelain` が空)。きれいでなければ準備せずに止める(他人の変更を混ぜない)
-3. `git fetch origin` のあと、ブランチを用意する
+3. `git fetch origin` のあと、ブランチを用意する。切り替える前のブランチ名(`git branch --show-current`)をレポートに書く(止めたときに戻すため)
    - [A][B][C][D] の着手: 工程の種類のブランチを `origin/main` から切る(`git switch -c <種類>/<n>-<名前> origin/main`)。`<名前>` は Issue のタイトルから英小文字・数字・ハイフンで短く作る
    - [D] の続き(`stage:実装中`): 既存の `impl/<n>-…` ブランチに切り替え、`origin` の同じブランチにそろえる(`git switch <ブランチ>`、`git merge --ff-only origin/<ブランチ>`)。早送りできなければ止める
 4. 前提ファイルを作る([C] と [D] だけ)
