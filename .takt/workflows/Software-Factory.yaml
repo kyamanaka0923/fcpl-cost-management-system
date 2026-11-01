@@ -4,7 +4,8 @@ description: >-
   書く → takt の中で検証する(差し戻しループ)→ 工程別ブランチに push して Draft PR を作る → CI を見届ける、までを行って
   人のゲート判定に渡す。次の工程には進まない。タスクの本文に Issue 番号(例: #123)を書いて実行する。番号がなければ止める。
   ブランチ・コミット・PR は workflow が自分で扱うため、takt 側の worktree と git 操作を止めて、リポジトリの中で実行する
-  (例: takt --pipeline --skip-git -w software-factory -t "#123")。
+  (例: takt --pipeline --skip-git -w Software-Factory -t "#123"。workflow 名は大文字小文字を区別する)。
+  takt の worktree(共有 clone)は origin を外すため、gh も push も動かない。takt add で積むときも worktree は使わない。
 
 # 1回の実行の上限。最も長い経路([B] で、CI の各回に検証の差し戻しを3回直し、CI の失敗を3回直したあとの4回目の失敗)は
 # 74 step。judge の実行も見込んで余裕を持たせている。
@@ -166,7 +167,7 @@ steps:
         - name: triage.md
           format: triage
     rules:
-      - condition: タスクに Issue 番号がない、または Issue を読めない
+      - condition: 実行環境に origin がない(takt の worktree で動いている)、タスクに Issue 番号がない、または Issue を読めない
         next: ABORT
       - condition: 進めてよい工程がない(判断待ち・表にない組み合わせ・WIP の上限を超えた・PR が既にあるなど)
         next: COMPLETE

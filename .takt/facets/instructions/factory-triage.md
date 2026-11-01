@@ -2,6 +2,7 @@
 
 **手順:**
 
+0. 実行環境を確かめる。`git remote get-url origin` が失敗したら(takt の worktree は origin を外す)、ここで止めて「実行環境に origin がない」を選ぶ。`gh -R` などでリポジトリを推測して続けない。レポートの「進めない理由」に、リポジトリの checkout で `takt --pipeline --skip-git -w Software-Factory -t "#<n>"` を実行し直すよう書く
 1. タスクの本文から Issue 番号を取り出す
    - 本文が `## Issue #123: …` の見出し(takt が Issue を読み込んだ形)で始まるときは、その番号を使う
    - それ以外は、本文の `#123` の形の番号を探す。異なる番号がちょうど1つならそれを使う
