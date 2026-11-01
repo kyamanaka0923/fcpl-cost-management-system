@@ -78,7 +78,7 @@ public sealed class ActualEntry
 
     /// <summary>
     /// 実績を計上する。区分と案件/費目の排他(<see cref="BudgetCategories.ValidateKey"/>)を検証し、
-    /// 金額は0以上を要求する。month を指定すると特定月の計上(1..6)、null なら半期一括の計上。
+    /// 金額は0以上の1円単位の整数を要求する。month を指定すると特定月の計上(1..6)、null なら半期一括の計上。
     /// periodDetail は期間費用の明細名(費目一括や案件別区分では null)。
     /// </summary>
     public static ActualEntry Record(DepartmentId departmentId, FiscalHalf fiscalHalf,
@@ -88,8 +88,7 @@ public sealed class ActualEntry
         BudgetCategories.ValidateKey(category, projectId, elementCode);
         if (month is { } m)
             HalfMonths.Validate(m);
-        if (amount.IsNegative)
-            throw new DomainException("金額は0以上で入力してください。");
+        amount.EnsureAcceptableAmount();
         var detail = BudgetLine.NormalizeDetail(periodDetail);
         if (detail is not null && category != BudgetCategory.PeriodCost)
             throw new DomainException("明細名は期間費用の実績にのみ指定できます。");

@@ -24,6 +24,7 @@ gh issue view <n> --json number,title,labels,state --jq '{number,title,state,lab
 | `stage:判断待ち`、`needs-answer` | **何もしない**(人の回答を待つ) | — | — |
 
 - **列を飛ばさない。** 表にない組み合わせ(例: `stage:準備中` で `gate1-approved` あり)は、自分で直さずに人に報告する
+  - CI「ゲートラベルの確認」は、その工程までのゲートラベルが全部そろっていることと、ゲートラベルの工程の PR(`req/<n>-…`・`spec/<n>-…`)がマージ済みであることを確かめる。ラベルを付け外ししたときは `factory-labels.yml` が組み合わせを確かめて Issue にコメントする(#77)
 - ナレッジに足すものがない作業項目は、[A] を「変更なし」と PR なしで済ませてよい。そのときも `gate0-approved` は人が付ける
 - 列のラベル(`stage:…`)は、エージェントが付け替えてよい。**ゲートラベル(`gate…-approved`)は付けない・外さない**
   - 着手したら `stage:実装中` など次の列にする。問いで止めたら `stage:判断待ち` と `needs-answer`

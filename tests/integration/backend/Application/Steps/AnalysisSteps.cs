@@ -9,6 +9,10 @@ public sealed class 実績と分析のステップ(業務コンテキスト ctx)
 {
     // ---- 実績 ----
 
+    [When("課 {string} の {string} に次の実績を計上しようとする:")]
+    public Task 実績を計上しようとする(string department, string half, DataTable table) =>
+        ctx.試行(() => 実績を計上する(department, half, table));
+
     [StepDefinition("課 {string} の {string} に次の実績を計上する:")]
     public async Task 実績を計上する(string department, string half, DataTable table)
     {

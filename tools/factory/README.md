@@ -5,6 +5,8 @@
 | ファイル | 中身 |
 |---|---|
 | `cli.mjs` | ゲートの検査の入口。`node tools/factory/cli.mjs <検査名>`(リポジトリ直下で実行) |
+| `ci-scope-cli.mjs`、`lib/ci-scope.mjs` | PR で変えた場所から、動かす CI のジョブを決める(#73。`ci.yml` と `factory.yml` の最初のジョブで使う。依存のパッケージなしで動く) |
+| `cli.mjs changes`、`lib/changes.mjs` | 工場の変更の記録(`.factory/changes/`)を確かめて、Issue の番号の順の表を出す(#66) |
 | `checks/` | 検査の中身(入力を引数で受け取る純粋な関数) |
 | `lib/` | 共通の部品(frontmatter・日本語 Gherkin の簡易パーサ・ブランチ名) |
 | `test/` | 検査のテスト(`npm test` = `node --test`)。正例と反例を両方置く |
@@ -28,15 +30,21 @@ CI(`.github/workflows/factory.yml`)のジョブ名が、そのまま main のル
 | ナレッジの出どころと確定 | `knowledge` | 業務ルールの frontmatter と `sources`、要件が参照する業務ルール | 出どころがない・索引にない、未確定の業務ルールを要件が参照している |
 | 画面要件と fixtures | `screens` | `requirements/screens/screens.yaml` の形、fixtures の body が OpenAPI の応答のスキーマに合うか | 項目の欠け、fixtures がない・余っている、スキーマに合わない、OpenAPI にない API |
 | 工程の持ち場(role-guard) | `role` | PR のブランチ名と、変えたファイル | 命名に合わないブランチ、工程の持ち場の外の変更 |
-| ゲートラベルの確認(gate-check) | `gate` | `req/`・`spec/`・`impl/` の PR の Issue のラベル | 前のゲートのラベル(gate0〜2-approved)がない |
+| ゲートラベルの確認(gate-check) | `gate` | `req/`・`spec/`・`impl/` の PR の Issue のラベルと、main にマージされた PR | その工程までのゲートラベル(`spec/` なら gate0・gate1、`impl/` なら gate0〜2)が全部そろっていない。`gate1-approved` があるのに `req/<n>-…` が、`gate2-approved` があるのに `spec/<n>-…` がマージされていない(#77) |
 | 前提の版(upstream-approved) | `premises` | `spec/`・`impl/` の PR の `.factory/premises/ISSUE-<n>.yml` | 前提の記録がない、前提のファイルが main で変わった・main にない |
 | 作業項目を途中で閉じない(閉じるキーワード) | `closing` | `knowledge/`・`req/`・`spec/`・`prep/` の PR の本文 | 閉じるキーワード(close・fix・resolve の活用形)+ Issue の参照がある。否定の文の中でも落とす |
-| 工場の版の更新(factory-version) | `factory-version` | `.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/` の変更 | `.factory/CHANGELOG.md` を変えていない |
+| 工場の版の更新(factory-version) | `factory-version` | `.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/` の変更 | 変更の記録 `.factory/changes/<Issue番号>.md` を足していない、記録の frontmatter(`issue`・`kind`)が違う、記録を消した |
 
 - このほかに、ジョブ「画面の差分(承認した画面との比較)」が `tests/e2e/screens` の Playwright を Playwright のコンテナで動かす(`requirements/screens/README.md`)
 - 持ち場・ゲートラベル・前提の版・工場の版・閉じるキーワードの 5 つは PR だけの検査。main への push では何もしない。PR の本文を直すと(`edited`)検査が動き直す
 - ゲートラベルは Issue に付くので、付けても PR の検査は動き直さない。付けたあとで「ゲートラベルの確認」を再実行する
 - Dependabot のブランチ(`dependabot/…`)は、持ち場と工場の版の検査から外す
+
+## ラベルの付け外しのたびの確認(#77)
+
+`.github/workflows/factory-labels.yml`(`labels-cli.mjs`、判定は `lib/gate-labels.mjs`)。Issue に `stage:…` かゲートラベルを付け外ししたとき、
+ゲートラベル・列のラベル・マージ済みの工程の PR の組み合わせが `factory-line` スキルの表どおりかを確かめ、表にないなら Issue にコメントで知らせる
+(ラベルは付け外ししない)。あわせて、その Issue の開いている `req/`・`spec/`・`impl/` の PR の「工場のゲート」が失敗していれば、失敗したジョブを再実行する。
 
 ## 計測(週報と介入の記録)
 

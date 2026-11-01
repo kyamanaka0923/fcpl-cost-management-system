@@ -3,7 +3,8 @@
 [![CI](https://github.com/kyamanaka0923/fcpl-cost-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/kyamanaka0923/fcpl-cost-management-system/actions/workflows/ci.yml)
 
 **課(部門)単位の半期予算の策定・実績計上・差異分析**を行うシステムです。
-明細は数量×単価ではなく**金額**で直接管理します。
+明細は数量×単価ではなく**金額**で直接管理します。金額は **0 以上の 1 円単位の整数**で、
+1 円未満の端数は入力欄に入れられず、API にも受け付けられません(400)。
 
 - 組織は **部 > 課** の2階層です。課は必ず1つの部に属し、**部では配下課の予算・予実を合計**して把握できます
   (部自体は予算を策定しない集計ビュー)。部詳細は「予算(計画)」タブ(区分別の予算・計画損益・粗利率と、
@@ -35,6 +36,7 @@
 このリポジトリは、AI エージェント(Claude Code)が書き、人が「何を作るか」と「出してよいか」を決める
 **工場(ソフトウェアファクトリー)**の形で開発しています。決定は [ADR-0015](docs/adr/0015-software-factory.md)、
 エージェントへの共通の指示は [AGENTS.md](AGENTS.md) です。
+工場を回す人(要望を出す・問いに答える・ゲートで判定する人)向けの案内は **[工場の回し方](docs/factory/README.md)** です。
 
 ```mermaid
 flowchart LR
@@ -64,7 +66,7 @@ flowchart LR
 | [specs/](specs/README.md) | 仕様: 処理ルール(`SPEC-…`)・テスト計画。WebAPI 仕様は [docs/api/openapi.json](docs/api/openapi.json) |
 | `.claude/agents/`・`.claude/skills/` | 工程ごとのエージェント(書く役と確かめる役を分ける)と手順 |
 | [tools/factory/](tools/factory/README.md) | ゲートの検査(EARS・曖昧語・網羅・持ち場・ゲートラベル・前提の版・画面の差分など)と週報 |
-| `.factory/` | 工場の版(`VERSION`・`CHANGELOG.md`)と、作業ごとの前提の記録 |
+| `.factory/` | 工場の版(`VERSION`・`CHANGELOG.md`)、工場の変更の記録(`changes/`)、作業ごとの前提の記録 |
 
 人(判定する人)がすること:
 
@@ -125,7 +127,7 @@ flowchart LR
 | 区分 | 技術 | 内容 |
 |---|---|---|
 | 開発環境 | Docker / docker compose / VS Code Dev Containers | `docker/dev.Dockerfile`(.NET 10 SDK + Node.js 22)を共用 |
-| CI | GitHub Actions(ubuntu-latest) | `ci.yml`: バックエンド(ビルド・テスト・カバレッジ)/ フロントエンド(ESLint・Prettier・型チェック・ビルド)/ フロントエンド単独テスト / ブラウザE2E / ミューテーションテスト / コードメトリクス。`factory.yml`: 工場のゲートの検査(フック・検査スクリプトのテスト・画面の差分と 9 つの検査。[tools/factory/](tools/factory/README.md))。`factory-metrics.yml`・`factory-intervention.yml`: 週報と介入の記録 |
+| CI | GitHub Actions(ubuntu-latest) | `ci.yml`: バックエンド(ビルド・テスト・カバレッジ)/ フロントエンド(ESLint・Prettier・型チェック・ビルド)/ フロントエンド単独テスト / ブラウザE2E / ミューテーションテスト / コードメトリクス。`factory.yml`: 工場のゲートの検査(フック・検査スクリプトのテスト・画面の差分と 10 の検査。[tools/factory/](tools/factory/README.md))。`factory-metrics.yml`・`factory-intervention.yml`: 週報と介入の記録 |
 | 依存の自動更新 | Dependabot | NuGet・npm・GitHub Actions・Docker ベースイメージを毎週月曜 09:00 JST に確認して PR を作成(`.github/dependabot.yml`)。マイナー・パッチはまとめて1件、メジャーは個別 |
 | デプロイ | AWS SAM | Lambda(`provided.al2023`, arm64)+ EFS(SQLite)+ S3 + CloudFront + Cognito + AWS Backup(EFS を日次バックアップ)。詳細は [infra/README.md](infra/README.md) |
 

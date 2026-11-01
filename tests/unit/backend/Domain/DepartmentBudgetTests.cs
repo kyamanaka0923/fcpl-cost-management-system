@@ -239,6 +239,118 @@ public class DepartmentBudgetTests
             budget.UpsertPeriodCostLine(Personnel, new Money(-1m)));
     }
 
+    private const string 負の文言 = "金額は0以上で入力してください。";
+    private const string 端数の文言 = "金額は1円単位の整数で入力してください。";
+
+    [Theory]
+    [InlineData("0", 0)]
+    [InlineData("1", 1)]
+    [InlineData("2000000", 2_000_000)]
+    [InlineData("100.0", 100)]
+    public void 半期一括の金額が0以上の1円単位の整数の値なら受け付ける(string text, int expected)
+    {
+        var amount = decimal.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+        var budget = NewDraft();
+
+        budget.UpsertProjectLine(BudgetCategory.Revenue, ProjectA, new Money(amount));
+
+        Assert.Equal((decimal)expected, Assert.Single(budget.Lines).Amount.Value);
+    }
+
+    [Theory]
+    [InlineData("-1", 負の文言)]
+    [InlineData("-0.5", 負の文言)]
+    [InlineData("0.1", 端数の文言)]
+    [InlineData("0.5", 端数の文言)]
+    [InlineData("100.5", 端数の文言)]
+    public void 半期一括の金額が0未満か1円未満の端数つきなら拒否し明細は増えない(string text, string message)
+    {
+        var amount = decimal.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+        var budget = NewDraft();
+
+        var error = Assert.Throws<DomainException>(() =>
+            budget.UpsertProjectLine(BudgetCategory.Revenue, ProjectA, new Money(amount)));
+        var periodError = Assert.Throws<DomainException>(() =>
+            budget.UpsertPeriodCostLine(Personnel, new Money(amount)));
+
+        Assert.Equal(message, error.Message);
+        Assert.Equal(message, periodError.Message);
+        Assert.Empty(budget.Lines);
+    }
+
+    [Fact]
+    public void 既にある明細を端数つきの金額で上書きしようとしても金額は保存前のまま()
+    {
+        var budget = NewDraft();
+        budget.UpsertProjectLine(BudgetCategory.Revenue, ProjectA, new Money(1000m));
+
+        var error = Assert.Throws<DomainException>(() =>
+            budget.UpsertProjectLine(BudgetCategory.Revenue, ProjectA, new Money(100.5m)));
+
+        Assert.Equal(端数の文言, error.Message);
+        Assert.Equal(1000m, Assert.Single(budget.Lines).Amount.Value);
+    }
+
+    [Fact]
+    public void 月別金額に0と1があれば受け付け明細の金額は合計になる()
+    {
+        var budget = NewDraft();
+
+        budget.UpsertProjectLineMonthly(BudgetCategory.Revenue, ProjectA,
+            new Dictionary<int, Money> { [1] = new(0m), [2] = new(1m) });
+
+        Assert.Equal(1m, Assert.Single(budget.Lines).Amount.Value);
+    }
+
+    [Theory]
+    [InlineData("-0.5", 負の文言)]
+    [InlineData("100.5", 端数の文言)]
+    public void 月別金額が不正なら拒否し既存の月次は保存前のまま(string text, string message)
+    {
+        var amount = decimal.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+        var budget = NewDraft();
+        budget.UpsertProjectLineMonthly(BudgetCategory.Revenue, ProjectA,
+            new Dictionary<int, Money> { [1] = new(100m) });
+
+        var error = Assert.Throws<DomainException>(() =>
+            budget.UpsertProjectLineMonthly(BudgetCategory.Revenue, ProjectA,
+                new Dictionary<int, Money> { [1] = new(amount) }));
+
+        Assert.Equal(message, error.Message);
+        var line = Assert.Single(budget.Lines);
+        Assert.True(line.IsMonthly);
+        Assert.Equal(100m, line.MonthlyAmounts[1].Value);
+    }
+
+    [Fact]
+    public void 同じ要求の一部の月だけ端数でも端数のない月の分も保存しない()
+    {
+        var budget = NewDraft();
+
+        var error = Assert.Throws<DomainException>(() =>
+            budget.UpsertProjectLineMonthly(BudgetCategory.Revenue, ProjectA,
+                new Dictionary<int, Money> { [1] = new(100m), [2] = new(0.5m) }));
+
+        Assert.Equal(端数の文言, error.Message);
+        Assert.Empty(budget.Lines);
+    }
+
+    [Fact]
+    public void 既にある月次の明細を一部の月だけ端数の要求で更新しようとしても月次は保存前のまま()
+    {
+        var budget = NewDraft();
+        budget.UpsertProjectLineMonthly(BudgetCategory.Revenue, ProjectA,
+            new Dictionary<int, Money> { [1] = new(100m), [2] = new(200m) });
+
+        Assert.Throws<DomainException>(() =>
+            budget.UpsertProjectLineMonthly(BudgetCategory.Revenue, ProjectA,
+                new Dictionary<int, Money> { [1] = new(999m), [2] = new(0.5m) }));
+
+        var line = Assert.Single(budget.Lines);
+        Assert.Equal(300m, line.Amount.Value);
+        Assert.Equal(100m, line.MonthlyAmounts[1].Value);
+    }
+
     [Fact]
     public void 存在しない明細は削除できない()
     {

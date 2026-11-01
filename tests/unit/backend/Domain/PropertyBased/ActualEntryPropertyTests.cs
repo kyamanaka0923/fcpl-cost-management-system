@@ -21,7 +21,7 @@ public class 実績計上の性質
                     : element is not null && project is null;
                 var monthIsValid = month is null or (>= 1 and <= HalfMonths.Count);
                 var detailIsValid = string.IsNullOrWhiteSpace(detail) || category == BudgetCategory.PeriodCost;
-                var shouldSucceed = keyIsValid && monthIsValid && amount >= 0m && detailIsValid;
+                var shouldSucceed = keyIsValid && monthIsValid && 受け付ける金額(amount) && detailIsValid;
 
                 var error = Record.Exception(() => ActualEntry.Record(対象課, 対象半期, category, project,
                     element, month, new Money(amount), null, 現在時刻, detail));

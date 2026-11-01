@@ -69,6 +69,10 @@ public sealed class 予算のステップ(業務コンテキスト ctx)
     [When("次の明細を登録しようとする:")]
     public Task 次の明細を登録しようとする(DataTable table) => ctx.試行(() => 次の明細を登録する(table));
 
+    [When("区分 {string} の案件 {string} を次の月別金額で登録しようとする:")]
+    public Task 月別金額で登録しようとする(string category, string project, DataTable table) =>
+        ctx.試行(() => 月別金額で登録する(category, project, table));
+
     [StepDefinition("区分 {string} の案件 {string} を次の月別金額で登録する:")]
     public async Task 月別金額で登録する(string category, string project, DataTable table)
     {

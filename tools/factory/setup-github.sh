@@ -58,6 +58,9 @@ wanted=(
   "前提の版(upstream-approved)"
   "工場の版の更新(factory-version)"
   "作業項目を途中で閉じない(閉じるキーワード)"
+  # 2 つのワークフローの判定のジョブ。名前が同じだと必須チェックで区別できないので、名前を分けている(#73)
+  "変えた場所の判定(CI)"
+  "変えた場所の判定(工場のゲート)"
 )
 ran_on_main="$(gh api --paginate "repos/$repo/commits/main/check-runs?per_page=100" --jq '.check_runs[].name')"
 required=()

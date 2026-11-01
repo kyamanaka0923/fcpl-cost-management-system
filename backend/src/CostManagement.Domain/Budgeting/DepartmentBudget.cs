@@ -186,8 +186,7 @@ public sealed class BudgetLine
         foreach (var (month, amount) in monthly)
         {
             HalfMonths.Validate(month);
-            if (amount.IsNegative)
-                throw new DomainException("金額は0以上で入力してください。");
+            amount.EnsureAcceptableAmount();
         }
 
         _monthly.Clear();
@@ -468,12 +467,8 @@ public sealed class DepartmentBudget
             throw new DomainException("承認済み・失効済みの予算は編集できません。改定版を作成してください。");
     }
 
-    /// <summary>金額が0以上であることを検証する。</summary>
-    private static void ValidateAmount(Money amount)
-    {
-        if (amount.IsNegative)
-            throw new DomainException("金額は0以上で入力してください。");
-    }
+    /// <summary>金額が0以上の1円単位の整数であることを検証する(<see cref="Money.EnsureAcceptableAmount"/>)。</summary>
+    private static void ValidateAmount(Money amount) => amount.EnsureAcceptableAmount();
 
     /// <summary>予算名が空でないことを検証する。</summary>
     private static void ValidateLabel(string label)

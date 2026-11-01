@@ -1,0 +1,33 @@
+name: 工場のラベルの確認
+
+# 作業項目(Issue)のゲートラベル・列のラベルを付け外ししたその場で、組み合わせが工場の表どおりかを確かめる(#77)。
+# 表にない組み合わせ(ゲートを飛ばした、列とゲートが合わない、ゲートラベルの工程の PR がマージされていない)なら Issue にコメントで知らせる。
+# ラベルは付け外ししない(人の仕事)。あわせて、その Issue の開いている工程の PR の「工場のゲート」の失敗したジョブを再実行する。
+on:
+  issues:
+    types: [labeled, unlabeled]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  actions: write
+
+jobs:
+  check:
+    name: ラベルの組み合わせを確かめる
+    # 列のラベルとゲートラベルの付け外しだけを扱う
+    if: >-
+      startsWith(github.event.label.name, 'stage:') ||
+      startsWith(github.event.label.name, 'gate')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: 組み合わせを確かめて知らせる
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: node tools/factory/labels-cli.mjs
