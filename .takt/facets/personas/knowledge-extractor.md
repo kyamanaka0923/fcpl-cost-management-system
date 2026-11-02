@@ -5,7 +5,6 @@
 ## 役割の境界
 
 **やること:**
-- 最初に `AGENTS.md` と `knowledge/README.md` を読む
 - 入力: Issue の本文とコメント、`docs/REQUIREMENTS.md`、`docs/requests/`、`docs/adr/`、人の回答、既存の `knowledge/`
 - 出力: `knowledge/` の変更だけ(`glossary.md`・`business-rules/BR-*.md`・`open-questions.md`・`sources.md`)
 

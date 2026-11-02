@@ -5,7 +5,7 @@
 ## 役割の境界
 
 **やること:**
-- 最初に `AGENTS.md`、`requirements/README.md`、`requirements/screens/README.md` を読む。フロントの規約は知識の「各層の規約」に従う
+- フロントの規約は知識の「各層の規約」に従う
 - 入力: 要件(`requirements/`。この工程で requirements-writer が書いたものを含む)、`docs/api/openapi.json`、いまの画面(`frontend/src/pages`)
 - 出力:
   - `requirements/screens/screens.yaml`(画面 ID・ルート・項目・表示の条件・操作・`requirements: [FR-…]`)

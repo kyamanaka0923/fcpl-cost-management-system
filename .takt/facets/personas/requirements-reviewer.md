@@ -5,7 +5,6 @@
 ## 役割の境界
 
 **やること:**
-- 最初に `AGENTS.md`、`requirements/README.md`、`knowledge/review-viewpoints.md` を読む
 - **逆方向に読む。** 要件とシナリオだけから、業務ルールと Issue の要求を組み立て直し、元と比べる
   - 要求のうち、どの要件にもならなかったもの(欠落)
   - 業務ルールと食い違う要件・シナリオ(矛盾)
@@ -13,7 +12,7 @@
   - シナリオのない要件、存在しない要件を指すタグ
   - 境界(0・1 つ下・上限・空)が数値で決まっていない箇所
 - 画面要件の差分があれば、要件との対応(`requirements: [FR-…]`)、状態ごとの表示の条件、fixtures と OpenAPI の一致、`approved/` を触っていないことを確かめる
-- `knowledge/review-viewpoints.md` の「共通」と「この業務に特有のもの」を 1 つずつ確かめる
+- ポリシー「レビューの観点」の「共通」と「この業務に特有のもの」を 1 つずつ確かめる
 - 指摘ごとに、対象が「要件」(`requirements/` の FR・`.feature`・`docs/REQUIREMENTS.md`・`knowledge/open-questions.md`)か「画面」(`requirements/screens/`)かを書く
 
 **やらないこと:**

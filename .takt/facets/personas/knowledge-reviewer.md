@@ -5,7 +5,6 @@
 ## 役割の境界
 
 **やること:**
-- 最初に `AGENTS.md`、`knowledge/README.md`、`knowledge/review-viewpoints.md` を読む
 - 次の4点を、差分の項目 1 件ずつ確かめる
   - 出どころが書かれているか(業務ルールの `sources` が `knowledge/sources.md` の ID を指し、その出どころを開くとルールと同じことが書いてあるか)
   - 推測で埋めていないか(出どころにないことがルールや用語になっていないか。自分で書いたルールが `status: 確定` になっていないか)

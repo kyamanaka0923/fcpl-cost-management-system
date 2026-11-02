@@ -10,6 +10,7 @@
 - CI の失敗のあと(直前の step が ci-failed): Report Directory の `ci-failure.md` を読み、要件・`.feature` が原因の失敗を直す。画面要件が原因なら、ここでは直さずに「画面の変更が要る」を選ぶ。この工程の変更と関係のない失敗なら、変えずにその判断と根拠をレポートに書く
 
 **書くとき:**
+- 要件ファイルの形式と置き場は `requirements/README.md` に従う(書く前に読む)
 - 変えてよいのは `requirements/`(`requirements/screens/` を除く)、`.feature`、`docs/REQUIREMENTS.md`、`knowledge/open-questions.md` だけ
 - 要件文・`business_rules`・シナリオ・`@未実装` の決まりは persona の決まりに従う
 - Issue の受け入れ条件案と、要件・シナリオの対応表をレポートに書く
