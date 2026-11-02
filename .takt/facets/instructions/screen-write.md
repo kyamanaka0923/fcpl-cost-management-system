@@ -1,7 +1,7 @@
 工程 [B] 画面として、要件から画面要件と fixtures を書いてください。要件・`.feature` は書き換えません。コミット・プッシュ・PR の作成はしません。
 
 **最初に:**
-- Report Directory の `start.md` と `requirements-write.md`(画面の変更が要る理由)を読む。`git branch --show-current` が `req/<n>-…` であることを確かめる。違えば作業せずに止める
+- タスクの本文と、Report Directory の `requirements-write.md`(画面の変更が要る理由)を読む。`git branch --show-current` が `req/<n>-…` であることを確かめる。違えば作業せずに止める
 
 **どの回かで作業を分ける:**
 - 前の step はいつも requirements-write。`requirements-write.md` に書かれた、画面の変更が要る理由に沿って画面要件を書く

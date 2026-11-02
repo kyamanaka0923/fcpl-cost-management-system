@@ -1,15 +1,14 @@
 version: 1
 
-# Software-Factory の step ごとのエージェントとモデル。workflow YAML には provider・model を書けないため、ここで決める。
+# 工場の workflow(Knowledge・Requirements・Spec・Implement)の step ごとのエージェントとモデル。workflow YAML には provider・model を書けないため、ここで決める。
 # エージェントは assignment で選ぶ(tools/factory/takt.sh の第2引数。takt の --runtime-assignment)。
 #   claude(既定): Claude Agent SDK。重い step は opus、手順どおりの step は sonnet・haiku
 #   codex:  OpenAI Codex SDK(`takt install codex`)。step の重さは reasoning_effort で分ける
 #   copilot: GitHub Copilot CLI(`copilot` を PATH に置く)。step の重さは effort で分ける
 # takt は profile に model を必須にしている。codex・copilot の model は、契約で使えるモデルに合わせて変える。
-# step の重さの分け方は、どのエージェントでも同じにする:
-#   heavy  … 判定・成果物を書く・検証する step(既定)
-#   medium … publish(git・gh の手順とレポートのまとめ)、ci-failed(失敗の原因から戻す工程を選ぶ)、escalate(報告を写す)
-#   light  … ci-wait(CI の結果を待って確かめるだけ)
+# step の重さの分け方は、どのエージェントでも同じにする(step は名前だけで指す。4 つの workflow で共通):
+#   heavy  … 成果物を書く・検証する step(既定)
+#   medium … publish(git・gh の手順とレポートのまとめ)、escalate(問いを写して Issue に出す)
 #
 # 権限はどのエージェントも takt の既定(edit)のまま。Codex は workspace-write の砂場で動く。
 # ゲートは tools/factory/guard/ の gh・git の包み(Claude はさらに .claude/hooks/guard.sh)と、main のルールセットで守る。
@@ -25,10 +24,6 @@ provider:
     claude-medium:
       provider: claude-sdk
       model: sonnet
-    claude-light:
-      provider: claude-sdk
-      model: haiku
-
     codex-heavy:
       provider: codex
       model: gpt-5
@@ -39,12 +34,6 @@ provider:
       model: gpt-5
       options:
         reasoning_effort: medium
-    codex-light:
-      provider: codex
-      model: gpt-5
-      options:
-        reasoning_effort: low
-
     copilot-heavy:
       provider: copilot
       model: gpt-5
@@ -55,42 +44,28 @@ provider:
       model: gpt-5
       options:
         effort: medium
-    copilot-light:
-      provider: copilot
-      model: gpt-5
-      options:
-        effort: low
-
   # assignment を選ばないときの割り当て(assignments.claude と同じ)。
   targets:
     steps:
-      Software-Factory/publish: { profile: claude-medium }
-      Software-Factory/ci-failed: { profile: claude-medium }
-      Software-Factory/escalate: { profile: claude-medium }
-      Software-Factory/ci-wait: { profile: claude-light }
+      publish: { profile: claude-medium }
+      escalate: { profile: claude-medium }
 
   assignments:
     claude:
       defaults: { profile: claude-heavy }
       targets:
         steps:
-          Software-Factory/publish: { profile: claude-medium }
-          Software-Factory/ci-failed: { profile: claude-medium }
-          Software-Factory/escalate: { profile: claude-medium }
-          Software-Factory/ci-wait: { profile: claude-light }
+          publish: { profile: claude-medium }
+          escalate: { profile: claude-medium }
     codex:
       defaults: { profile: codex-heavy }
       targets:
         steps:
-          Software-Factory/publish: { profile: codex-medium }
-          Software-Factory/ci-failed: { profile: codex-medium }
-          Software-Factory/escalate: { profile: codex-medium }
-          Software-Factory/ci-wait: { profile: codex-light }
+          publish: { profile: codex-medium }
+          escalate: { profile: codex-medium }
     copilot:
       defaults: { profile: copilot-heavy }
       targets:
         steps:
-          Software-Factory/publish: { profile: copilot-medium }
-          Software-Factory/ci-failed: { profile: copilot-medium }
-          Software-Factory/escalate: { profile: copilot-medium }
-          Software-Factory/ci-wait: { profile: copilot-light }
+          publish: { profile: copilot-medium }
+          escalate: { profile: copilot-medium }

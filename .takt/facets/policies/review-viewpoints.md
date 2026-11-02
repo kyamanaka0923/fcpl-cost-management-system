@@ -1,6 +1,6 @@
 # レビューの観点
 
-Software-Factory workflow の検証する step(knowledge-review・requirements-review・spec-review・code-review)が、差分を判定するときに確かめる観点。
+工場の workflow の検証する step(knowledge-review・requirements-review・spec-review・code-review)が、差分を判定するときに確かめる観点。
 どの節を使うかは各 step の instruction に従う。当てはまらない項目は「該当なし」と書く。
 正本はリポジトリの `knowledge/review-viewpoints.md` で、このポリシーはその写し。正本と食い違いを見つけたら、食い違いをレポートに書く(正本は書き換えない)。
 

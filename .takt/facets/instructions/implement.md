@@ -1,15 +1,15 @@
 工程 [D] 実装として、承認済みの仕様からテストとコードを書いてください。コミット・プッシュ・PR の作成はしません。
 
 **最初に:**
-- Report Directory の `start.md` を読む。`git branch --show-current` が `impl/<n>-…` であることを確かめる。違えば作業せずに止める
+- タスクの本文(起動スクリプトが書いた Issue 番号・工程・ブランチ・既存の PR)と、Issue の本文・コメント(`gh issue view <n> --comments`)を読む。`git branch --show-current` が `impl/<n>-…` であることを確かめる。違えば作業せずに止める
 - `gh issue view <n> --json labels` で `gate2-approved` と、`stage:実装中` があることを確かめる。なければ作業せずに止める
+- 前提ファイル `.factory/premises/ISSUE-<n>.yml` がこのブランチになければ作る。[C] の前提(main にあればその一覧)に、直前の [C] の PR の処理ルール・`docs/api/openapi.json` を足して、`bash tools/factory/premises.sh <n> impl <ファイル>…`。スクリプトが「main にないファイル」で失敗したら、要件の穴として止める
 - `.factory/premises/ISSUE-<n>.yml` を読み、各前提の blob が `git rev-parse origin/main:<path>` と一致するかを確かめる。違えば、要件の穴として止める
 
 **どの回かで作業を分ける:**
 - 着手の初回: 処理ルール(`specs/rules/`)、`docs/api/openapi.json`、要件と `.feature`、業務ルールを読み、具体例の各行とシナリオを先にテストにしてから、層の順に実装する
-- [D] の続きの初回(`start.md` に既存の PR がある): `gh pr view <番号> --comments` と `gh pr checks <番号>` で、PR のレビューの指摘と CI の失敗を読み、1件ずつ対応する。CI の失敗は `gh run view <run-id> --log-failed` で原因を見る。対応しない指摘は理由をレポートに書く
+- 続き(タスクの「既存の PR」が番号)の初回: `gh pr view <番号> --comments` と `gh pr checks <番号>` で、PR のレビューの指摘と CI の失敗を読み、指摘と失敗を1件ずつ直す。CI の失敗は `gh run view <run-id> --log-failed` で原因を見る。この工程の変更と関係のない失敗・対応しない指摘は、変えずにその判断と根拠をレポートに書く
 - 検証の差し戻しのあと(直前の step が code-review): Report Directory の `code-review.md` の「直す」の指摘を1件ずつ直す。直さない指摘は理由をレポートに書く
-- CI の失敗のあと(直前の step が ci-failed): Report Directory の `ci-failure.md` を読み、原因を直す
 
 **書くとき:**
 - 変えてよいのは `impl/` の持ち場(`backend/`・`frontend/`・`tests/`・`docs/`(`docs/REQUIREMENTS.md` と `docs/adr/` を除く)・`infra/`・`docker/`・`docker-compose.yml`・`README.md`・`.factory/premises/`)だけ
