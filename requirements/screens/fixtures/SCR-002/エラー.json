@@ -1,0 +1,17 @@
+{
+  "GET /api/budgets/{budgetId}": {
+    "status": 404,
+    "body": { "error": "予算が見つかりません: 33333333-3333-4333-8333-333333333333" }
+  },
+  "GET /api/departments/{id}/projects": {
+    "status": 200,
+    "body": []
+  },
+  "GET /api/cost-elements": {
+    "status": 200,
+    "body": [
+      { "code": "PERSONNEL", "name": "人件費" },
+      { "code": "LICENSE", "name": "ライセンス費" }
+    ]
+  }
+}

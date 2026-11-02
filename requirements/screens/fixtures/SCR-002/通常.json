@@ -1,0 +1,40 @@
+{
+  "GET /api/budgets/{budgetId}": {
+    "status": 200,
+    "body": {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "departmentId": "22222222-2222-4222-8222-222222222222",
+      "fiscalHalf": "2026-H2",
+      "version": 1,
+      "label": "当初予算",
+      "status": "Draft",
+      "createdAt": "2026-10-01T00:00:00Z",
+      "approvedAt": null,
+      "revenueTotal": 1500000,
+      "processingTotal": 300000,
+      "outsourcingTotal": 0,
+      "periodCostTotal": 200000,
+      "plannedProfit": 1000000,
+      "lines": [
+        { "id": "77777777-7777-4777-8777-000000000001", "category": "Revenue", "projectId": "55555555-5555-4555-8555-555555555555", "elementCode": null, "periodDetail": null, "amount": 1000000, "isMonthly": false, "monthlyAmounts": {} },
+        { "id": "77777777-7777-4777-8777-000000000002", "category": "Revenue", "projectId": "66666666-6666-4666-8666-666666666666", "elementCode": null, "periodDetail": null, "amount": 500000, "isMonthly": false, "monthlyAmounts": {} },
+        { "id": "77777777-7777-4777-8777-000000000003", "category": "Processing", "projectId": "55555555-5555-4555-8555-555555555555", "elementCode": null, "periodDetail": null, "amount": 300000, "isMonthly": false, "monthlyAmounts": {} },
+        { "id": "77777777-7777-4777-8777-000000000004", "category": "PeriodCost", "projectId": null, "elementCode": "PERSONNEL", "periodDetail": null, "amount": 200000, "isMonthly": false, "monthlyAmounts": {} }
+      ]
+    }
+  },
+  "GET /api/departments/{id}/projects": {
+    "status": 200,
+    "body": [
+      { "id": "55555555-5555-4555-8555-555555555555", "departmentId": "22222222-2222-4222-8222-222222222222", "code": "PJ-X", "name": "案件X", "createdAt": "2026-10-01T00:00:00Z" },
+      { "id": "66666666-6666-4666-8666-666666666666", "departmentId": "22222222-2222-4222-8222-222222222222", "code": "PJ-Y", "name": "案件Y", "createdAt": "2026-10-01T00:00:00Z" }
+    ]
+  },
+  "GET /api/cost-elements": {
+    "status": 200,
+    "body": [
+      { "code": "PERSONNEL", "name": "人件費" },
+      { "code": "LICENSE", "name": "ライセンス費" }
+    ]
+  }
+}

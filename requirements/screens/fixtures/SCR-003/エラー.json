@@ -1,0 +1,10 @@
+{
+  "GET /api/departments/{id}": {
+    "status": 404,
+    "body": { "error": "課が見つかりません: 22222222-2222-4222-8222-222222222222" }
+  },
+  "GET /api/departments/{id}/budgets": {
+    "status": 404,
+    "body": { "error": "課が見つかりません: 22222222-2222-4222-8222-222222222222" }
+  }
+}
