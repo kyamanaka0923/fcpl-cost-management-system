@@ -64,7 +64,8 @@ flowchart LR
 | [requirements/](requirements/README.md) | 要件(EARS。1 件 1 ファイル)。触った機能から [要件定義書](docs/REQUIREMENTS.md) より移していく。受け入れ条件は `.feature` の `ルール:` と `@FR-x.y` タグ |
 | [requirements/screens/](requirements/screens/README.md) | 画面要件: 画面ごとの状態・fixtures・**人が承認した画面の画像** |
 | [specs/](specs/README.md) | 仕様: 処理ルール(`SPEC-…`)・テスト計画。WebAPI 仕様は [docs/api/openapi.json](docs/api/openapi.json) |
-| `.claude/agents/`・`.claude/skills/` | 工程ごとのエージェント(書く役と確かめる役を分ける)と手順 |
+| `.takt/` | 工場の工程ごとの workflow と、担当(書く役と確かめる役を分ける)・規約の正本(`facets/`) |
+| `.claude/skills/` | Claude Code のスキル(多くは `.takt/facets/` を読む案内) |
 | [tools/factory/](tools/factory/README.md) | ゲートの検査(EARS・曖昧語・網羅・持ち場・ゲートラベル・前提の版・画面の差分など)と週報 |
 | `.factory/` | 工場の版(`VERSION`・`CHANGELOG.md`)、工場の変更の記録(`changes/`)、作業ごとの前提の記録 |
 

@@ -59,7 +59,7 @@ export function checkGate(branch, issueLabels, mergedBranches = []) {
 }
 
 /** 工場の版を上げる対象のファイル。 */
-const FACTORY_FILES = ['.claude/', 'AGENTS.md', 'CLAUDE.md', '.github/workflows/', 'tools/factory/'];
+const FACTORY_FILES = ['.takt/', '.claude/', 'AGENTS.md', 'CLAUDE.md', '.github/workflows/', 'tools/factory/'];
 
 /** 変更の記録のファイル(.factory/changes/<Issue番号>.md。1 つの Issue で 2 つ目の PR を出すときは <Issue番号>-<名前>.md)。 */
 export const CHANGE_FILE = /^\.factory\/changes\/(\d+)(?:-[^/]+)?\.md$/;

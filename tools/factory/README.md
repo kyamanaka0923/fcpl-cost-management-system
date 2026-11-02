@@ -33,7 +33,7 @@ CI(`.github/workflows/factory.yml`)のジョブ名が、そのまま main のル
 | ゲートラベルの確認(gate-check) | `gate` | `req/`・`spec/`・`impl/` の PR の Issue のラベルと、main にマージされた PR | その工程までのゲートラベル(`spec/` なら gate0・gate1、`impl/` なら gate0〜2)が全部そろっていない。`gate1-approved` があるのに `req/<n>-…` が、`gate2-approved` があるのに `spec/<n>-…` がマージされていない(#77) |
 | 前提の版(upstream-approved) | `premises` | `spec/`・`impl/` の PR の `.factory/premises/ISSUE-<n>.yml` | 前提の記録がない、前提のファイルが main で変わった・main にない |
 | 作業項目を途中で閉じない(閉じるキーワード) | `closing` | `knowledge/`・`req/`・`spec/`・`prep/` の PR の本文 | 閉じるキーワード(close・fix・resolve の活用形)+ Issue の参照がある。否定の文の中でも落とす |
-| 工場の版の更新(factory-version) | `factory-version` | `.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/` の変更 | 変更の記録 `.factory/changes/<Issue番号>.md` を足していない、記録の frontmatter(`issue`・`kind`)が違う、記録を消した |
+| 工場の版の更新(factory-version) | `factory-version` | `.takt/`・`.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/` の変更 | 変更の記録 `.factory/changes/<Issue番号>.md` を足していない、記録の frontmatter(`issue`・`kind`)が違う、記録を消した |
 
 - このほかに、ジョブ「画面の差分(承認した画面との比較)」が `tests/e2e/screens` の Playwright を Playwright のコンテナで動かす(`requirements/screens/README.md`)
 - 持ち場・ゲートラベル・前提の版・工場の版・閉じるキーワードの 5 つは PR だけの検査。main への push では何もしない。PR の本文を直すと(`edited`)検査が動き直す

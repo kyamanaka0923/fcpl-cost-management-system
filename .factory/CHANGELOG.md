@@ -1,7 +1,7 @@
 # 工場の変更履歴
 
 工場(指示・エージェント・スキル・CI・フック・ナレッジの型)の版と、変更の種類。
-`.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/` を変えたら、**[`changes/`](changes/README.md) に変更の記録を 1 ファイル足し**、
+`.takt/`・`.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/` を変えたら、**[`changes/`](changes/README.md) に変更の記録を 1 ファイル足し**、
 必要なら `VERSION` を上げる(CI の `factory-version` が検査する)。ここの表には足さない(#66。同じ表に行を足すと、工場の PR が同時に開いたときに衝突する)。
 
 ## 変更の種類(導入計画 §11.2)
