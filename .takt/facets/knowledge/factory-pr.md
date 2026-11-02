@@ -62,7 +62,7 @@
 ```
 
 - 「介入の記録」の表は、人が記録した介入だけを書く。エージェントの作業(検証の差し戻し、CI の手直し)は介入ではない。介入がなければ表の行を「なし」にする
-- 「実行環境」には takt の workflow `Software-Factory` で動いたことと、実行場所(ローカル・devcontainer など)を書く
+- 「実行環境」には takt の workflow `Software-Factory` で動いたことと、エージェント(環境変数 `FACTORY_AGENT` の値。claude・codex・copilot)、実行場所(ローカル・devcontainer など)を書く
 
 ## レビューView(事実・理由・問い)
 

@@ -2,6 +2,7 @@
 
 Software-Factory workflow のすべての step で守る判断基準。
 工場の決まりの正本はリポジトリの `AGENTS.md`、`CLAUDE.md`、`.claude/agents/`、`.claude/skills/` で、このポリシーはそこから写したもの。
+どのエージェント(Claude・Codex・Copilot)で動かしても、この workflow の facet だけで作業できるように書いている。正本のファイルを読めるエージェントでも、食い違ったらこのポリシーに従い、食い違いをレポートに書く。
 
 ## 原則
 
@@ -24,7 +25,7 @@ Software-Factory workflow のすべての step で守る判断基準。
 | ゲートラベル(`gate0-approved`・`gate1-approved`・`gate2-approved`)の付与・削除 | 禁止 |
 | `/intervention` の記録(コメントに `/intervention` を書く) | 禁止。介入を記録するのは人 |
 | main への push、強制 push(`--force`・`-f`・`--force-with-lease`・`+refspec`) | 禁止 |
-| `.claude/settings.json`・`.claude/hooks/guard.sh` やリポジトリのルールセットに止められた操作を、言い換え・別コマンド・API で通す | 禁止。止められたら回避せず、止められた事実を報告して人に頼む |
+| ゲートのガード(`tools/factory/guard/` の `gh`・`git` の包み、`.claude/hooks/guard.sh`)やリポジトリのルールセットに止められた操作を、言い換え・別コマンド・本物の `gh`・`git` の直接の呼び出し・API で通す | 禁止。止められたら回避せず、止められた事実を報告して人に頼む |
 | 自分が書いたものを自分で検証する | 禁止 |
 | 検証する step がファイルを書き換える | 禁止 |
 | `impl/` の PR の `Closes #n` 以外の場所に、閉じるキーワード(close・fix・resolve の活用形)と `#番号` を続けて書く | 禁止。否定の文の中でも書かない。Issue・PR へのコメントも同じ |

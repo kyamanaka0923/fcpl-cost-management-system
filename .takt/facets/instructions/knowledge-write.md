@@ -1,7 +1,7 @@
 工程 [A] ナレッジとして、Issue の内容から `knowledge/` を書いてください。コミット・プッシュ・PR の作成はしません(公開の step がします)。
 
 **最初に:**
-- Report Directory の `triage.md`(Issue の要約)と `prepare.md`(ブランチ)を読む。`git branch --show-current` が `knowledge/<n>-…` であることを確かめる。違えば作業せずに止める
+- Report Directory の `start.md`(Issue の要約とブランチ)を読む。`git branch --show-current` が `knowledge/<n>-…` であることを確かめる。違えば作業せずに止める
 
 **どの回かで作業を分ける:**
 - 初回: Issue の本文とコメント、`docs/REQUIREMENTS.md`、`docs/requests/`、`docs/adr/`、既存の `knowledge/` を読み、用語・業務ルール・未確定事項・出どころを書く

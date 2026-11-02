@@ -69,6 +69,23 @@ flowchart LR
 | 「Issue を確認して進めて」 | 進めてよい Issue のうち、番号の古いものから 1 つ進める |
 | `/loop 30min Issue を確認して進めて` | 30 分ごとに上を繰り返す。進めてよい Issue がなければ何もしない |
 
+#### takt で動かす(Claude・Codex・Copilot)
+
+takt の workflow [Software-Factory](../../.takt/workflows/Software-Factory.yaml) でも、同じく 1 つの Issue の工程を 1 つだけ進めます。
+エージェントは Claude・Codex・GitHub Copilot から選べます。リポジトリの checkout(takt の worktree ではなく)で実行します。
+
+```bash
+tools/factory/takt.sh 46            # Claude(既定)
+tools/factory/takt.sh 46 codex      # Codex(先に `takt install codex`)
+tools/factory/takt.sh 46 copilot    # GitHub Copilot CLI(`copilot` を PATH に置く)
+```
+
+- 流れ: start(判定と着手の準備)→ 書く → 検証(差し戻しは 3 回まで)→ publish(Draft PR)→ CI(手直しは 3 回まで)。
+  止めるときは escalate が Issue に理由と問いを書きます
+- step ごとのモデル・effort は [.takt/runtime.yaml](../../.takt/runtime.yaml) の assignment(`claude`・`codex`・`copilot`)で決めます
+- `tools/factory/takt.sh` は、ゲートを破る操作を止める `gh`・`git` の包み([tools/factory/guard/](../../tools/factory/guard/))を PATH の先頭に置きます。
+  エージェントのシェルで包みが効いていないと、start が止めます(ガードなしでは動きません)
+
 進め方の手順は [issue-response スキル](../../.claude/skills/issue-response/SKILL.md) にあります。
 エージェントは PR を出し、CI を見届け、Issue にコメントして止まります。マージ・PR の Ready 化・承認・ゲートラベルの付与はしません。
 
@@ -132,7 +149,8 @@ PR の本文の「レビューView」(事実・理由・問い)を読み、差�
 | 導く | 工程の担当(7 つ) | [.claude/agents/](../../.claude/agents/) |
 | 導く | 手順と規約(スキル) | [.claude/skills/](../../.claude/skills/)。工場の運転は `issue-response`・`factory-line`・`gate-review`、作業の規約は `domain-design`・`feature-dev`・`testing`・`docs-update`・`ci-and-env`・`commit` |
 | 止める | 権限の拒否 | [.claude/settings.json](../../.claude/settings.json) の `permissions.deny` |
-| 止める | フック | [.claude/hooks/guard.sh](../../.claude/hooks/guard.sh)。マージ・Ready 化・承認・ゲートラベルの付け外し・main への push・強制 push・承認した画面の書き換えなどを止める。止める操作の一覧は [guard.test.sh](../../.claude/hooks/guard.test.sh) |
+| 止める | フック(Claude Code) | [.claude/hooks/guard.sh](../../.claude/hooks/guard.sh)。マージ・Ready 化・承認・ゲートラベルの付け外し・main への push・強制 push・承認した画面の書き換えなどを止める。止める操作の一覧は [guard.test.sh](../../.claude/hooks/guard.test.sh) |
+| 止める | `gh`・`git` の包み(どのエージェントでも) | [tools/factory/guard/](../../tools/factory/guard/)。判定はフックと同じ [rules.sh](../../tools/factory/guard/rules.sh)。`tools/factory/takt.sh` が PATH の先頭に置く。ファイルの書き換え(承認した画面)は止められないので、CI とレビューで確かめる |
 | 止める | main のルールセット | 必須チェックとマージの制限。作るのは [tools/factory/setup-github.sh](../../tools/factory/setup-github.sh)(人が実行する) |
 | 止める | Dev Container の通信の制限 | [.devcontainer/devcontainer.json](../../.devcontainer/devcontainer.json)(外への通信を許可リストに絞る) |
 | 確かめる | ゲートの検査(CI) | [tools/factory/README.md](../../tools/factory/README.md) の「検査」。EARS・曖昧語・網羅・ナレッジ・画面・持ち場・ゲートラベル・前提の版・閉じるキーワード・工場の版と、画面の差分 |

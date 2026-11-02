@@ -2,7 +2,7 @@
 
 **手順:**
 
-1. Report Directory の `triage.md`(Issue の要約)、`requirements-write.md`、あれば `screen-write.md` を読む(報告は手がかりで、判定は実物で行う)。要件ファイルの形式の決まりとして `requirements/README.md` も読む
+1. Report Directory の `start.md`(Issue の要約)、`requirements-write.md`、あれば `screen-write.md` を読む(報告は手がかりで、判定は実物で行う)。要件ファイルの形式の決まりとして `requirements/README.md` も読む
 2. 差分を読む: `git diff "$(git merge-base origin/main HEAD)"`、`git status --porcelain`(未追跡のファイルは中身を開く)
 3. 要件とシナリオだけから、業務ルールと Issue の要求を組み立て直し、元(Issue・`knowledge/` の確定ルール)と比べる。欠落・矛盾・曖昧さ・網羅(シナリオのない要件、存在しない要件を指すタグ、数値で決まっていない境界)を探す
 4. 画面要件の差分があれば、要件との対応、状態ごとの表示の条件、fixtures と `docs/api/openapi.json` の一致、`requirements/screens/approved/` を触っていないことを確かめる
@@ -13,4 +13,4 @@
 
 **指摘の対象:**
 - 指摘ごとに、対象を「要件」か「画面」で書く。直す場所が `requirements/screens/` なら「画面」、それ以外なら「要件」
-- 指摘ありのとき、差し戻し先を決める。対象「要件」の指摘が1件でもあれば「要件」、対象「画面」の指摘だけなら「画面」
+- 差し戻しは、指摘の対象によらず requirements-write に戻る。画面だけの指摘は、requirements-write が要件を変えずに screen-write へ渡す

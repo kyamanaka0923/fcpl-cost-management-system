@@ -1,7 +1,7 @@
 工程 [C] 仕様として、承認済みの要件から処理ルール・OpenAPI の差分・テストの観点を書いてください。コミット・プッシュ・PR の作成はしません。
 
 **最初に:**
-- Report Directory の `triage.md` と `prepare.md` を読む。`git branch --show-current` が `spec/<n>-…` であることを確かめる。違えば作業せずに止める
+- Report Directory の `start.md` を読む。`git branch --show-current` が `spec/<n>-…` であることを確かめる。違えば作業せずに止める
 - `gh issue view <n> --json labels` で `stage:着手待ち` と `gate1-approved` があることを確かめる。なければ作業せずに止める
 - `.factory/premises/ISSUE-<n>.yml` を読み、前提のファイルを開く
 
@@ -19,4 +19,4 @@
 
 **要件の穴を見つけたとき:**
 - 満たし方が一通りに決まらない、要件や業務ルールにない決まりが要る、前提の版と main の版が違う、のどれかに当たったら、作業を止める。仕様に仮決めを書かない
-- 問い(Yes/No か選択肢。各答えで何が起きるか)と、穴の場所(要件・業務ルールの ID、ファイル)をレポートに書く。Issue へのラベルとコメントは後の step がする
+- 問い(Yes/No か選択肢。各答えで何が起きるか)と、穴の場所(要件・業務ルールの ID、ファイル)をレポートに書く。Issue へのラベルとコメントは escalate の step がする
