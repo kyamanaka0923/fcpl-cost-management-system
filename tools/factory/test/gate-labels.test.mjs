@@ -42,3 +42,24 @@ test('ゲートラベルの工程の PR がマージされていなければ指�
   ]);
   assert.deepEqual(checkIssueLabels(48, ['stage:準備中', 'gate0-approved'], []), []);
 });
+
+test('ラベルから進めてよい工程を選ぶ', async () => {
+  const { selectStage } = await import('../lib/gate-labels.mjs');
+  const all = ['gate0-approved', 'gate1-approved', 'gate2-approved'];
+  assert.deepEqual(selectStage(['stage:準備中']), { role: 'knowledge' });
+  assert.deepEqual(selectStage(['stage:準備中', 'gate0-approved']), { role: 'req' });
+  assert.deepEqual(selectStage(['stage:着手待ち', 'gate0-approved', 'gate1-approved']), { role: 'spec' });
+  assert.deepEqual(selectStage(['stage:仕様確定', ...all]), { role: 'impl' });
+  assert.deepEqual(selectStage(['stage:実装中', ...all, 'enhancement']), { role: 'impl' });
+});
+
+test('進めてよい工程がないときは理由を返す', async () => {
+  const { selectStage } = await import('../lib/gate-labels.mjs');
+  assert.match(selectStage(['stage:判断待ち', 'gate0-approved']).reason, /回答待ち/);
+  assert.match(selectStage(['stage:着手待ち', 'gate0-approved', 'gate1-approved', 'needs-answer']).reason, /回答待ち/);
+  assert.match(selectStage(['factory', 'factory:C']).reason, /工場の改善/);
+  assert.match(selectStage(['gate0-approved']).reason, /ちょうど1つでない/);
+  assert.match(selectStage(['stage:準備中', 'stage:着手待ち']).reason, /ちょうど1つでない/);
+  assert.match(selectStage(['stage:着手待ち', 'gate0-approved']).reason, /表にない/);
+  assert.match(selectStage(['stage:仕様確定', 'gate0-approved', 'gate2-approved']).reason, /表にない/);
+});
