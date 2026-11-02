@@ -49,6 +49,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: guard.sh の確認を実行
         run: bash .claude/hooks/guard.test.sh
+      - name: gh・git の包み(Codex・Copilot でも効くガード)の確認を実行
+        run: bash tools/factory/guard/guard.test.sh
 
   tools-test:
     name: 工場の検査スクリプトのテスト
