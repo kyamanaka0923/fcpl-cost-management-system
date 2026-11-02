@@ -2,15 +2,15 @@ name: Software-Factory
 description: >-
   GitHub Issue の列ラベル(stage:…)とゲートラベル(gate0〜2-approved)から、工場のラインでいま進めてよい工程を1つだけ選び、
   書く → takt の中で検証する(差し戻しループ)→ 工程別ブランチに push して Draft PR を作る → CI を見届ける、までを行って
-  人のゲート判定に渡す。次の工程には進まない。タスクの本文に Issue 番号(例: #123)を書いて実行する。番号がなければ止める。
-  ブランチ・コミット・PR は workflow が自分で扱うため、takt 側の worktree と git 操作を止めて、リポジトリの中で実行する
-  (例: takt --pipeline --skip-git -w Software-Factory -t "#123"。workflow 名は大文字小文字を区別する)。
-  takt の worktree(共有 clone)は origin を外すため、gh も push も動かない。takt add で積むときも worktree は使わない。
+  人のゲート判定に渡す。次の工程には進まない。止めるときは escalate が Issue に理由を書く。
+  タスクの本文に Issue 番号(例: #123)を書いて実行する。番号がなければ止める。
+  ゲートのガードを効かせるため、リポジトリの checkout で tools/factory/takt.sh <Issue番号> [claude|codex|copilot] から実行する
+  (ガードが効いていなければ start が止める)。takt の worktree(共有 clone)は origin を外すため使わない。
 
 # 1回の実行の上限。最も長い経路([B] で、CI の各回に検証の差し戻しを3回直し、CI の失敗を3回直したあとの4回目の失敗)は
-# 74 step。judge の実行も見込んで余裕を持たせている。
-max_steps: 90
-initial_step: triage
+# 62 step。judge の実行も見込んで余裕を持たせている。
+max_steps: 80
+initial_step: start
 
 personas:
   factory-operator: ../facets/personas/factory-operator.md
@@ -39,14 +39,12 @@ knowledge:
   factory-schema: ../facets/knowledge/factory-schema.md
 
 instructions:
-  triage: ../facets/instructions/factory-triage.md
-  prepare: ../facets/instructions/factory-prepare.md
+  start: ../facets/instructions/factory-start.md
   knowledge-write: ../facets/instructions/knowledge-write.md
   knowledge-review: ../facets/instructions/knowledge-review.md
   requirements-write: ../facets/instructions/requirements-write.md
   screen-write: ../facets/instructions/screen-write.md
   requirements-review: ../facets/instructions/requirements-review.md
-  requirements-rework: ../facets/instructions/requirements-rework.md
   spec-write: ../facets/instructions/spec-write.md
   spec-review: ../facets/instructions/spec-review.md
   implement: ../facets/instructions/implement.md
@@ -54,16 +52,12 @@ instructions:
   publish: ../facets/instructions/factory-publish.md
   ci-wait: ../facets/instructions/factory-ci-wait.md
   ci-failed: ../facets/instructions/factory-ci-failed.md
-  requirements-gap: ../facets/instructions/factory-requirements-gap.md
-  review-limit: ../facets/instructions/factory-review-limit.md
-  ci-limit: ../facets/instructions/factory-ci-limit.md
+  escalate: ../facets/instructions/factory-escalate.md
   review-limit-judge: ../facets/instructions/factory-review-limit-judge.md
   ci-limit-judge: ../facets/instructions/factory-ci-limit-judge.md
-  knowledge-gap: ../facets/instructions/factory-knowledge-gap.md
 
 report_formats:
-  triage: ../facets/output-contracts/factory-triage.md
-  prepare: ../facets/output-contracts/factory-prepare.md
+  start: ../facets/output-contracts/factory-start.md
   write: ../facets/output-contracts/factory-write.md
   knowledge-review: ../facets/output-contracts/knowledge-review.md
   requirements-review: ../facets/output-contracts/requirements-review.md
@@ -74,130 +68,80 @@ report_formats:
   ci-failure: ../facets/output-contracts/factory-ci-failure.md
   escalation: ../facets/output-contracts/factory-escalation.md
 
-# 上限の数え方(検証の差し戻しも CI の失敗も、直すのは3回まで。4回目に通らなければ止めて人に渡す)
+# 上限の数え方(検証の差し戻しも CI の失敗も、直すのは3回まで。4回目に通らなければ escalate で止めて人に渡す)
 # takt の loop monitor は、次の step が cycle の先頭のときだけ、履歴の末尾から続く cycle の回数を数える。
-# - 検証の差し戻し: 書く step → 検証 step の連続を数える。4回目の差し戻しで検証 step が終わり、書く step に戻ろうとした
-#   ところで(連続 4 回)judge が review-limit に回す。検証が通る(公開に進む)と連続が切れるので、CI の手直しの回ごとに数え直す。
-#   [B] は差し戻し先が要件と画面に分かれるため、requirements-rework → requirements-review の連続を、書く step を除いて数える。
-#   1回目の差し戻しの前には rework がないので、k 回目の差し戻しのときの連続は k-1 回。threshold 3 で4回目の差し戻しに当たる。
+# - 検証の差し戻し: 書く step → 検証 step の連続を数える。4回目の差し戻しで書く step に戻ろうとしたところで judge が止める。
+#   publish・ci-wait・ci-failed は ignore しないので、CI の手直しの回ごとに数え直す。
+#   [B] の差し戻しはいつも requirements-write に戻り、画面が要るときだけ screen-write を挟むので、screen-write を除いて数える。
 # - CI の手直し: ci-failed → ci-wait の連続を、それ以外の step を除いて数える。CI の4回目の失敗(3回直しても失敗)で
-#   ci-wait が終わり、ci-failed に進もうとしたところで(連続 3 回)judge が ci-limit に回す。
+#   ci-wait が終わり、ci-failed に進もうとしたところで(連続 3 回)judge が止める。
 # judge の選択肢は1つだけにし、上限に達したら必ず止める。
 loop_monitors:
-  - cycle:
-      - knowledge-write
-      - knowledge-review
+  - cycle: [knowledge-write, knowledge-review]
     threshold: 4
-    judge:
+    judge: &review-limit
       persona: factory-operator
       instruction: review-limit-judge
       rules:
         - condition: 検証の差し戻しを3回直しても、4回目の検証で指摘が残った
-          next: review-limit
-  - cycle:
-      - requirements-rework
-      - requirements-review
+          next: escalate
+  - cycle: [requirements-write, requirements-review]
+    ignore_steps: [screen-write]
+    threshold: 4
+    judge: *review-limit
+  - cycle: [spec-write, spec-review]
+    threshold: 4
+    judge: *review-limit
+  - cycle: [implement, code-review]
+    threshold: 4
+    judge: *review-limit
+  - cycle: [ci-failed, ci-wait]
     ignore_steps:
-      - requirements-write
-      - screen-write
-    threshold: 3
-    judge:
-      persona: factory-operator
-      instruction: review-limit-judge
-      rules:
-        - condition: 検証の差し戻しを3回直しても、4回目の検証で指摘が残った
-          next: review-limit
-  - cycle:
-      - spec-write
-      - spec-review
-    threshold: 4
-    judge:
-      persona: factory-operator
-      instruction: review-limit-judge
-      rules:
-        - condition: 検証の差し戻しを3回直しても、4回目の検証で指摘が残った
-          next: review-limit
-  - cycle:
-      - implement
-      - code-review
-    threshold: 4
-    judge:
-      persona: factory-operator
-      instruction: review-limit-judge
-      rules:
-        - condition: 検証の差し戻しを3回直しても、4回目の検証で指摘が残った
-          next: review-limit
-  - cycle:
-      - ci-failed
-      - ci-wait
-    ignore_steps:
-      - triage
-      - prepare
+      - start
       - knowledge-write
       - knowledge-review
       - requirements-write
       - screen-write
       - requirements-review
-      - requirements-rework
       - spec-write
       - spec-review
       - implement
       - code-review
       - publish
-      - requirements-gap
-      - knowledge-gap
-      - review-limit
-      - ci-limit
+      - escalate
     threshold: 3
     judge:
       persona: factory-operator
       instruction: ci-limit-judge
       rules:
         - condition: CI の失敗を3回直しても、4回目の CI が失敗した
-          next: ci-limit
+          next: escalate
 
 # capabilities: readonly の step で edit: true にしているのは、Bash(git・gh)を残すため。
 # takt は edit が true でない step(出力契約あり)から Bash を外す。readonly の道具には Edit・Write がないので、
 # ファイルの書き換えはできない。書き換えないことは persona・policy・instruction でも決めている。
 steps:
-  # 判定: Issue 番号を取り出し、列とゲートラベルから工程を1つ選ぶ。何も作らない・変えない。
-  - name: triage
+  # 判定と着手の準備: Issue 番号を取り出し、列とゲートラベルから工程を1つ選び、ブランチ・前提ファイル・列ラベルを用意する。
+  - name: start
     capabilities: readonly
     edit: true
     persona: factory-operator
     session: refresh
     policy: factory-rules
     knowledge: factory-line
-    instruction: triage
+    instruction: start
     pass_previous_response: false
     output_contracts:
       report:
-        - name: triage.md
-          format: triage
+        - name: start.md
+          format: start
     rules:
-      - condition: 実行環境に origin がない(takt の worktree で動いている)、タスクに Issue 番号がない、または Issue を読めない
+      - condition: 実行環境が整っていない(origin がない・ゲートのガードが効いていない)、タスクに Issue 番号がない、Issue を読めない、または準備できなかった
         next: ABORT
       - condition: '[B] の候補だが、要件の土台になる業務ルールが確定していない(ナレッジが未確定)'
-        next: knowledge-gap
+        next: escalate
       - condition: 進めてよい工程がない(判断待ち・表にない組み合わせ・WIP の上限を超えた・PR が既にあるなど)
         next: COMPLETE
-      - condition: 進めてよい工程が1つに決まった
-        next: prepare
-
-  # 着手準備: ブランチ、前提ファイル([C][D])、列ラベル([D] の着手だけ)。
-  - name: prepare
-    capabilities: readonly
-    edit: true
-    persona: factory-operator
-    session: refresh
-    policy: factory-rules
-    knowledge: factory-line
-    instruction: prepare
-    output_contracts:
-      report:
-        - name: prepare.md
-          format: prepare
-    rules:
       - condition: '[A] ナレッジの準備ができた'
         next: knowledge-write
       - condition: '[B] 要件・画面の準備ができた'
@@ -206,8 +150,6 @@ steps:
         next: spec-write
       - condition: '[D] 実装(着手または続き)の準備ができた'
         next: implement
-      - condition: 準備できなかった
-        next: ABORT
 
   # [A] ナレッジ
   - name: knowledge-write
@@ -250,7 +192,7 @@ steps:
       - condition: 指摘あり
         next: knowledge-write
 
-  # [B] 要件・画面。画面の変更が要るかは requirements-write が判定する。
+  # [B] 要件・画面。画面の変更が要るかは requirements-write が判定する(検証の差し戻しのあとも同じ)。
   - name: requirements-write
     capabilities: edit
     edit: true
@@ -272,7 +214,7 @@ steps:
       - condition: 要件を書き終え、画面の変更は要らない
         next: requirements-review
       - condition: 要件の土台のナレッジが未確定・足りないので、要件を書かずに止めた
-        next: knowledge-gap
+        next: escalate
       - condition: 作業を進められない
         next: ABORT
 
@@ -317,24 +259,8 @@ steps:
     rules:
       - condition: 指摘なし
         next: publish
-      - condition: 指摘あり
-        next: requirements-rework
-
-  # 差し戻し先(要件か画面か)を、requirements-review.md の「差し戻し先」から選ぶだけの step。
-  # 判定はしない。差し戻しの回数を1つの連続として数えるためにも使う。
-  - name: requirements-rework
-    capabilities: readonly
-    edit: false
-    persona: factory-operator
-    session: refresh
-    policy: factory-rules
-    instruction: requirements-rework
-    pass_previous_response: false
-    rules:
-      - condition: 要件に指摘がある(画面への指摘を含んでもよい)
+      - condition: 指摘あり(画面だけの指摘も requirements-write に戻す)
         next: requirements-write
-      - condition: 画面にだけ指摘がある
-        next: screen-write
 
   # [C] 仕様
   - name: spec-write
@@ -357,7 +283,7 @@ steps:
       - condition: 仕様を書き終えた
         next: spec-review
       - condition: 要件の穴を見つけて作業を止めた
-        next: requirements-gap
+        next: escalate
       - condition: 作業を進められない
         next: ABORT
 
@@ -409,7 +335,7 @@ steps:
       - condition: 実装を終えた
         next: code-review
       - condition: 要件・仕様の穴を見つけて作業を止めた(前提の版の食い違いを含む)
-        next: requirements-gap
+        next: escalate
       - condition: 作業を進められない
         next: ABORT
 
@@ -515,70 +441,9 @@ steps:
       - condition: '[D] 実装の書く step で直す'
         next: implement
 
-  # 要件の穴の報告([C][D] の書く step から)。needs-answer と stage:判断待ち を付けて問いをコメントし、終える。
-  - name: requirements-gap
-    capabilities: readonly
-    edit: true
-    persona: factory-operator
-    session: refresh
-    policy: factory-rules
-    knowledge: factory-line
-    instruction: requirements-gap
-    pass_previous_response: false
-    output_contracts:
-      report:
-        - name: requirements-gap.md
-          format: escalation
-    rules:
-      - condition: Issue にラベルを付け、問いをコメントした
-        next: COMPLETE
-      - condition: ラベルかコメントを付けられなかった
-        next: ABORT
-
-  # ナレッジが未確定([B] の土台の業務ルールが status: 確定 でない)。triage か requirements-write から来る。
-  # Issue に問いと人がすること(回答・gate0-approved の外し方)をコメントし、何も入っていないブランチを片付けて終える。
-  # [A] をやり直すには gate0-approved を外す必要があり、それは人の仕事なので、ラベルは変えない。
-  - name: knowledge-gap
-    capabilities: readonly
-    edit: true
-    persona: factory-operator
-    session: refresh
-    policy: factory-rules
-    knowledge: factory-line
-    instruction: knowledge-gap
-    pass_previous_response: false
-    output_contracts:
-      report:
-        - name: knowledge-gap.md
-          format: escalation
-    rules:
-      - condition: Issue に問いをコメントした(同じ報告が既にあって書かなかった場合を含む)
-        next: COMPLETE
-      - condition: Issue にコメントできなかった
-        next: ABORT
-
-  # 検証の差し戻しの上限: 残った指摘を Issue にコメントして ABORT。
-  - name: review-limit
-    capabilities: readonly
-    edit: true
-    persona: factory-operator
-    session: refresh
-    policy: factory-rules
-    knowledge: factory-line
-    instruction: review-limit
-    pass_previous_response: false
-    output_contracts:
-      report:
-        - name: review-limit.md
-          format: escalation
-    rules:
-      - condition: Issue に残った指摘をコメントした
-        next: ABORT
-      - condition: Issue にコメントできなかった
-        next: ABORT
-
-  # CI の手直しの上限: 失敗の内容を Issue にコメントして ABORT。
-  - name: ci-limit
+  # 人に渡して止める: ナレッジが未確定・要件の穴・検証の差し戻しの上限・CI の手直しの上限を、Issue にコメントする。
+  # 理由は前の step の出力とレポートから決める。要件の穴だけ、列を stage:判断待ち にして needs-answer を付ける。
+  - name: escalate
     capabilities: readonly
     edit: true
     persona: factory-operator
@@ -587,14 +452,15 @@ steps:
     knowledge:
       - factory-line
       - factory-pr
-    instruction: ci-limit
-    pass_previous_response: false
+    instruction: escalate
     output_contracts:
       report:
-        - name: ci-limit.md
+        - name: escalate.md
           format: escalation
     rules:
-      - condition: Issue に CI の失敗の内容をコメントした
+      - condition: ナレッジが未確定、または要件の穴を Issue に報告した(同じ報告が既にあって書かなかった場合を含む)
+        next: COMPLETE
+      - condition: 検証の差し戻しか CI の手直しの上限に達したことを Issue に報告した
         next: ABORT
-      - condition: Issue にコメントできなかった
+      - condition: 止めた理由を決められなかった、または Issue に報告できなかった
         next: ABORT

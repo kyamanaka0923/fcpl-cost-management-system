@@ -1,11 +1,11 @@
 工程 [B] 画面として、要件から画面要件と fixtures を書いてください。要件・`.feature` は書き換えません。コミット・プッシュ・PR の作成はしません。
 
 **最初に:**
-- Report Directory の `triage.md` と `requirements-write.md`(画面の変更が要る理由)を読む。`git branch --show-current` が `req/<n>-…` であることを確かめる。違えば作業せずに止める
+- Report Directory の `start.md` と `requirements-write.md`(画面の変更が要る理由)を読む。`git branch --show-current` が `req/<n>-…` であることを確かめる。違えば作業せずに止める
 
 **どの回かで作業を分ける:**
-- requirements-write のあと: `requirements-write.md` に書かれた、画面の変更が要る理由に沿って画面要件を書く。直前に `requirements-review.md` の画面への指摘があれば、それも直す
-- 検証の差し戻しのあと(直前の step が requirements-rework): Report Directory の `requirements-review.md` の指摘のうち、対象が「画面」のものを1件ずつ直す。直さない指摘は理由をレポートに書く
+- 前の step はいつも requirements-write。`requirements-write.md` に書かれた、画面の変更が要る理由に沿って画面要件を書く
+- 検証の差し戻しのあと(Report Directory の `requirements-review.md` が「指摘あり」): その指摘のうち、対象が「画面」のものも1件ずつ直す。直さない指摘は理由をレポートに書く
 
 **書くとき:**
 - 画面要件の形式と置き場は `requirements/README.md` と `requirements/screens/README.md` に従う(書く前に読む)

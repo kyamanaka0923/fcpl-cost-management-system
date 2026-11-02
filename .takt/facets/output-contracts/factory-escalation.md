@@ -2,11 +2,11 @@
 # Issue への報告
 
 ## 結果
-- 種類: {ナレッジが未確定で止めた / 要件の穴で止めた / 検証の差し戻しが上限に達した / CI の手直しが上限に達した}
+- 種類: {ナレッジが未確定で止めた / 要件の穴で止めた / 検証の差し戻しが上限に達した / CI の手直しが上限に達した / 報告できなかった}
 - Issue: #{番号}
 - 工程: {[A] / [B] / [C] / [D] / [D] の続き}
-- 止めた step: {triage / requirements-write / spec-write / implement / それ以外の step 名}
-- コメント: {URL / 書けなかった(出力)}
+- 止めた step: {start / requirements-write / spec-write / implement / 上限の判定(検証の差し戻し・CI の手直し)}
+- コメント: {URL / 同じ報告が既にあった(その URL) / 書けなかった(出力)}
 - 付けたラベル: {needs-answer と stage:判断待ち / なし}
 - 外したラベル: {外した列のラベル / なし}
 

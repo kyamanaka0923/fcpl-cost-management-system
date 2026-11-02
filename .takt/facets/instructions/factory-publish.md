@@ -1,7 +1,7 @@
 検証を通った成果物をコミット・プッシュし、Draft PR を作るか更新してください。成果物の中身は直しません。
 
 **最初に:**
-1. Report Directory の `triage.md`(Issue 番号・工程・既存の PR)、`prepare.md`(ブランチ)、その工程の書く step のレポート(`knowledge-write.md`・`requirements-write.md` と `screen-write.md`・`spec-write.md`・`implement.md` のうち、その工程のもの)、検証のレポート(`knowledge-review.md`・`requirements-review.md`・`spec-review.md`・`code-review.md` のうち、その工程のもの)を読む
+1. Report Directory の `start.md`(Issue 番号・工程・既存の PR・ブランチ)、その工程の書く step のレポート(`knowledge-write.md`・`requirements-write.md` と `screen-write.md`・`spec-write.md`・`implement.md` のうち、その工程のもの)、検証のレポート(`knowledge-review.md`・`requirements-review.md`・`spec-review.md`・`code-review.md` のうち、その工程のもの)を読む
 2. 検証のレポートの結果が「指摘なし」であることを確かめる。違えば公開せずに止める
 3. `git branch --show-current` がその工程のブランチであることを確かめる。main や別の工程のブランチなら止める
 
@@ -23,7 +23,7 @@
    - 何をしたか: 書く step のレポートと差分から
    - 前提: `.factory/premises/ISSUE-<n>.yml` と、前提にした要件・仕様・ナレッジ([A][B] は「なし」)
    - 工場の版: `.factory/VERSION` の中身と `git log -1 --format=%h -- .claude/`
-   - 実行環境: takt の workflow `Software-Factory` で動いたこと、実行場所
+   - 実行環境: takt の workflow `Software-Factory` で動いたこと、エージェント(環境変数 `FACTORY_AGENT` の値。claude・codex・copilot)、実行場所
    - レビューView: 事実(件数・数値・確かめた方法。この実行で検証が差し戻した回数と CI を直した回数を数えられた範囲で書き、数えられなければ「未確認」)・理由(根拠の ID)・問い(Yes/No か選択肢、3 つまで)。書き方は知識の「レビューView」とゲートごとの確認観点に従う
    - [B] で画面の変更があるとき: 問いに「この状態の画面を撮って承認してほしい(画面 ID・状態)」を入れる。承認画像はこの workflow では撮らない
    - 介入の記録: 人が記録した介入だけ。なければ「なし」

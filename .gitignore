@@ -1,5 +1,7 @@
 # .NET
 bin/
+# 工場のガードの gh・git の包み(ビルドの出力ではない)
+!tools/factory/guard/bin/
 obj/
 *.user
 

@@ -38,7 +38,7 @@
 - 差異の色は、コスト = 正が赤(利益が減る)、売上高・損益 = 正が緑(利益が増える)
 - ダークモード対応は必須(CSS 変数)
 - エラーは各ページの `error`/`setError` の state を `<Toast message={error} onClose={() => setError(null)} />`(`components/Toast.tsx`。画面右下に固定・自動で消える)で出す。最上部のバナー(`.error-banner`)は廃止済み(Issue #4)。新しいページも Toast を使う
-- チャートを足す・変えるときは dataviz スキルを先に読み、検証済みのパレット(`frontend/src/styles.css` の CSS 変数)を使う
+- チャートを足す・変えるときは、検証済みのパレット(`frontend/src/styles.css` の CSS 変数)を使う(Claude Code なら dataviz スキルも先に読む)
 
 ## 静的解析
 

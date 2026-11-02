@@ -2,7 +2,7 @@
 
 **手順:**
 
-1. Report Directory の `triage.md` で Issue 番号と要約を読み、`knowledge-write.md` で書く step の報告を読む(報告は手がかりで、判定は実物で行う)。ナレッジの形式の決まりとして `knowledge/README.md` も読む
+1. Report Directory の `start.md` で Issue 番号と要約を読み、`knowledge-write.md` で書く step の報告を読む(報告は手がかりで、判定は実物で行う)。ナレッジの形式の決まりとして `knowledge/README.md` も読む
 2. 差分を読む: `git diff "$(git merge-base origin/main HEAD)"`、`git status --porcelain`(未追跡のファイルは中身を開く)
 3. 差分の業務ルール・用語・問いを1件ずつ、次の4点で確かめる
    - 出どころが書かれているか: `sources` の ID が `knowledge/sources.md` にあり、その出どころ(Issue の文・資料・ADR・コード)を開くと同じことが書いてあるか

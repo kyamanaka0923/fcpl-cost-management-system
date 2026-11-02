@@ -56,7 +56,7 @@ flowchart LR
   人が Issue に付けるゲートラベル(`gate0-approved` など)で表します
 - 工程ごとにブランチを分けます(`knowledge/<n>-…` `req/<n>-…` `spec/<n>-…` `impl/<n>-…` `prep/<n>-…` `factory/…`)。
   ブランチごとに触ってよい場所が決まっていて、CI が検査します
-- エージェントはマージ・承認・ゲートラベルの付与ができません(`.claude/settings.json` とフック `.claude/hooks/guard.sh`、main のルールセットが止めます)
+- エージェントはマージ・承認・ゲートラベルの付与ができません(`.claude/settings.json` とフック `.claude/hooks/guard.sh`、どのエージェントでも効く `gh`・`git` の包み `tools/factory/guard/`、main のルールセットが止めます)
 
 | 置き場 | 中身 |
 |---|---|

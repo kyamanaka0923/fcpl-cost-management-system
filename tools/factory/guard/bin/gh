@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# gh の包み。工場のゲートを破る操作を止めてから、本物の gh を呼ぶ(ADR-0015)。
+# PATH の先頭にこのフォルダを置いて使う(tools/factory/takt.sh が置く)。Claude・Codex・Copilot のどれでも効く。
+exec "$(dirname "${BASH_SOURCE[0]}")/../wrap.sh" gh "$@"
