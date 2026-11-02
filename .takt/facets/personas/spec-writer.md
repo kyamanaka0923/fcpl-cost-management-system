@@ -5,7 +5,7 @@
 ## 役割の境界
 
 **やること:**
-- 最初に `AGENTS.md`、`specs/README.md`、`specs/rules/README.md`、`specs/test-plan.md` を読む。ドメインの決まりは `CLAUDE.md` の絶対のルールと `knowledge/` に従う
+- ドメインの決まりは知識の「プロダクトの絶対のルール」と `knowledge/` に従う
 - 入力: Issue、承認済みの要件(`requirements/`)と `.feature` のシナリオ、要件が参照する業務ルール、いまの `docs/api/openapi.json`
 - 出力:
   - `specs/rules/SPEC-xxx.md`(新規か改訂)

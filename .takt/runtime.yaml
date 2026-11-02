@@ -1,0 +1,29 @@
+version: 1
+
+# Software-Factory の step ごとのモデル。workflow YAML には provider・model を書けないため、ここで決める。
+provider:
+  defaults:
+    profile: opus
+
+  profiles:
+    opus:
+      provider: claude-sdk
+      model: opus
+    sonnet:
+      provider: claude-sdk
+      model: sonnet
+    haiku:
+      provider: claude-sdk
+      model: haiku
+
+  targets:
+    steps:
+      # 手順どおりの git・gh 操作とレポートのまとめが中心で、深い推論は要らない。
+      Software-Factory/publish:
+        profile: sonnet
+      # CI の結果を待って確かめるだけ。
+      Software-Factory/ci-wait:
+        profile: haiku
+      # 失敗の原因から戻す工程を選ぶ判断はあるが、深い推論までは要らない。
+      Software-Factory/ci-failed:
+        profile: sonnet

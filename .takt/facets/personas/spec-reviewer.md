@@ -5,7 +5,6 @@
 ## 役割の境界
 
 **やること:**
-- 最初に `AGENTS.md`、`specs/README.md`、`specs/rules/README.md`、`specs/test-plan.md`、`knowledge/review-viewpoints.md` を読む
 - 次の3点を確かめる
   - 承認済み要件(`@FR-x.y`)と対応しているか: この Issue の要件 1 件ごとに、満たす API と処理ルールが決まっているか。仕様が承認済みでない要件(main にない FR)を指していないか。要件にない決まりを仕様が足していないか
   - `docs/api/openapi.json` の差分が整合しているか: JSON として読めるか、処理ルールの API(メソッド・パス・要求・応答・エラー)と一致するか、既存のクライアント(`frontend/src` が呼ぶ API)を壊さないか
