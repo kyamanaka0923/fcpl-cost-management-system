@@ -1,12 +1,13 @@
 # 工場の PR・レビューView・CI の知識
 
-出どころはリポジトリ(main)の `AGENTS.md`、`gate-review`・`ci-and-env`・`issue-response` スキル、`.github/pull_request_template.md`、`tools/factory/checks/closing.mjs`。
+工場の workflow が PR を出すときの決まり。PR の欄の正本は `.github/pull_request_template.md`、閉じるキーワードの検査は `tools/factory/checks/closing.mjs`。
+レビューView とゲートごとの確認観点は、人がゲートを判定するときの手引き(スキル `gate-review`)と同じ内容にしている。
 
 ## PR の決まり
 
 - PR は Draft で作る。マージ・Ready 化・承認は人がする
 - `.github/pull_request_template.md` の欄をすべて埋める。当てはまらない欄は「なし」と書き、欄を消さない
-- 工場の版は `.factory/VERSION` の中身。`.claude/` の最終コミットは `git log -1 --format=%h -- .claude/`
+- 工場の版は `.factory/VERSION` の中身。工場(`.takt/`)の最終コミットは `git log -1 --format=%h -- .takt/`
 - プッシュと `gh pr create --base main` は別のコマンドにする。PR の本文・コメントの本文はリポジトリの外(`$TMPDIR` など)のファイルに書き、`--body-file` で渡す(コマンドの文字列に「git push」と「main」が並ぶとフックが誤って止めることがある)
 - 1 作業項目 → 1 ブランチ → 1 PR。同じ実行の中で2回目以降に公開するときは、同じブランチ・同じ PR を更新する。PR を作り直さない
 - PR を出したあとで中身が変わったら、PR の説明も合わせて直す(`gh pr edit <番号> --body-file <ファイル>`)
@@ -39,7 +40,7 @@
 ## 工場の版
 
 - `.factory/VERSION`:
-- `.claude/` の最終コミット:
+- 工場(`.takt/`)の最終コミット:
 
 ## 実行環境
 
@@ -61,8 +62,8 @@
 - 手で直した回数: 0
 ```
 
-- 「介入の記録」の表は、人が記録した介入だけを書く。エージェントの作業(検証の差し戻し、CI の手直し)は介入ではない。介入がなければ表の行を「なし」にする
-- 「実行環境」には takt の workflow `Software-Factory` で動いたことと、エージェント(環境変数 `FACTORY_AGENT` の値。claude・codex・copilot)、実行場所(ローカル・devcontainer など)を書く
+- 「介入の記録」の表は、人が記録した介入だけを書く。エージェントの作業(検証の差し戻し、続きでの手直し)は介入ではない。ただし人が CI の失敗を見て takt.sh をもう一度実行したことは、介入ではなく通常の運転。介入がなければ表の行を「なし」にする
+- 「実行環境」には takt の工程の workflow(Knowledge・Requirements・Spec・Implement のどれか)で動いたことと、エージェント(環境変数 `FACTORY_AGENT` の値。claude・codex・copilot)、実行場所(ローカル・devcontainer など)を書く
 
 ## レビューView(事実・理由・問い)
 
@@ -114,8 +115,7 @@
 - CI は `.github/workflows/ci.yml`(バックエンド・フロントエンド・Vitest・ブラウザE2E・メトリクス・ミューテーション)と、工場のゲート `.github/workflows/factory.yml`(フックの確認、検査スクリプトのテスト、画面の差分、role-guard・gate-check・閉じるキーワードなどのゲートの検査)
 - PR では、変えた場所に応じてジョブを飛ばす(最初のジョブ「変えた場所の判定」が決める。正は `tools/factory/lib/ci-scope.mjs`)。`knowledge/`・`requirements/`(screens 以外)・`specs/`・`docs/`・`.factory/`・`*.md` だけを変えた PR では、工場のゲートの検査だけが動く。飛ばしたジョブ(skipped)は、必須チェックとしては通ったものとして扱われる
 - mutation は非ブロッキング(Stryker 自体の失敗だけが赤)
-- プッシュしたら `gh pr checks <番号> --watch` で、必須チェックがすべて成功するまで見届ける。実行は約1〜5分
-- 落ちたら `gh run view <run-id> --log-failed` で原因を見る
+- 工場の workflow は CI を待たない。人が結果を見て、落ちていたら `tools/factory/takt.sh <n>` をもう一度実行する。書く step が「続き」として、`gh pr checks <番号>` と `gh run view <run-id> --log-failed` で原因を読んで直す
 - 「ゲートラベルの確認」は、その工程までのゲートラベルがすべてそろい、ゲートラベルの工程の PR(`req/<n>-…`・`spec/<n>-…`)がマージ済みであることを確かめる。人がゲートラベルを付けたあとに再実行するもの。エージェントはゲートラベルを変えない
 - CI の再実行や例外の判断(CI の承認)は人の介入。エージェントは CI を再実行しない
 - `gh` はリポジトリのディレクトリで実行する

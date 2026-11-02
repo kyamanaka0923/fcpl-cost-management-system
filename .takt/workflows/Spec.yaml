@@ -1,0 +1,71 @@
+name: Spec
+description: >-
+  工程 [C] 仕様。承認済みの要件から処理ルール・OpenAPI の差分・テストの観点を書き、検証して Draft PR を出す。
+  tools/factory/takt.sh が、ラベルの確認とブランチの用意をしてから呼ぶ。直接は呼ばない。
+
+max_steps: 20
+initial_step: spec-write
+
+loop_monitors:
+  - cycle: [spec-write, spec-review]
+    threshold: 4
+    judge:
+      persona: factory-operator
+      instruction: factory-review-limit-judge
+      rules:
+        - condition: 検証の差し戻しを3回直しても、4回目の検証で指摘が残った
+          next: publish
+
+steps:
+  - name: spec-write
+    capabilities: edit
+    edit: true
+    persona: spec-writer
+    policy: factory-rules
+    knowledge: [factory-line, factory-dev, factory-testing, factory-domain]
+    instruction: spec-write
+    output_contracts:
+      report:
+        - name: spec-write.md
+          format: factory-write
+    rules:
+      - condition: 仕様を書き終えた
+        next: spec-review
+      - condition: 要件の穴を見つけて作業を止めた
+        next: escalate
+      - condition: 作業を進められない
+        next: ABORT
+
+  - name: spec-review
+    capabilities: readonly
+    edit: true
+    persona: spec-reviewer
+    policy: [factory-rules, factory-review, review-viewpoints]
+    knowledge: [factory-line, factory-pr, factory-dev, factory-testing, factory-domain]
+    instruction: spec-review
+    pass_previous_response: false
+    output_contracts:
+      report:
+        - name: spec-review.md
+          format: spec-review
+    rules:
+      - condition: 指摘なし
+        next: publish
+      - condition: 指摘あり
+        next: spec-write
+
+  - name: publish
+    uses: factory-publish
+    rules:
+      - condition: Draft PR を作成または更新した
+        next: COMPLETE
+      - condition: 公開できなかった
+        next: ABORT
+
+  - name: escalate
+    uses: factory-escalate
+    rules:
+      - condition: Issue に問いを出した
+        next: COMPLETE
+      - condition: Issue に問いを出せなかった
+        next: ABORT

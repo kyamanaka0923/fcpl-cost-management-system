@@ -1,7 +1,7 @@
 # テストの規約の知識
 
 総合原価管理システム(予実管理)のテストを書く・直す・動かすときの規約。[B] 要件(シナリオ)・[C] 仕様(テストの観点)・[D] 実装・[E] 検証で使う。
-出どころはリポジトリ(main)の `testing`・`ci-and-env` スキル。正本はそれらのファイルで、この知識はその写し。正本と食い違いを見つけたら、食い違いをレポートに書く(正本は書き換えない)。
+この知識が正本(スキル `testing` はここを読む案内)。工場の外のふだんの開発でも、この規約に従う。CI の構成は知識「CI・開発環境・プッシュの運用」にある。
 
 ## テストの出どころ
 
@@ -99,11 +99,20 @@
 ## プロパティベーステスト(CsCheck)
 
 - ドメインとユースケースの不変条件は、例示テストに加えて CsCheck で任意の入力に対して確かめる。`[Fact]` の中で `gen.Sample(...)` / `gen.SampleAsync(...)` を呼ぶ
-- 既存の性質テスト: `tests/unit/backend/Domain/PropertyBased/` の `値オブジェクトの性質`・`課予算の性質`(モデルベース)・`実績計上の性質`・`分析サービスの性質`、`tests/integration/backend/Application/PropertyBased/` の `ユースケースの性質`
+- 既存の性質テスト:
+
+| 置き場所 | クラス | 確かめる性質 |
+|---|---|---|
+| `tests/unit/backend/Domain/PropertyBased/ValueObjectPropertyTests.cs` | `値オブジェクトの性質` | Money の加減算の法則、FiscalHalf の文字列往復と全順序、費目コードの正規化、月 1..6 |
+| 〃 `DepartmentBudgetPropertyTests.cs` | `課予算の性質` | モデルベース: 任意の編集操作の列を集約と単純なモデルに適用し、成否・状態が一致する。拒否された操作は副作用がない。不変条件(区分合計 = 明細合計・月次合計・混在の禁止)。承認後の編集の拒否、改定の引き継ぎ、Restore の往復 |
+| 〃 `ActualEntryPropertyTests.cs` | `実績計上の性質` | 計上できるかの規則、明細名・備考の正規化、Restore の往復 |
+| 〃 `AnalysisServicePropertyTests.cs` | `分析サービスの性質` | 差異 = 実績 − 予算、区分合計 = 明細合計、予定外の判定、入力の順に依らない、比較の反対称性、「案件別損益 − 期間費用 = 全体の損益」、「部合計 = 課別内訳の合計」 |
+| `tests/integration/backend/Application/PropertyBased/UseCasePropertyTests.cs` | `ユースケースの性質` | SQLite を往復しても応答どおり読み戻せる、改定を繰り返しても承認版は常に 1 件、実績合計の反映、部合計は承認済みの課だけ |
 - 生成器は `PropertyBased/DomainGenerators.cs`(`ドメイン生成器`)。案件・費目・明細名は小さなプールから選び、上書き・衝突・混在が起きやすくする。金額は 1 円単位の整数(decimal の和を厳密に比べるため)
 - 失敗すると `Set seed: "..."` が出る。`CsCheck_Seed=<seed> dotnet test --filter ...` で再現する。反復回数は `CsCheck_Iter=2000` などで一時的に増やせる(既定 100。Application は DB を作るため `iter: 25`)
 - 反例を読めるように、Dictionary を持つ操作の record は `ToString` を上書きする
 - SQLite を往復した decimal は、値が同じでも scale が変わる(`100` → `100.0`)。文字列で比べるときは正規化する
+- PBT で `BudgetLine.SetMonthly` が検証の前に月別金額を書き換えていた不具合を見つけて直した(回帰テスト `不正な月次金額での上書きが拒否されても既存明細の金額と月次は変わらない`)
 
 ## 既知の落とし穴(実際に踏んだもの)
 
@@ -127,5 +136,27 @@ bash tools/factory/screens-docker.sh          # 画面の差分の検査(CI と�
 - devcontainer は起動時に `docker/init-firewall.sh` が外への通信を許可リストに絞る。許可リストにない宛先は `Connection refused` に似た失敗になるので、通信の失敗はまずこれを疑う。宛先を足すのは工場の変更で、この workflow ではしない
 - ブラウザの要らない場面では `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` を保つ
 - カバレッジの目標は全体 85% 以上
-- ミューテーションテスト(Stryker.NET。Domain・Application のみ)は CI では非ブロッキング。手元では `cd tests && dotnet tool restore` のあと、`unit/backend/Domain`・`integration/backend/Application` で `dotnet tool run dotnet-stryker`
 - E2E(API・ブラウザ)のテストケースを足す・変えたら、`docs/design/e2e-test-guide.html` も直す
+
+## 画面の差分の検査(tests/e2e/screens)
+
+- 画面要件(`requirements/screens/screens.yaml`)の状態ごとに、fixtures で API を返して画面を開き、承認した画面(`requirements/screens/approved/`)と比べる。バックエンドは起動しない
+- CI と同じコンテナで `bash tools/factory/screens-docker.sh` で動かす(手元の Chromium では描画が違うので比べない)
+- 承認した画面の撮り直しは人の仕事(ガードが止める)
+
+## ミューテーションテスト(Stryker.NET。Issue #6)
+
+行カバレッジは「実行したか」しか見ないので、テストが仕様を実際に確かめているかを Stryker.NET のミューテーションテストで補う。ツールはローカルツールとして `tests/.config/dotnet-tools.json` に固定している(`dotnet-stryker` 5.0.0)。
+
+- 対象は Domain・Application 層だけ(業務ロジックの中核。Infrastructure は SQL の文字列が中心で価値が低く遅い、WebApi は薄いホスティングなので除く)
+- 設定は各テストプロジェクト直下の `stryker-config.json`(`tests/unit/backend/Domain` / `tests/integration/backend/Application`)。`project` で対象の src を明示する(テストプロジェクトが複数の src を参照するときの曖昧さを避けるのに要る)。レポータは html・json・markdown・cleartext。閾値は high:80 low:60 break:0(スコアで CI を落とさない)
+- 実行(各テストプロジェクトのディレクトリで):
+
+```bash
+cd tests && dotnet tool restore
+(cd unit/backend/Domain             && dotnet tool run dotnet-stryker)
+(cd integration/backend/Application && dotnet tool run dotnet-stryker)
+```
+
+- 出力は `StrykerOutput/<日時>/reports/`(gitignore 済み)。CI は `mutation` ジョブで markdown を実行サマリへ、html を `mutation-report` アーティファクトへ出す(非ブロッキング)
+- スコアの目安: Domain ≈ 54%、Application ≈ 54%。実行時間は各 1.5〜2 分ほど

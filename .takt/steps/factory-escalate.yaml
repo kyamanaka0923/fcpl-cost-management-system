@@ -1,0 +1,13 @@
+# 人に渡して止める(どの工程でも共通): ナレッジが未確定・要件の穴を、stage:判断待ち + needs-answer と問いのコメントで知らせる。
+name: escalate
+capabilities: readonly
+edit: true
+persona: factory-operator
+session: refresh
+policy: factory-rules
+knowledge: factory-line
+instruction: factory-escalate
+output_contracts:
+  report:
+    - name: escalate.md
+      format: factory-escalation

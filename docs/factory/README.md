@@ -38,17 +38,17 @@ flowchart LR
   G3 --> M[main・完了]
 ```
 
-| 工程 | 作るもの | 書く担当 | 確かめる担当 | ブランチ |
-|---|---|---|---|---|
-| [A] ナレッジ | 用語・業務ルール・未確定事項([knowledge/](../../knowledge/README.md)) | `knowledge-extractor` | 人(ゲート0) | `knowledge/<n>-…` |
-| [B] 要件・画面 | EARS の要件・受け入れシナリオ・画面要件([requirements/](../../requirements/README.md)) | `requirements-writer`・`screen-writer` | `requirements-reviewer`、人(ゲート1) | `req/<n>-…` |
-| [C] 仕様 | 処理ルール・OpenAPI・テスト計画([specs/](../../specs/README.md)) | `spec-writer` | 人(ゲート2) | `spec/<n>-…` |
-| [D] 実装・[E] 検証 | コードとテスト | `implementer` | `code-reviewer`、CI、人(ゲート3) | `impl/<n>-…` |
+| 工程 | 作るもの | workflow | 書く担当 | 確かめる担当 | ブランチ |
+|---|---|---|---|---|---|
+| [A] ナレッジ | 用語・業務ルール・未確定事項([knowledge/](../../knowledge/README.md)) | Knowledge | `knowledge-extractor` | `knowledge-reviewer`、人(ゲート0) | `knowledge/<n>-…` |
+| [B] 要件・画面 | EARS の要件・受け入れシナリオ・画面要件([requirements/](../../requirements/README.md)) | Requirements | `requirements-writer`・`screen-writer` | `requirements-reviewer`、人(ゲート1) | `req/<n>-…` |
+| [C] 仕様 | 処理ルール・OpenAPI・テスト計画([specs/](../../specs/README.md)) | Spec | `spec-writer` | `spec-reviewer`、人(ゲート2) | `spec/<n>-…` |
+| [D] 実装・[E] 検証 | コードとテスト | Implement | `implementer` | `code-reviewer`、CI、人(ゲート3) | `impl/<n>-…` |
 
-- 担当(エージェント)の定義は [.claude/agents/](../../.claude/agents/) にあります。書く担当と確かめる担当は分けます
+- 工程ごとに takt の workflow([.takt/workflows/](../../.takt/workflows/))があり、どれも「書く ⇄ 検証 → Draft PR」の一本道です。担当(persona)と規約の正本は [.takt/facets/](../../.takt/facets/) にあります。書く担当と確かめる担当は分けます
 - Issue の状態は、列のラベル `stage:準備中` → `stage:着手待ち` → `stage:仕様確定` → `stage:実装中` と、
   ゲートラベル `gate0-approved`・`gate1-approved`・`gate2-approved` で表します。問いで止まると `stage:判断待ち` と `needs-answer` が付きます
-- どの状態で何を進めてよいかの表は [factory-line スキル](../../.claude/skills/factory-line/SKILL.md) の「1.」にあります
+- どの状態で何を進めてよいかの表は [ラインの知識](../../.takt/facets/knowledge/factory-line.md) の「進めてよい工程の判定表」にあります(コードは `tools/factory/lib/gate-labels.mjs`)
 
 ## 2. 要望を投入して、工場を動かす
 
@@ -61,33 +61,30 @@ flowchart LR
 ### 工場を動かす
 
 **工場は自動では動きません。** Issue を作っても、PR をマージしても、ラベルを付けても、エージェントは起動しません。
-人が Claude Code に頼んだときに、1 つの Issue の工程を 1 つだけ進めて、次のゲートの手前で止まります。
-
-| 頼み方 | 動き |
-|---|---|
-| 「Issue #46 を進めて」 | その Issue の、いま進めてよい工程を 1 つ進める |
-| 「Issue を確認して進めて」 | 進めてよい Issue のうち、番号の古いものから 1 つ進める |
-| `/loop 30min Issue を確認して進めて` | 30 分ごとに上を繰り返す。進めてよい Issue がなければ何もしない |
-
-#### takt で動かす(Claude・Codex・Copilot)
-
-takt の workflow [Software-Factory](../../.takt/workflows/Software-Factory.yaml) でも、同じく 1 つの Issue の工程を 1 つだけ進めます。
-エージェントは Claude・Codex・GitHub Copilot から選べます。リポジトリの checkout(takt の worktree ではなく)で実行します。
+人が起動スクリプトを実行したとき(または Claude Code に頼んだとき)に、1 つの Issue の工程を 1 つだけ進めて、Draft PR を出したところで止まります。
 
 ```bash
-tools/factory/takt.sh 46            # Claude(既定)
-tools/factory/takt.sh 46 codex      # Codex(先に `takt install codex`)
-tools/factory/takt.sh 46 copilot    # GitHub Copilot CLI(`copilot` を PATH に置く)
+tools/factory/takt.sh 46                 # ラベルから工程を選んで、Claude で進める
+tools/factory/takt.sh 46 spec codex      # 工程とエージェントを指定する(Codex は先に `takt install codex`)
+tools/factory/takt.sh 46 copilot         # GitHub Copilot CLI(`copilot` を PATH に置く)
 ```
 
-- 流れ: start(判定と着手の準備)→ 書く → 検証(差し戻しは 3 回まで)→ publish(Draft PR)→ CI(手直しは 3 回まで)。
-  止めるときは escalate が Issue に理由と問いを書きます
+- リポジトリの checkout(takt の worktree ではなく)で、作業ツリーがきれいな状態で実行します
+- 起動スクリプトがラベルから工程を選び(表に当たらなければ何もしない)、ブランチ(`<種類>/<n>-takt`)を用意し、[D] の着手なら列を `stage:実装中` にしてから、工程の workflow を呼びます
+- workflow は CI を待ちません。**CI が落ちたり PR に指摘を付けたりしたら、同じコマンドをもう一度実行します。** 既存のブランチ・PR の「続き」として直します
+- 検証の差し戻しが 3 回で直らなければ、残った指摘を添えて Draft PR を出します(タイトルに「⚠️ 未解決の指摘あり」)。扱いはゲートで決めます
+- 人の回答が要るとき(ナレッジが未確定・要件の穴)は、Issue を `stage:判断待ち` + `needs-answer` にして問いをコメントします。回答して列を戻し、もう一度実行します
 - step ごとのモデル・effort は [.takt/runtime.yaml](../../.takt/runtime.yaml) の assignment(`claude`・`codex`・`copilot`)で決めます
-- `tools/factory/takt.sh` は、ゲートを破る操作を止める `gh`・`git` の包み([tools/factory/guard/](../../tools/factory/guard/))を PATH の先頭に置きます。
-  エージェントのシェルで包みが効いていないと、start が止めます(ガードなしでは動きません)
+- 起動スクリプトは、ゲートを破る操作を止める `gh`・`git` の包み([tools/factory/guard/](../../tools/factory/guard/))を PATH の先頭に置きます。push や Issue の操作の前に、エージェントのシェルで包みが効いているかを確かめ、効いていなければ止めます
 
-進め方の手順は [issue-response スキル](../../.claude/skills/issue-response/SKILL.md) にあります。
-エージェントは PR を出し、CI を見届け、Issue にコメントして止まります。マージ・PR の Ready 化・承認・ゲートラベルの付与はしません。
+| Claude Code への頼み方 | 動き |
+|---|---|
+| 「Issue #46 を進めて」 | `tools/factory/takt.sh 46` を実行して、結果を伝える |
+| 「Issue を確認して進めて」 | 進めてよく、まだブランチのない Issue のうち、番号の古いものを 1 つ進める |
+| `/loop 30min Issue を確認して進めて` | 30 分ごとに上を繰り返す。進めてよい Issue がなければ何もしない |
+
+Claude Code が Issue を選ぶ手順は [issue-response スキル](../../.claude/skills/issue-response/SKILL.md) にあります。
+マージ・PR の Ready 化・承認・ゲートラベルの付与はしません。
 
 ## 3. ゲートで人がやること
 
@@ -146,8 +143,8 @@ PR の本文の「レビューView」(事実・理由・問い)を読み、差�
 | 種類 | 中身 | 正 |
 |---|---|---|
 | 導く | 共通の指示 | [AGENTS.md](../../AGENTS.md)、[CLAUDE.md](../../CLAUDE.md) |
-| 導く | 工程の担当(7 つ) | [.claude/agents/](../../.claude/agents/) |
-| 導く | 手順と規約(スキル) | [.claude/skills/](../../.claude/skills/)。工場の運転は `issue-response`・`factory-line`・`gate-review`、作業の規約は `domain-design`・`feature-dev`・`testing`・`docs-update`・`ci-and-env`・`commit` |
+| 導く | 工程の workflow と担当・規約(正本) | [.takt/workflows/](../../.takt/workflows/)(4 つ)と [.takt/facets/](../../.takt/facets/)(担当 10・規約・判断基準)。起動は [tools/factory/takt.sh](../../tools/factory/takt.sh) |
+| 導く | Claude Code のスキル | [.claude/skills/](../../.claude/skills/)。`domain-design`・`feature-dev`・`testing`・`docs-update`・`ci-and-env`・`factory-line` は facet を読む案内。`issue-response` は起動スクリプトを呼ぶ手順。`gate-review`(人のゲートの判定)・`commit` |
 | 止める | 権限の拒否 | [.claude/settings.json](../../.claude/settings.json) の `permissions.deny` |
 | 止める | フック(Claude Code) | [.claude/hooks/guard.sh](../../.claude/hooks/guard.sh)。マージ・Ready 化・承認・ゲートラベルの付け外し・main への push・強制 push・承認した画面の書き換えなどを止める。止める操作の一覧は [guard.test.sh](../../.claude/hooks/guard.test.sh) |
 | 止める | `gh`・`git` の包み(どのエージェントでも) | [tools/factory/guard/](../../tools/factory/guard/)。判定はフックと同じ [rules.sh](../../tools/factory/guard/rules.sh)。`tools/factory/takt.sh` が PATH の先頭に置く。ファイルの書き換え(承認した画面)は止められないので、CI とレビューで確かめる |
@@ -161,7 +158,7 @@ PR の本文の「レビューView」(事実・理由・問い)を読み、差�
 | 変更 | 通し方 | 正 |
 |---|---|---|
 | 工場そのものの改善(指示・スキル・CI・フック) | Issue テンプレート「[工場の改善](../../.github/ISSUE_TEMPLATE/factory-improvement.yml)」で起票し、`factory/<名前>` ブランチの PR で直す(例: `factory/66-changes-per-file`)。変更の記録 `.factory/changes/<Issue番号>.md` を 1 ファイル足す | [.factory/changes/README.md](../../.factory/changes/README.md)、[.factory/CHANGELOG.md](../../.factory/CHANGELOG.md)(変更の種類 A〜D) |
-| 判定を楽にする下ごしらえ(レビューView の見直し・テストの強化) | `prep/<n>-…` ブランチ。判断待ちが溜まったときにエージェントが選ぶ | [factory-line スキル](../../.claude/skills/factory-line/SKILL.md) の「6.」 |
+| 判定を楽にする下ごしらえ(レビューView の見直し・テストの強化) | `prep/<n>-…` ブランチ。判断待ちが溜まったときにエージェントが選ぶ | [ラインの知識](../../.takt/facets/knowledge/factory-line.md) |
 | 成果物を人が手で直したくなったとき | 手で直さず、ナレッジ・要件・仕様・工場のどこが悪かったかを「工場の改善」で直す | [AGENTS.md](../../AGENTS.md) の「守ること」 |
 | 要件の変わらない技術的な改善(型の導入、依存の更新など) | **未決。** いまは [A]〜[D] のどれにも素直に乗らない(`impl/` はゲート2 のラベルと前提の版を求める。`factory/` は `frontend/src/` などを変えられない) | なし |
 | アーキテクチャの決定(ADR) | **未決。** `docs/adr/` を変えられるのは実質 `factory/` ブランチだけで、プロダクトの設計判断を通す工程がない | [docs/adr/](../adr/README.md) |
@@ -188,7 +185,7 @@ PR の本文の「レビューView」(事実・理由・問い)を読み、差�
 | もの | いつ | 中身 | 正 |
 |---|---|---|---|
 | 工場の週報 | 毎週月曜 09:00 JST(手動でも動く) | 直近 7 日の WIP・流れの時間(起票 → ゲート0〜2 → 完了)・マージした PR・介入。「工場の週報」Issue にコメントで足す | [tools/factory/README.md](../../tools/factory/README.md) の「計測」 |
-| WIP の上限 | 週報で知らせる | 判断待ち 5 件まで・未回答の問い 10 件まで・着手待ち 2 件以上。超えたらエージェントは新しい工程に着手せず下ごしらえをする | [factory-line スキル](../../.claude/skills/factory-line/SKILL.md) の「6.」 |
+| WIP の上限 | 週報で知らせる | 判断待ち 5 件まで・未回答の問い 10 件まで・着手待ち 2 件以上。超えたらエージェントは新しい工程に着手せず下ごしらえをする | [ラインの知識](../../.takt/facets/knowledge/factory-line.md) |
 | 介入の記録 | `/intervention` のコメントのたび | 形を確かめて `intervention` ラベルを付ける | [.github/workflows/factory-intervention.yml](../../.github/workflows/factory-intervention.yml) |
 
 手元で数えるだけなら `node tools/factory/metrics-cli.mjs --days 30` です(投稿しません)。

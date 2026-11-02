@@ -1,0 +1,92 @@
+name: Requirements
+description: >-
+  工程 [B] 要件・画面。確定したナレッジから要件と受け入れシナリオを書き、画面の変更が要るときだけ画面要件も書いて、
+  検証して Draft PR を出す。tools/factory/takt.sh が、ラベルの確認とブランチの用意をしてから呼ぶ。直接は呼ばない。
+
+max_steps: 25
+initial_step: requirements-write
+
+# 差し戻しはいつも requirements-write に戻り、画面が要るときだけ screen-write を挟むので、screen-write を除いて数える。
+loop_monitors:
+  - cycle: [requirements-write, requirements-review]
+    ignore_steps: [screen-write]
+    threshold: 4
+    judge:
+      persona: factory-operator
+      instruction: factory-review-limit-judge
+      rules:
+        - condition: 検証の差し戻しを3回直しても、4回目の検証で指摘が残った
+          next: publish
+
+steps:
+  - name: requirements-write
+    capabilities: edit
+    edit: true
+    persona: requirements-writer
+    policy: factory-rules
+    knowledge: [factory-line, factory-dev, factory-testing]
+    instruction: requirements-write
+    output_contracts:
+      report:
+        - name: requirements-write.md
+          format: factory-write
+    rules:
+      - condition: 要件を書き終え、画面の変更が要る
+        next: screen-write
+      - condition: 要件を書き終え、画面の変更は要らない
+        next: requirements-review
+      - condition: 要件の土台のナレッジが未確定・足りないので、要件を書かずに止めた
+        next: escalate
+      - condition: 作業を進められない
+        next: ABORT
+
+  - name: screen-write
+    capabilities: edit
+    edit: true
+    persona: screen-writer
+    policy: factory-rules
+    knowledge: [factory-line, factory-dev]
+    instruction: screen-write
+    output_contracts:
+      report:
+        - name: screen-write.md
+          format: factory-write
+    rules:
+      - condition: 画面要件を書き終えた
+        next: requirements-review
+      - condition: 作業を進められない
+        next: ABORT
+
+  - name: requirements-review
+    capabilities: readonly
+    edit: true
+    persona: requirements-reviewer
+    policy: [factory-rules, factory-review, review-viewpoints]
+    knowledge: [factory-line, factory-pr, factory-dev, factory-testing]
+    instruction: requirements-review
+    pass_previous_response: false
+    output_contracts:
+      report:
+        - name: requirements-review.md
+          format: requirements-review
+    rules:
+      - condition: 指摘なし
+        next: publish
+      - condition: 指摘あり(画面だけの指摘も requirements-write に戻す)
+        next: requirements-write
+
+  - name: publish
+    uses: factory-publish
+    rules:
+      - condition: Draft PR を作成または更新した
+        next: COMPLETE
+      - condition: 公開できなかった
+        next: ABORT
+
+  - name: escalate
+    uses: factory-escalate
+    rules:
+      - condition: Issue に問いを出した
+        next: COMPLETE
+      - condition: Issue に問いを出せなかった
+        next: ABORT

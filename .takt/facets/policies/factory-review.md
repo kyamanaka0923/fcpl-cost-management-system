@@ -1,6 +1,6 @@
 # 工場の検証のポリシー
 
-Software-Factory workflow の検証する step(knowledge-review・requirements-review・spec-review・code-review)で使う判断基準。
+工場の workflow の検証する step(knowledge-review・requirements-review・spec-review・code-review)で使う判断基準。
 
 ## 原則
 

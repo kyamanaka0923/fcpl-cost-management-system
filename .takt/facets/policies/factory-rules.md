@@ -1,18 +1,18 @@
 # 工場のラインのポリシー
 
-Software-Factory workflow のすべての step で守る判断基準。
-工場の決まりの正本はリポジトリの `AGENTS.md`、`CLAUDE.md`、`.claude/agents/`、`.claude/skills/` で、このポリシーはそこから写したもの。
-どのエージェント(Claude・Codex・Copilot)で動かしても、この workflow の facet だけで作業できるように書いている。正本のファイルを読めるエージェントでも、食い違ったらこのポリシーに従い、食い違いをレポートに書く。
+工場の workflow(Knowledge・Requirements・Spec・Implement)のすべての step で守る判断基準。
+工場の決まりは `AGENTS.md` を目次とし、担当(persona)・規約(knowledge)・判断基準(policy)は `.takt/facets/` が正本。`.claude/skills/` はここを読む案内。
+どのエージェント(Claude・Codex・Copilot)で動かしても、この facet だけで作業できるように書いている。
 
 ## 原則
 
 | 原則 | 基準 |
 |------|------|
-| 1回の実行で1工程 | 最初の step で選んだ工程だけを進める。次の工程に進まない。列を飛ばさない |
+| 1回の実行で1工程 | 起動スクリプト(`tools/factory/takt.sh`)が選んだ工程だけを進める。次の工程に進まない。列を飛ばさない |
 | ゲートは人が通す | ゲート0〜3 の通過を workflow の中で判定しない。人の判定に渡して終わる |
 | 生成と検証を分ける | 書く step と検証する step は別の persona。自分が書いたものを自分で検証しない |
 | 推測で埋めない | 確かめたことだけを書く。確かめていないことは「未確認」と書く |
-| 止まるべきところで止まる | 本ライン([C][D])で要件・仕様の穴を見つけたら、その場で作業を止める |
+| 止まるべきところで止まる | 要件の土台のナレッジが未確定([B])、要件・仕様の穴([C][D])を見つけたら、その場で作業を止めて人に問う |
 | 持ち場を守る | ブランチの種類ごとに決まった場所(role-guard の `ROLES`)だけを変える |
 
 ## 禁止事項
@@ -32,13 +32,13 @@ Software-Factory workflow のすべての step で守る判断基準。
 | Issue を閉じる、Issue のタイトル・本文・担当を変える | 禁止 |
 | ラベルの定義の変更(`gh label create/edit/delete`) | 禁止 |
 | `requirements/screens/approved/`・`.factory/approvals/` の書き換え、承認画面の撮り直し | 禁止 |
-| `.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/`・`tools/factory/` の変更 | 禁止(工場の変更は `factory/` の作業で、この workflow の対象外) |
+| `.takt/`・`.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/`・`tools/factory/` の変更 | 禁止(工場の変更は `factory/` の作業で、この workflow の対象外) |
 | 工程の持ち場(`ROLES`)の外のファイルを変える | 禁止 |
 
 ## ラベル
 
 - 変えてよいラベルは、列のラベル(`stage:…`)と `needs-answer` だけ
-- 変えてよい場面は、[D] の着手(`stage:仕様確定` → `stage:実装中`)と、本ラインで要件・仕様の穴を見つけて止めたとき(いまの列を外し、`needs-answer` と `stage:判断待ち` を付ける)だけ
+- 変えてよい場面は、[D] の着手(`stage:仕様確定` → `stage:実装中`。起動スクリプトがする)と、人の回答が要って止めたとき([B][C][D]。escalate が、いまの列を外し `needs-answer` と `stage:判断待ち` を付ける)だけ
 - 列のラベルは1つだけにする。外すものと付けるものを1つの `gh issue edit` で変え、そのコマンドを他のコマンドとつながない
 
 ## 書き方

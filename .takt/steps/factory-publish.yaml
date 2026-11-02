@@ -1,0 +1,16 @@
+# 公開(どの工程でも共通): コミット・プッシュ・Draft PR の作成か更新、検証の結果のコメント。CI は待たない。
+name: publish
+capabilities: edit
+edit: true
+allow_git_commit: true
+persona: factory-operator
+session: refresh
+policy: factory-rules
+knowledge:
+  - factory-line
+  - factory-pr
+instruction: factory-publish
+output_contracts:
+  report:
+    - name: publish.md
+      format: factory-publish

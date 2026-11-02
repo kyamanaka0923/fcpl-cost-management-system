@@ -1,6 +1,6 @@
 # 工場の実装のポリシー
 
-Software-Factory workflow の [D] 実装(implement)と [E] 検証(code-review)で使う、コードとテストの判断基準。
+工場の workflow の [D] 実装(implement)と [E] 検証(code-review)で使う、コードとテストの判断基準。
 implement はこの基準を満たすように書き、code-review はこの基準に反するものを「直す」の指摘にする。
 細かい手順と規約は、知識「実装の規約」「テストの規約」「ドメインの規約」「DB スキーマ変更の手順」にある。
 

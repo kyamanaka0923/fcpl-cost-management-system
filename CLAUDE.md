@@ -18,20 +18,22 @@
 | `testing` | テストの追加・修正・実行 | claude-sonnet-5 |
 | `docs-update` | README/MANUAL/DESIGN の同期 | claude-haiku-4-5 |
 | `ci-and-env` | CI・環境・スキーマ移行・プッシュ運用 | claude-sonnet-5 |
-| `issue-response` | GitHub Issue を確認し、ラインで進めてよい工程を進める運用 | claude-opus-5 |
-| `factory-line` | 作業項目の列とゲートラベルから、進めてよい工程と担当エージェントを決める | claude-opus-5 |
+| `issue-response` | GitHub Issue を選び、`tools/factory/takt.sh` で工程を進める運用 | claude-opus-5 |
+| `factory-line` | 工場のラインの決まり(正本 `.takt/facets/knowledge/factory-line.md` を読む案内) | claude-opus-5 |
 | `gate-review` | PR のレビューView(事実・理由・問い)とゲートごとの確認観点 | claude-sonnet-5 |
 
-## 工程ごとのエージェント(`.claude/agents/`)
+## 工程ごとの workflow と担当(`.takt/`)
 
-生成と検証を分ける。検証役(reviewer)はファイルを書き換えず、PR へのコメントだけで返す。
+工場のラインは takt で動かす。`tools/factory/takt.sh <Issue番号> [工程] [claude|codex|copilot]`。
+担当(persona)・規約(knowledge)・判断基準(policy)の正本は `.takt/facets/`。上のスキルの多くは、そこを読む案内。
+生成と検証を分ける。検証役(reviewer)はファイルを書き換えない。
 
-| 工程 | 書く | 検証する |
-|---|---|---|
-| [A] ナレッジ | `knowledge-extractor` | 人(ゲート0) |
-| [B] 要件・画面 | `requirements-writer`、`screen-writer` | `requirements-reviewer` |
-| [C] 仕様 | `spec-writer` | 人(ゲート2) |
-| [D] 実装 / [E] 検証 | `implementer` | `code-reviewer`、CI |
+| 工程 | workflow | 書く | 検証する |
+|---|---|---|---|
+| [A] ナレッジ | Knowledge | `knowledge-extractor` | `knowledge-reviewer`、人(ゲート0) |
+| [B] 要件・画面 | Requirements | `requirements-writer`、`screen-writer` | `requirements-reviewer`、人(ゲート1) |
+| [C] 仕様 | Spec | `spec-writer` | `spec-reviewer`、人(ゲート2) |
+| [D] 実装 / [E] 検証 | Implement | `implementer` | `code-reviewer`、CI、人(ゲート3) |
 
 ## 絶対のルール(スキルより先に知るべき最小限)
 

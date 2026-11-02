@@ -2,7 +2,7 @@
 
 **手順:**
 
-1. Report Directory の `start.md`(Issue の要約・既存の PR)と `implement.md` を読む(報告は手がかりで、判定は実物で行う)
+1. タスクの本文と Issue(`gh issue view <n> --comments`)と、Report Directory の `implement.md` を読む(報告は手がかりで、判定は実物で行う)
 2. 差分を読む: `git diff "$(git merge-base origin/main HEAD)"`、`git status --porcelain`(未追跡のファイルは中身を開く)
 3. `.factory/premises/ISSUE-<n>.yml` を読み、前提の要件・仕様を開く。各前提の blob が `git rev-parse origin/main:<path>` と一致するかを確かめる
 4. 仕様の具体例の各行と `.feature` のシナリオが、テストになっているかを確かめる(足りない行を挙げる)

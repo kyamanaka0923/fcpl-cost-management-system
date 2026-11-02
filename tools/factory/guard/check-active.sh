@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # このシェルの gh・git に、工場のガード(bin/ の包み)が効いているかを確かめる。
-# Software-Factory の start step が最初に実行する。効いていなければ終了コード 1 で、理由を出す。
+# tools/factory/takt.sh と、工場の workflow の publish・escalate が最初に実行する。効いていなければ終了コード 1 で、理由を出す。
 # ログインシェル(bash -lc)は ~/.profile で PATH の先頭を書き換えることがあるので、エージェントのシェルの中で確かめる。
 set -uo pipefail
 

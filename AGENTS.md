@@ -17,6 +17,17 @@
 - 作業項目(Issue)の列は `stage:準備中` → `stage:着手待ち` → `stage:仕様確定` → `stage:実装中` → `stage:判断待ち` → 完了。
   **列を飛ばして作業しない**(着手待ちでない Issue の仕様を書かない、仕様確定でない Issue を実装しない)
 
+## 動かし方
+
+工場のラインは takt で動かす。エージェントは Claude・Codex・Copilot から選べる。
+
+```bash
+tools/factory/takt.sh <Issue番号> [knowledge|req|spec|impl] [claude|codex|copilot]
+```
+
+起動スクリプトがラベルから工程を選び、ブランチを用意して、工程の workflow(`.takt/workflows/`)を呼ぶ。
+担当・規約・判断基準の正本は `.takt/facets/`。ラインの決まりは `.takt/facets/knowledge/factory-line.md`。
+
 ## 工程ごとの置き場とブランチ
 
 | 工程 | 書く場所 | ブランチ |
@@ -26,7 +37,7 @@
 | [C] 仕様 | [`specs/`](specs/README.md)、`docs/api/openapi.json`、テスト計画 | `spec/<n>-…` |
 | [D] 実装 | `backend/`、`frontend/`、`tests/` | `impl/<n>-…` |
 | 下ごしらえ | レビューView、テスト強化、ナレッジの穴の洗い出し | `prep/<n>-…` |
-| 工場の変更 | `.claude/`、`AGENTS.md`、`.github/`、`tools/factory/`、`.factory/` | `factory/<名前>` |
+| 工場の変更 | `.takt/`、`.claude/`、`AGENTS.md`、`.github/`、`tools/factory/`、`.factory/` | `factory/<名前>` |
 
 - 1 作業項目 → 1 ブランチ → 1 PR。main に直接 push しない
 - ブランチの種類ごとに触ってよい場所が決まっている(CI の「工程の持ち場(role-guard)」が検査する。一覧は `tools/factory/checks/branch.mjs` の `ROLES`)。

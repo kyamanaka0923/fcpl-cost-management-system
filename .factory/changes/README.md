@@ -1,6 +1,6 @@
 # 工場の変更の記録(.factory/changes/)
 
-工場の設定(`.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/`)を変える PR は、ここに**変更 1 件につき 1 ファイル**を足す。
+工場の設定(`.takt/`・`.claude/`・`AGENTS.md`・`CLAUDE.md`・`.github/workflows/`・`tools/factory/`)を変える PR は、ここに**変更 1 件につき 1 ファイル**を足す。
 CI の「工場の版の更新(factory-version)」が検査する。変更の種類(A〜D)と版の上げ方は [`../CHANGELOG.md`](../CHANGELOG.md)。
 
 1 つの表に行を足すと、工場の PR が同時に 2 つ開いたときに必ず衝突する(#62 と #64)。ファイルを分けて、PR ごとに書く場所を別にしている(#66)。

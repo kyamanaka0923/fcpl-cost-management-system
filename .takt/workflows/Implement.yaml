@@ -1,0 +1,71 @@
+name: Implement
+description: >-
+  工程 [D] 実装。承認済みの仕様からテストとコードを書き、検証して Draft PR を出す(続きは既存の PR の指摘・CI の失敗を直す)。
+  tools/factory/takt.sh が、ラベルの確認・ブランチの用意・列の付け替えをしてから呼ぶ。直接は呼ばない。
+
+max_steps: 20
+initial_step: implement
+
+loop_monitors:
+  - cycle: [implement, code-review]
+    threshold: 4
+    judge:
+      persona: factory-operator
+      instruction: factory-review-limit-judge
+      rules:
+        - condition: 検証の差し戻しを3回直しても、4回目の検証で指摘が残った
+          next: publish
+
+steps:
+  - name: implement
+    capabilities: edit
+    edit: true
+    persona: implementer
+    policy: [factory-rules, factory-coding]
+    knowledge: [factory-dev, factory-testing, factory-domain, factory-schema, factory-ci-env]
+    instruction: implement
+    output_contracts:
+      report:
+        - name: implement.md
+          format: factory-write
+    rules:
+      - condition: 実装を終えた
+        next: code-review
+      - condition: 要件・仕様の穴を見つけて作業を止めた(前提の版の食い違いを含む)
+        next: escalate
+      - condition: 作業を進められない
+        next: ABORT
+
+  - name: code-review
+    capabilities: readonly
+    edit: true
+    persona: code-reviewer
+    policy: [factory-rules, factory-review, review-viewpoints, factory-coding]
+    knowledge: [factory-line, factory-pr, factory-dev, factory-testing, factory-domain, factory-schema]
+    instruction: code-review
+    pass_previous_response: false
+    output_contracts:
+      report:
+        - name: code-review.md
+          format: code-review
+    rules:
+      - condition: 指摘なし
+        next: publish
+      - condition: 指摘あり
+        next: implement
+
+  - name: publish
+    uses: factory-publish
+    rules:
+      - condition: Draft PR を作成または更新した
+        next: COMPLETE
+      - condition: 公開できなかった
+        next: ABORT
+
+  - name: escalate
+    uses: factory-escalate
+    rules:
+      - condition: Issue に問いを出した
+        next: COMPLETE
+      - condition: Issue に問いを出せなかった
+        next: ABORT
