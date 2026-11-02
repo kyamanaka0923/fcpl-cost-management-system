@@ -11,6 +11,7 @@
 - CI の失敗のあと(直前の step が ci-failed): Report Directory の `ci-failure.md` を読み、この工程の変更が原因の失敗を直す。この工程の変更と関係のない失敗なら、変えずにその判断と根拠をレポートに書く
 
 **書くとき:**
+- 仕様の形式と置き場は `specs/README.md`・`specs/rules/README.md`・`specs/test-plan.md` に従う(書く前に読む)
 - 変えてよいのは `specs/`、`docs/api/openapi.json`、`.factory/premises/` だけ
 - 要件 1 件ごとに、満たす API と処理ルールを決め、対応表をレポートに書く
 - 具体例の表に境界の値を入れ、各行のテストの観点を書く

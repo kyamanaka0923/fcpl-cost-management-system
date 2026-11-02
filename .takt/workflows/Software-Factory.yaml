@@ -27,11 +27,16 @@ personas:
 policies:
   factory-rules: ../facets/policies/factory-rules.md
   factory-review: ../facets/policies/factory-review.md
+  review-viewpoints: ../facets/policies/review-viewpoints.md
+  factory-coding: ../facets/policies/factory-coding.md
 
 knowledge:
   factory-line: ../facets/knowledge/factory-line.md
   factory-pr: ../facets/knowledge/factory-pr.md
   factory-dev: ../facets/knowledge/factory-dev.md
+  factory-testing: ../facets/knowledge/factory-testing.md
+  factory-domain: ../facets/knowledge/factory-domain.md
+  factory-schema: ../facets/knowledge/factory-schema.md
 
 instructions:
   triage: ../facets/instructions/factory-triage.md
@@ -160,6 +165,7 @@ steps:
     capabilities: readonly
     edit: true
     persona: factory-operator
+    session: refresh
     policy: factory-rules
     knowledge: factory-line
     instruction: triage
@@ -183,6 +189,7 @@ steps:
     capabilities: readonly
     edit: true
     persona: factory-operator
+    session: refresh
     policy: factory-rules
     knowledge: factory-line
     instruction: prepare
@@ -227,6 +234,7 @@ steps:
     policy:
       - factory-rules
       - factory-review
+      - review-viewpoints
     knowledge:
       - factory-line
       - factory-pr
@@ -247,10 +255,12 @@ steps:
     capabilities: edit
     edit: true
     persona: requirements-writer
-    policy: factory-rules
+    policy:
+      - factory-rules
     knowledge:
       - factory-line
       - factory-dev
+      - factory-testing
     instruction: requirements-write
     output_contracts:
       report:
@@ -292,10 +302,12 @@ steps:
     policy:
       - factory-rules
       - factory-review
+      - review-viewpoints
     knowledge:
       - factory-line
       - factory-pr
       - factory-dev
+      - factory-testing
     instruction: requirements-review
     pass_previous_response: false
     output_contracts:
@@ -314,6 +326,7 @@ steps:
     capabilities: readonly
     edit: false
     persona: factory-operator
+    session: refresh
     policy: factory-rules
     instruction: requirements-rework
     pass_previous_response: false
@@ -328,10 +341,13 @@ steps:
     capabilities: edit
     edit: true
     persona: spec-writer
-    policy: factory-rules
+    policy:
+      - factory-rules
     knowledge:
       - factory-line
       - factory-dev
+      - factory-testing
+      - factory-domain
     instruction: spec-write
     output_contracts:
       report:
@@ -352,10 +368,13 @@ steps:
     policy:
       - factory-rules
       - factory-review
+      - review-viewpoints
     knowledge:
       - factory-line
       - factory-pr
       - factory-dev
+      - factory-testing
+      - factory-domain
     instruction: spec-review
     pass_previous_response: false
     output_contracts:
@@ -373,10 +392,14 @@ steps:
     capabilities: edit
     edit: true
     persona: implementer
-    policy: factory-rules
+    policy:
+      - factory-rules
+      - factory-coding
     knowledge:
-      - factory-line
       - factory-dev
+      - factory-testing
+      - factory-domain
+      - factory-schema
     instruction: implement
     output_contracts:
       report:
@@ -397,10 +420,15 @@ steps:
     policy:
       - factory-rules
       - factory-review
+      - review-viewpoints
+      - factory-coding
     knowledge:
       - factory-line
       - factory-pr
       - factory-dev
+      - factory-testing
+      - factory-domain
+      - factory-schema
     instruction: code-review
     pass_previous_response: false
     output_contracts:
@@ -419,6 +447,7 @@ steps:
     edit: true
     allow_git_commit: true
     persona: factory-operator
+    session: refresh
     policy: factory-rules
     knowledge:
       - factory-line
@@ -442,6 +471,8 @@ steps:
     capabilities: readonly
     edit: true
     persona: factory-operator
+    # 前の step の会話は要らない(レポートとコマンドの出力で判断する)ため、毎回新しいセッションで始める。
+    session: refresh
     policy: factory-rules
     knowledge: factory-pr
     instruction: ci-wait
@@ -462,6 +493,8 @@ steps:
     capabilities: readonly
     edit: true
     persona: factory-operator
+    # 前の step の会話は要らない(レポートとコマンドの出力で判断する)ため、毎回新しいセッションで始める。
+    session: refresh
     policy: factory-rules
     knowledge:
       - factory-line
@@ -487,6 +520,7 @@ steps:
     capabilities: readonly
     edit: true
     persona: factory-operator
+    session: refresh
     policy: factory-rules
     knowledge: factory-line
     instruction: requirements-gap
@@ -508,6 +542,7 @@ steps:
     capabilities: readonly
     edit: true
     persona: factory-operator
+    session: refresh
     policy: factory-rules
     knowledge: factory-line
     instruction: knowledge-gap
@@ -527,6 +562,7 @@ steps:
     capabilities: readonly
     edit: true
     persona: factory-operator
+    session: refresh
     policy: factory-rules
     knowledge: factory-line
     instruction: review-limit
@@ -546,6 +582,7 @@ steps:
     capabilities: readonly
     edit: true
     persona: factory-operator
+    session: refresh
     policy: factory-rules
     knowledge:
       - factory-line

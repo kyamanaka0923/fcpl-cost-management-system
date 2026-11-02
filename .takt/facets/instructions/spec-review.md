@@ -2,7 +2,7 @@
 
 **手順:**
 
-1. Report Directory の `triage.md`(Issue の要約)と `spec-write.md` を読む(報告は手がかりで、判定は実物で行う)
+1. Report Directory の `triage.md`(Issue の要約)と `spec-write.md` を読む(報告は手がかりで、判定は実物で行う)。仕様の形式の決まりとして `specs/README.md`・`specs/rules/README.md`・`specs/test-plan.md` も読む
 2. 差分を読む: `git diff "$(git merge-base origin/main HEAD)"`、`git status --porcelain`(未追跡のファイルは中身を開く)
 3. `.factory/premises/ISSUE-<n>.yml` を読み、各前提の blob が `git rev-parse origin/main:<path>` と一致するかを確かめる
 4. 承認済み要件(`@FR-x.y`)との対応を確かめる
@@ -16,5 +16,5 @@
 6. テストの観点が要件から導かれているかを確かめる
    - 具体例の表に境界(0・1 つ下・上限・空)があり、各行にテストの観点があるか
    - 観点が `.feature` のシナリオ・業務ルールの例とつながっているか。いまのコードの写しになっていないか
-7. 持ち場(`spec/` の `ROLES`)の外のファイルが変わっていないか、`knowledge/review-viewpoints.md` の「共通」と「この業務に特有のもの」を確かめる
+7. 持ち場(`spec/` の `ROLES`)の外のファイルが変わっていないか、ポリシー「レビューの観点」の「共通」と「この業務に特有のもの」を確かめる
 8. 2回目以降は、前回の `spec-review.md` の指摘が直ったかを1件ずつ確かめる

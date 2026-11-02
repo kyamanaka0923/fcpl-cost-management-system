@@ -1,6 +1,8 @@
-# 実装・テストの規約の知識
+# 実装の規約の知識
 
-出どころはリポジトリ(main)の `feature-dev`・`testing`・`domain-design`・`ci-and-env`・`docs-update` スキル。[B] 画面・[C] 仕様・[D] 実装・[E] 検証で使う。
+総合原価管理システム(予実管理)のコードを書くときの規約。[B] 画面・[C] 仕様・[D] 実装・[E] 検証で使う。
+出どころはリポジトリ(main)の `feature-dev`・`docs-update` スキル。正本はそれらのファイルで、この知識はその写し。正本と食い違いを見つけたら、食い違いをレポートに書く(正本は書き換えない)。
+テストの書き方は知識「テストの規約」、ドメインの決定事項は知識「ドメインの規約」、DB スキーマの変更は知識「DB スキーマ変更の手順」にある。
 
 ## 実装の順番(この順で層を通す)
 
@@ -9,79 +11,82 @@
 3. Infrastructure(`.../CostManagement.Infrastructure`): Dapper リポジトリ、スキーマ(`DatabaseInitializer`)、DI 登録(`DependencyInjection.cs`)
 4. WebApi(`.../CostManagement.WebApi/Program.cs`): Minimal API のエンドポイント
 5. Frontend(`frontend/src`): `api.ts` に型とクライアント → ページ・コンポーネント → `App.tsx` のルート
-6. テスト → ドキュメント(README・`docs/MANUAL.md`・`docs/DESIGN.md`)
+6. テスト → ドキュメント(下の「ドキュメントの同期」)
 
 ## 各層の規約
 
-- API の型は OpenAPI から生成する。DTO・エンドポイントを変えたら `cd backend && UPDATE_OPENAPI=1 dotnet test --filter OpenApi`(`docs/api/openapi.json` を更新)→ `cd frontend && npm run gen:api`(`src/api-schema.d.ts` を再生成)。手書きの interface を増やさない。201・204 のエンドポイントは `.Produces<T>()` で応答型を明示する
+### バックエンド
+
+- API の型は OpenAPI から生成する。DTO・エンドポイントを変えたら `cd backend && UPDATE_OPENAPI=1 dotnet test --filter OpenApi`(`docs/api/openapi.json` を更新)→ `cd frontend && npm run gen:api`(`src/api-schema.d.ts` を再生成)
+- 作成系(201)・204 のエンドポイントは `.Produces<T>()` で応答型を明示する
 - [C] の仕様で手で書いた `docs/api/openapi.json` の差分は、[D] で実装から再生成したものと一致させる
-- DTO は camelCase JSON。数値は JSON の数値のみ受け付ける(`NumberHandling.Strict`)
-- Dapper: decimal・Guid・DateTime は TEXT 往復。金額カラムは TEXT。明細の `project_id` / `element_code` は区分により排他で、未使用側は DB では `''`、読み出しで null に読み替える
-- 半期は DB では `fiscal_half TEXT`("2026-H1" 形式)
-- 集約の更新は「ヘッダ UPDATE + 明細 DELETE→INSERT」をトランザクションで行う
-- エラー: 不変条件違反は `DomainException`(→400)、未検出は `NotFoundException`(→404)。メッセージは日本語でユーザーに見せられる文にする
-- フロント: 依存は React と Router のみ(UI・チャートのライブラリは使わない)。金額表示は `formatYen`/`formatSignedYen`、区分名は `categoryLabel`、半期は `halfLabel`。差異の色はコスト=正が赤、売上高・損益=正が緑。ダークモード対応(CSS 変数)。エラーは `<Toast message={error} onClose={() => setError(null)} />` で出す
-- バックエンドは警告をエラー扱い(`AnalysisLevel=latest-recommended`)。ルールを外すときはリポジトリ直下の `.editorconfig` に理由のコメントつきで書く
-- コメント: C# は XML コメントの `<summary>`(ドメイン層は日本語、他層は英語)。フロントは JSDoc
-- DB スキーマを変えるとき(ci-and-env): 旧世代のスキーマからのデータ移行はしない。`DatabaseInitializer` の CREATE TABLE を直し、構造が変わるなら `DropLegacyTables` に冪等な判定を足し、`SchemaResetTests` にテスト(旧テーブルの破棄・作り直し、2回実行しても壊れない、新スキーマのデータを保つ)を足し、README の「スキーマの作り直し」節を直す。単純なカラム追加は `ALTER TABLE … ADD COLUMN`
+- DTO は camelCase JSON(ASP.NET Core の既定)。数値は JSON の数値のみ受け付ける(`NumberHandling.Strict`)
+- Dapper: decimal・Guid・DateTime は `SqliteConnectionFactory` の型ハンドラで TEXT 往復。金額カラムは TEXT
+- 明細の `project_id` / `element_code` は区分により排他。未使用側は DB では `''` として保存し、読み出しで null に読み替える(SQLite の UNIQUE 制約で NULL が重複できてしまう問題の回避を兼ねる)
+- 半期は DB では `fiscal_half TEXT`("2026-H1" 形式 = `FiscalHalf.ToString()`)
+- リポジトリの検索は、列エイリアス付きの SQL + 入れ子の record `Row` → `Restore(...)` で集約を復元する
+- 集約の更新は「ヘッダ UPDATE + 明細 DELETE→INSERT(洗い替え)」をトランザクションで行う
+- エラー: 不変条件違反は `DomainException`(→400)、未検出は `NotFoundException`(→404)。メッセージは日本語で、ユーザーに見せられる文にする
+- WebApplicationFactory を使うため、`Program.cs` 末尾の `public partial class Program {}` を消さない
 
-## ドメインを変えるとき(domain-design)
+### フロントエンド
 
-- このシステムのドメインの決定事項は再検討しない。要点は知識「工場のライン」の「プロダクトの絶対のルール」と `knowledge/` の業務ルール。差異の符号は文書・画面・テストで「利益が増える/減る」と書き、「有利/不利」という語を使わない
-- 戦術パターン(アーキテクチャテストで強制される): 集約ルート・エンティティ・ドメインサービスは `sealed`、値オブジェクトは `readonly record struct`、集約に公開セッターを置かない、リポジトリのポートはドメイン層・実装はインフラ層、永続化からの復元は `Restore(...)`
-- 変えるときの手順: ドメインのテスト(日本語のテスト名)を先に直す → `Restore`・リポジトリ・DTO・分析サービスへの波及を追う → スキーマが変わるなら下の「スキーマ」→ `docs/DESIGN.md` のクラス図・不変条件表を同期 → `ArchitectureTests.cs` の固定値(ポート数・値オブジェクトの列挙・集約の列挙)を確かめる
+- 依存の追加は最小限。React と Router のみで、UI ライブラリ・チャートライブラリは使わない(チャートは手書きの SVG)
+- `api.ts` の型は生成した型から導く(区分などの文字列は `Override` で 4 値に絞る)。手書きの interface を増やさない
+- 金額の表示は `formatYen`/`formatSignedYen`、区分名は `categoryLabel`、半期は `halfLabel`
+- 対象の半期は `?half=` クエリでページ間を引き回す(既定は `currentFiscalHalf()`)
+- 差異の色は、コスト = 正が赤(利益が減る)、売上高・損益 = 正が緑(利益が増える)
+- ダークモード対応は必須(CSS 変数)
+- エラーは各ページの `error`/`setError` の state を `<Toast message={error} onClose={() => setError(null)} />`(`components/Toast.tsx`。画面右下に固定・自動で消える)で出す。最上部のバナー(`.error-banner`)は廃止済み(Issue #4)。新しいページも Toast を使う
+- チャートを足す・変えるときは dataviz スキルを先に読み、検証済みのパレット(`frontend/src/styles.css` の CSS 変数)を使う
 
-## ドキュメントの同期(docs-update)
+## 静的解析
+
+- バックエンドは `backend/Directory.Build.props` で `AnalysisLevel=latest-recommended` + 警告をエラー扱い。ロケール依存の `ToString`/`Parse`(CA1305)、比較方法を指定しない文字列比較(CA1310)などはビルドが通らない
+- ルールを外すときは、リポジトリ直下の `.editorconfig` に理由のコメントつきで書く。抑制属性をコードに散らさない。テスト向けの緩和は `[tests/**.cs]`
+- `dotnet format` は既存コードの意図的な桁揃えを崩すため、CI では強制しない
+- フロントは ESLint + Prettier(CI で検査する。書式は `npm run format` で直す)
+
+## コメント
+
+- C# は XML コメントの `<summary>`。ドメイン層は日本語、他の層は英語
+- クラスとメソッドには必ず `<summary>` を書く。パラメータ・戻り値のコメントは必要に応じて
+- フロントは JSDoc(`/** ... */`)。型定義・関数・コンポーネントに必ず書く
+
+## ドキュメントの同期
 
 | 文書 | 直すとき |
 |---|---|
-| `README.md` | API の追加、費目のシードの変更、テストの種類の追加、実行手順の変更 |
-| `docs/MANUAL.md` | 画面・操作の流れの変更 |
+| `README.md` | API の追加、費目のシードの変更、テストの種類の追加、実行手順の変更、スキーマの作り直し |
+| `docs/MANUAL.md` | 画面・操作の流れの変更。FAQ に新しいつまずきが出たとき |
 | `docs/design/e2e-test-guide.html` | E2E のテストケースの追加・変更・数値の変更 |
-| `docs/DESIGN.md` | 集約・ドメインサービス・層の構成・不変条件の変更(図は Mermaid) |
+| `docs/DESIGN.md` | 集約・ドメインサービス・層の構成・不変条件の変更 |
 
 - 費目マスタの一覧は `DatabaseInitializer` のシードと突き合わせて書く(推測で書かない)
+- 差異の符号のルール(原価 = 正で利益が減る、売上 = 正で利益が増える。「有利/不利」という語は使わない)は README・MANUAL・DESIGN の 3 か所に出てくる。変えるときは 3 か所とも直す
+- 図はすべて Mermaid。クラス図のステレオタイプは `<<Aggregate Root>>` `<<Value Object>>` `<<Domain Service>>` `<<record>>`
+- 図を変えたら mermaid-cli でレンダリングを確かめる(構文エラーは GitHub で初めて分かることが多い)
 
-## テストの出どころ
+```bash
+npm install --prefix frontend @mermaid-js/mermaid-cli --no-save
+echo '{"executablePath": "/opt/pw-browsers/chromium", "args": ["--no-sandbox"]}' > "$TMPDIR/pp.json"
+frontend/node_modules/.bin/mmdc -p "$TMPDIR/pp.json" -i diagram.mmd -o "$TMPDIR/out.svg"
+```
 
-テストは要件・仕様から導く。コードを読んでテストを作らない。
-
-| テスト | 出どころ |
-|---|---|
-| Gherkin のシナリオ | 要件(`requirements/`)。`.feature` の `ルール:` に要件文、`@FR-x.y` タグ |
-| 例示テスト | 処理ルール(`specs/rules/SPEC-xxx.md`)の「具体例」の各行 |
-| プロパティベーステスト | 業務ルール(`knowledge/business-rules/`)の不変条件 |
-
-- まだ実装のないシナリオには `@未実装` を付ける([B] が付け、[D] が外す)。`@未実装` を外すのはシナリオの文を変えることではない
-- 実装の定数をそのままテストの期待値にしない
-- テスト名は日本語の文にする(例: `改定版を承認すると旧バージョンは自動的に失効する()`)
-
-## テストの置き場所
-
-| 置き場所 | 対象 |
-|---|---|
-| `tests/unit/backend/Domain` | 不変条件・計算規則(純粋単体)。`PropertyBased/` に CsCheck |
-| `tests/unit/frontend` | 画面のロジックとコンポーネント(Vitest + Testing Library + MSW) |
-| `tests/integration/backend/Application` | ユースケース(一時 SQLite)。業務ルールの Gherkin(Reqnroll) |
-| `tests/integration/backend/Infrastructure` | 永続化の往復・スキーマの作り直し |
-| `tests/e2e/api` | HTTP 経由の業務フロー(Gherkin) |
-| `tests/e2e/browser` | 画面→API→DB のつながり(playwright-bdd) |
-| `tests/architecture/backend` | 層の依存ルール |
-
-- 迷ったら下のスコープ(速いテスト)から検討する
-- Gherkin は各 `.feature` 先頭に `# language: ja`。新しいステップを足す前に既存のステップを探して再利用する。ステップ文に `(` `)` `/` を書かない
-- 未定義ステップのあるシナリオは Skipped になる。全件 Passed で Skipped 0 を確かめる
-- E2E のテストケースを足したら `docs/design/e2e-test-guide.html` も直す
+- classDiagram の落とし穴: メンバ行の半角カッコ + 等号(`(null=共通費)`)や演算子の表記はパースを壊すことがある。注記は `※〜` の形にする。型は `List~T~ Name` の形
+- 分岐や棒グラフなどの説明は、スクリーンショットではなくテキストで書く(古くならないように)
 
 ## コミット前のチェックリスト([D])
 
 ```bash
-cd backend && dotnet test
-cd frontend && npm run build
-cd frontend && npm run lint && npm run format:check
-cd tests/unit/frontend && npm test      # 画面を触った場合
-cd tests/e2e/browser && npm test        # 画面を触った場合
+cd backend && dotnet test                              # 全テスト(ドメイン・アプリ・インフラ・API E2E・アーキテクチャ)
+cd frontend && npm run build                           # 型チェック + ビルド
+cd frontend && npm run lint && npm run format:check    # ESLint + Prettier
+cd tests/unit/frontend && npm test                     # 画面を触った場合
+cd tests/e2e/browser && npm test                       # 画面を触った場合
 ```
+
+- `.feature` のシナリオが、Skipped 0 で全件 Passed になること
 
 ## 画面要件([B] の画面)
 

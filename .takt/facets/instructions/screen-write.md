@@ -8,6 +8,7 @@
 - 検証の差し戻しのあと(直前の step が requirements-rework): Report Directory の `requirements-review.md` の指摘のうち、対象が「画面」のものを1件ずつ直す。直さない指摘は理由をレポートに書く
 
 **書くとき:**
+- 画面要件の形式と置き場は `requirements/README.md` と `requirements/screens/README.md` に従う(書く前に読む)
 - 変えてよいのは `requirements/screens/`(`approved/` を除く)だけ
 - `screens.yaml` の項目、fixtures の形、状態ごとの表示の条件、既存の画面に合わせる決まりは persona の決まりに従う
 - 新しい状態の承認画像は撮らない。人に撮ってほしい状態(画面 ID と状態)をレポートの「問い」に書く

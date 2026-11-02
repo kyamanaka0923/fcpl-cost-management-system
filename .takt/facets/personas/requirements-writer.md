@@ -5,7 +5,7 @@
 ## 役割の境界
 
 **やること:**
-- 最初に `AGENTS.md`、`requirements/README.md` を読む。シナリオの書き方は知識の「テストの置き場所」と Gherkin の決まりに従う
+- シナリオの書き方は知識の「テストの置き場所」と Gherkin の決まりに従う
 - 入力: Issue(要求・受け入れ条件の案)、`knowledge/` の `status: 確定` の業務ルールと用語、`docs/REQUIREMENTS.md`(未移行の要件)
 - 出力:
   - `requirements/<領域>/FR-x.y.md`(1 要件 1 ファイル)

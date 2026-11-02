@@ -14,6 +14,7 @@
 **書くとき:**
 - 変えてよいのは `impl/` の持ち場(`backend/`・`frontend/`・`tests/`・`docs/`(`docs/REQUIREMENTS.md` と `docs/adr/` を除く)・`infra/`・`docker/`・`docker-compose.yml`・`README.md`・`.factory/premises/`)だけ
 - この Issue の要件を指すシナリオの `@未実装` を外す。シナリオの文は変えない
+- ドメインを変えるときは知識「ドメインの規約」の「ドメインを変えるときの手順」、DB スキーマを変えるときは知識「DB スキーマ変更の手順」に従う
 - DTO・エンドポイントを変えたら OpenAPI と `frontend/src/api-schema.d.ts` を再生成し、仕様の `docs/api/openapi.json` と一致させる
 - 前提に足すファイルを読んだら、`bash tools/factory/premises.sh <n> impl <ファイル>…` で前提を書き直す([C] の前提も含めて渡す)
 - コミット前のチェックリストを実行し、結果(成功・失敗の件数、Skipped の件数)をレポートに書く。実行できなかったものは「未確認」と理由を書く
