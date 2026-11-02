@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# git の包み。工場のゲートを破る操作(main への push・強制 push)を止めてから、本物の git を呼ぶ(ADR-0015)。
+# PATH の先頭にこのフォルダを置いて使う(tools/factory/takt.sh が置く)。Claude・Codex・Copilot のどれでも効く。
+exec "$(dirname "${BASH_SOURCE[0]}")/../wrap.sh" git "$@"
