@@ -10,8 +10,8 @@
   "GET /api/departments/{id}/budgets": {
     "status": 200,
     "body": [
-      { "id": "44444444-4444-4444-8444-444444444444", "departmentId": "22222222-2222-4222-8222-222222222222", "fiscalHalf": "2026-H2", "version": 1, "label": "当初予算", "status": "Approved", "createdAt": "2026-10-01T00:00:00Z", "approvedAt": "2026-10-05T01:00:00Z", "revenueTotal": 1500000, "processingTotal": 300000, "outsourcingTotal": 0, "periodCostTotal": 200000, "plannedProfit": 1000000 },
-      { "id": "33333333-3333-4333-8333-333333333333", "departmentId": "22222222-2222-4222-8222-222222222222", "fiscalHalf": "2026-H2", "version": 2, "label": "下期見直し", "status": "Draft", "createdAt": "2026-10-20T00:00:00Z", "approvedAt": null, "revenueTotal": 1700000, "processingTotal": 300000, "outsourcingTotal": 100000, "periodCostTotal": 200000, "plannedProfit": 1100000 }
+      { "id": "44444444-4444-4444-8444-444444444444", "departmentId": "22222222-2222-4222-8222-222222222222", "fiscalHalf": "2026-H2", "version": 1, "label": "当初予算", "status": "Approved", "createdAt": "2026-10-01T00:00:00Z", "approvedAt": "2026-10-05T01:00:00Z", "revenueTotal": 1500000, "processingTotal": 300000, "outsourcingTotal": 0, "periodCostTotal": 200000, "plannedProfit": 1000000, "updateNumber": 6 },
+      { "id": "33333333-3333-4333-8333-333333333333", "departmentId": "22222222-2222-4222-8222-222222222222", "fiscalHalf": "2026-H2", "version": 2, "label": "下期見直し", "status": "Draft", "createdAt": "2026-10-20T00:00:00Z", "approvedAt": null, "revenueTotal": 1700000, "processingTotal": 300000, "outsourcingTotal": 100000, "periodCostTotal": 200000, "plannedProfit": 1100000, "updateNumber": 3 }
     ]
   }
 }

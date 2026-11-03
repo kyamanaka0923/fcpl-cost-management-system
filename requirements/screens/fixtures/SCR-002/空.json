@@ -15,7 +15,8 @@
       "outsourcingTotal": 0,
       "periodCostTotal": 0,
       "plannedProfit": 0,
-      "lines": []
+      "lines": [],
+      "updateNumber": 1
     }
   },
   "GET /api/departments/{id}/projects": {
