@@ -1,0 +1,47 @@
+issue: 45
+stage: spec
+factory_version: factory-v1
+recorded_at: 2026-11-03T02:07:38+09:00
+premises:
+  - path: requirements/budget/FR-4.15.md
+    blob: 755f01cd3694b81ee092aa942f2462326b35f348
+  - path: requirements/budget/FR-4.16.md
+    blob: eddc11c271bd87014e655c42fbad50c864308cb6
+  - path: requirements/budget/FR-4.17.md
+    blob: 22cb85c23313e8dd857cb8c2e21ad2f8edd47bc2
+  - path: requirements/budget/FR-4.18.md
+    blob: 8e32fc1520af57102342d5f6d5f89fe27259548c
+  - path: requirements/budget/FR-4.19.md
+    blob: 5ebf57a48dd3b32fe2118a3c851c43b08b0dd20f
+  - path: requirements/budget/FR-4.20.md
+    blob: a52583882f813739b5e9b6cbe410ee95af2786b1
+  - path: requirements/approval/FR-5.7.md
+    blob: 0b686bccd2f0d5c4b6b727da04cc6edff7d57462
+  - path: requirements/approval/FR-5.8.md
+    blob: ab0ceb78711a3f4a8938929f98c92e83b7bb8c18
+  - path: knowledge/business-rules/BR-BUD-008.md
+    blob: 572ac7aff921d160e46a78611c4907d0e600fce4
+  - path: knowledge/business-rules/BR-BUD-002.md
+    blob: 5e9c772ece5655da2fbf91f706bba1932b5f88ee
+  - path: knowledge/business-rules/BR-BUD-006.md
+    blob: a41caef8622ee13ecf432b68b8bafc41f4fa7f2c
+  - path: knowledge/business-rules/BR-BUD-007.md
+    blob: 8a449ac486a20b1f997c1654455115d067568fff
+  - path: knowledge/glossary.md
+    blob: e043ec8e557cafd13abb80ca80af1eecab2b9991
+  - path: knowledge/open-questions.md
+    blob: 3b11b1ca28ad0dd16b65e8b6f26fcc3463686281
+  - path: requirements/screens/screens.yaml
+    blob: 8304abaa02d25a3b237c51087b315b81f3f4ff5b
+  - path: tests/integration/backend/Application/Features/課予算の策定と改定.feature
+    blob: 3d54813b0a34f212b6e44d361f4e0ec53e5f47e6
+  - path: tests/e2e/browser/features/予算明細の入力.feature
+    blob: f1e3b459f64ea48dec52b627ccf5907d6eddfca0
+  - path: docs/api/openapi.json
+    blob: 922c95b68dd732a5f5b8a1ba01f31de80105fed4
+  - path: specs/test-plan.md
+    blob: a51efdae92acc393050bb069bb225a1c33277b34
+  - path: specs/rules/SPEC-001.md
+    blob: 5a44d7907d028bdbd416b4eba6fbca12f3b5ac0b
+  - path: specs/rules/SPEC-003.md
+    blob: 8735923528cf6ab4cde1b7c59761fee51cc9180c
