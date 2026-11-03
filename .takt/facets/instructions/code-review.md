@@ -6,7 +6,7 @@
 2. 差分を読む: `git diff "$(git merge-base origin/main HEAD)"`、`git status --porcelain`(未追跡のファイルは中身を開く)
 3. `.factory/premises/ISSUE-<n>.yml` を読み、前提の要件・仕様を開く。各前提の blob が `git rev-parse origin/main:<path>` と一致するかを確かめる
 4. 仕様の具体例の各行と `.feature` のシナリオが、テストになっているかを確かめる(足りない行を挙げる)
-5. テストが仕様から導かれているか(実装の写しになっていないか)を見る
+5. テストが仕様から導かれているか(実装の写しになっていないか)を見る。API の変更(`specs/api/ISSUE-<n>.openapi.json`)があれば `node tools/factory/cli.mjs api-spec` を実行し、作り直した `docs/api/openapi.json` が仕様どおりかを確かめる
 6. この Issue の要件を指すシナリオの `@未実装` が外れているか、シナリオの文が変わっていないかを見る
 7. ポリシー「レビューの観点」の「実装(ゲート3)」と「この業務に特有のもの」を1つずつ確かめる
 8. 触ってはいけない場所(`requirements/`・`knowledge/`・`specs/`)と、`impl/` の持ち場の外を変えていないかを見る

@@ -118,6 +118,7 @@ jobs:
           - { check: coverage, title: "要件とシナリオの網羅" }
           - { check: knowledge, title: "ナレッジの出どころと確定" }
           - { check: screens, title: "画面要件と fixtures" }
+          - { check: api-spec, title: "仕様の API と OpenAPI(api-spec)" }
           - { check: role, title: "工程の持ち場(role-guard)" }
           - { check: gate, title: "ゲートラベルの確認(gate-check)" }
           - { check: premises, title: "前提の版(upstream-approved)" }

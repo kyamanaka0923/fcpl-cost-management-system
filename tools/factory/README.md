@@ -28,7 +28,8 @@ CI(`.github/workflows/factory.yml`)のジョブ名が、そのまま main のル
 | 曖昧語の検査 | `ambiguity` | 要件・業務ルール・`.feature` の `ルール:` 行 | 曖昧語が 1 つでもある |
 | 要件とシナリオの網羅 | `coverage` | 要件 ↔ シナリオのトレーサビリティ(実行サマリと成果物 `coverage-matrix` に出す) | シナリオのない要件、孤児のタグ、`ルール:` の文が要件文と違う、1 ルールに 2 要件、`impl/<n>` で Issue #n の要件のシナリオに `@未実装` が残っている |
 | ナレッジの出どころと確定 | `knowledge` | 業務ルールの frontmatter と `sources`、要件が参照する業務ルール | 出どころがない・索引にない、未確定の業務ルールを要件が参照している |
-| 画面要件と fixtures | `screens` | `requirements/screens/screens.yaml` の形、fixtures の body が OpenAPI の応答のスキーマに合うか | 項目の欠け、fixtures がない・余っている、スキーマに合わない、OpenAPI にない API |
+| 画面要件と fixtures | `screens` | `requirements/screens/screens.yaml` の形、fixtures の body が OpenAPI の応答のスキーマに合うか。`spec/<n>-…` では仕様の API(`specs/api/ISSUE-<n>.openapi.json`)を当てた OpenAPI で確かめる | 項目の欠け、fixtures がない・余っている、スキーマに合わない、OpenAPI にない API |
+| 仕様の API と OpenAPI(api-spec) | `api-spec` | `spec/<n>-…`: `specs/api/ISSUE-<n>.openapi.json` の形と `$ref`。`impl/<n>-…`: 実装から作り直した `docs/api/openapi.json` に、仕様の API がすべて入っているか(#98) | 書けない場所・消す対象がない・解決できない `$ref`。実装にない・食い違う・消したはずのものが残る |
 | 工程の持ち場(role-guard) | `role` | PR のブランチ名と、変えたファイル | 命名に合わないブランチ、工程の持ち場の外の変更 |
 | ゲートラベルの確認(gate-check) | `gate` | `req/`・`spec/`・`impl/` の PR の Issue のラベルと、main にマージされた PR | その工程までのゲートラベル(`spec/` なら gate0・gate1、`impl/` なら gate0〜2)が全部そろっていない。`gate1-approved` があるのに `req/<n>-…` が、`gate2-approved` があるのに `spec/<n>-…` がマージされていない(#77) |
 | 前提の版(upstream-approved) | `premises` | `spec/`・`impl/` の PR の `.factory/premises/ISSUE-<n>.yml` | 前提の記録がない、前提のファイルが main で変わった・main にない |
