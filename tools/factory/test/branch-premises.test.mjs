@@ -16,7 +16,7 @@ test('ブランチ名から工程と Issue 番号を読む', () => {
 test('role-guard: 工程の持ち場の中の変更は通る', () => {
   assert.deepEqual(checkRole('knowledge/45-lock', ['knowledge/business-rules/BR-BUD-008.md']), []);
   assert.deepEqual(checkRole('req/46-x', ['requirements/budget/FR-4.8.md', 'tests/e2e/api/Features/APIのエラー応答.feature', 'docs/REQUIREMENTS.md']), []);
-  assert.deepEqual(checkRole('spec/46-x', ['specs/rules/SPEC-001.md', 'docs/api/openapi.json', '.factory/premises/ISSUE-46.yml']), []);
+  assert.deepEqual(checkRole('spec/46-x', ['specs/rules/SPEC-001.md', 'specs/api/ISSUE-46.openapi.json', '.factory/premises/ISSUE-46.yml']), []);
   assert.deepEqual(checkRole('impl/46-x', ['backend/src/A.cs', 'frontend/src/a.ts', 'tests/unit/x.cs', 'docs/MANUAL.md', '.factory/premises/ISSUE-46.yml']), []);
   assert.deepEqual(checkRole('factory/x', ['.claude/agents/a.md', 'tools/factory/cli.mjs', 'requirements/README.md', 'knowledge/README.md']), []);
   assert.deepEqual(checkRole('dependabot/nuget/x', ['backend/Directory.Packages.props']), []);
@@ -33,6 +33,8 @@ test('role-guard: 持ち場の外の変更を指摘する', () => {
   ]);
   assert.deepEqual(files('req/46-x', ['backend/src/A.cs', 'tests/unit/x.cs']), ['backend/src/A.cs', 'tests/unit/x.cs']);
   assert.deepEqual(files('spec/46-x', ['tests/e2e/a.feature', 'requirements/budget/FR-4.8.md']), ['tests/e2e/a.feature', 'requirements/budget/FR-4.8.md']);
+  // [C] は OpenAPI を直接変えない。実装より先に変えると CI の OpenAPI の一致の検査が落ちる(#98)
+  assert.deepEqual(files('spec/46-x', ['docs/api/openapi.json']), ['docs/api/openapi.json']);
   assert.deepEqual(files('factory/x', ['backend/src/A.cs', 'knowledge/business-rules/BR-BUD-001.md', 'requirements/budget/FR-4.8.md', 'specs/rules/SPEC-001.md']), [
     'backend/src/A.cs',
     'knowledge/business-rules/BR-BUD-001.md',

@@ -9,8 +9,8 @@
    - この Issue の要件(前提の FR と、`.feature` の `@FR-x.y`)1 件ごとに、満たす API と処理ルールがあるか
    - 仕様が origin/main にない要件を指していないか
    - 要件・業務ルールにない決まりを仕様が足していないか
-5. `docs/api/openapi.json` の差分の整合を確かめる
-   - JSON として読めるか(`node -e "JSON.parse(require('fs').readFileSync('docs/api/openapi.json','utf8'))"` など)
+5. API の変更(`specs/api/ISSUE-<n>.openapi.json`)の整合を確かめる。`docs/api/openapi.json` が変わっていたら指摘する([D] が実装から作り直す)
+   - `node tools/factory/cli.mjs api-spec` と `node tools/factory/cli.mjs screens` が指摘 0 件か
    - 処理ルールの API(メソッド・パス・要求・応答・エラー)と一致するか
    - 既存のクライアント(`frontend/src` が呼ぶ API)を壊さないか(消した・型を変えた項目を `frontend/src` で探す)
 6. テストの観点が要件から導かれているかを確かめる

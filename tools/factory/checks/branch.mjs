@@ -12,7 +12,8 @@ const FEATURE = /^tests\/.+\.feature$/;
 export const ROLES = {
   knowledge: { allow: ['knowledge/'], deny: [] },
   req: { allow: ['requirements/', 'docs/REQUIREMENTS.md', 'knowledge/open-questions.md', FEATURE], deny: [] },
-  spec: { allow: ['specs/', 'docs/api/openapi.json', '.factory/premises/'], deny: [] },
+  // [C] は docs/api/openapi.json を変えない。API の変更は specs/api/ISSUE-<n>.openapi.json に書き、[D] が実装から作り直す(#98)
+  spec: { allow: ['specs/', '.factory/premises/'], deny: [] },
   impl: {
     allow: ['backend/', 'frontend/', 'tests/', 'docs/', 'infra/', 'docker/', 'docker-compose.yml', 'README.md', '.factory/premises/'],
     deny: ['docs/REQUIREMENTS.md', 'docs/adr/'],

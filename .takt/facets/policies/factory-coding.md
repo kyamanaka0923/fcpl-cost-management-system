@@ -29,7 +29,7 @@ implement はこの基準を満たすように書き、code-review はこの基�
 | アーキテクチャテストの固定値を、集約・ポートの増減に合わせずに放置した。またはテストを弱めた(ポジティブコントロールを消すなど) | 直す |
 | 不変条件をドメイン層の外だけで確かめている。違反を `DomainException`(日本語)以外で返している | 直す |
 | アナライザの警告を抑制属性で散らして黙らせた。`.editorconfig` に理由なしでルールを外した | 直す |
-| DTO・エンドポイントを変えたのに、`docs/api/openapi.json` と `frontend/src/api-schema.d.ts` を再生成していない。または仕様の OpenAPI と一致しない | 直す |
+| DTO・エンドポイントを変えたのに、`docs/api/openapi.json` と `frontend/src/api-schema.d.ts` を再生成していない。または `node tools/factory/cli.mjs api-spec` が仕様の API(`specs/api/ISSUE-<n>.openapi.json`)との食い違いを指摘する | 直す |
 | フロントに手書きの API の interface を足した。React・Router 以外の依存を足した | 直す |
 | スキーマの変更で、現世代のデータを消す移行をした。移行が冪等でない。`SchemaResetTests` と同じ形のテストがない | 直す |
 | SQL の文字列に値を埋め込んだ(パラメータバインドでない)。秘密情報をコード・ログ・テストに書いた | 直す |
