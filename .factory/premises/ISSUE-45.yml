@@ -1,7 +1,7 @@
 issue: 45
 stage: spec
 factory_version: factory-v1
-recorded_at: 2026-11-03T02:07:38+09:00
+recorded_at: 2026-11-03T10:36:24+09:00
 premises:
   - path: requirements/budget/FR-4.15.md
     blob: 755f01cd3694b81ee092aa942f2462326b35f348
@@ -33,6 +33,12 @@ premises:
     blob: 3b11b1ca28ad0dd16b65e8b6f26fcc3463686281
   - path: requirements/screens/screens.yaml
     blob: 8304abaa02d25a3b237c51087b315b81f3f4ff5b
+  - path: requirements/screens/fixtures/SCR-002/通常.json
+    blob: df82003900d2e042c15b368755e0ebd63d7a381a
+  - path: requirements/screens/fixtures/SCR-002/空.json
+    blob: 0999dbb35fc6d9b5ab6db9d79506906541e463b6
+  - path: requirements/screens/fixtures/SCR-003/通常.json
+    blob: 9fe4d6a560d85e6df2cd03ead303e2c8142c2e11
   - path: tests/integration/backend/Application/Features/課予算の策定と改定.feature
     blob: 3d54813b0a34f212b6e44d361f4e0ec53e5f47e6
   - path: tests/e2e/browser/features/予算明細の入力.feature

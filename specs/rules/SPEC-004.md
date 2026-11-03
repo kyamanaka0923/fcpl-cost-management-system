@@ -112,9 +112,9 @@ issues: [45]
 5. 409 で見分けるのは衝突だけ。400・404 の拒否の画面の動き(いまのトースト)は変えない(FR-4.18 の補足: 衝突以外の拒否は対象外)
 6. 前の保存が拒否されたとき(409 でも 400 でも)の、待っている次の保存の扱いは決めない(上の「対象外」)
 
-- 画面要件の fixtures(`requirements/screens/fixtures/SCR-002/通常.json`・`空.json`、`SCR-003/通常.json`)の応答には `updateNumber` がない。
-  検査「画面要件と fixtures」(`node tools/factory/cli.mjs screens`)は fixtures を OpenAPI のスキーマで確かめるので、この仕様の差分では 3 件落ちる。
-  fixtures は要件([B])の成果物で、`spec/` のブランチでは変えられない(Issue #45 に問いを出して止めた)
+- 画面要件の fixtures(`requirements/screens/fixtures/SCR-002/通常.json`・`空.json`、`SCR-003/通常.json`)の応答は、`updateNumber` を持つ
+  (Issue #45 の問いへの回答 A により [B] で足した。PR #96)。検査「画面要件と fixtures」(`node tools/factory/cli.mjs screens`)は、
+  fixtures をこの仕様の差分を入れた OpenAPI のスキーマで確かめる
 
 ## 具体例
 
@@ -161,18 +161,20 @@ P の更新番号を n とする(n は起票と明細の登録で決まる値。
 | 36 | SCR-002: 4 つの操作のどれかの応答が 409 | トーストに応答の `error` を出し、`GET /api/budgets/{budgetId}` を送って表示と持つ `updateNumber` を置き換える | 画面の処理 3 |
 | 37 | SCR-003: 策定中の行の承認の応答が 409 | トーストに応答の `error` を出し、`GET /api/departments/{id}/budgets` を送って表と各行の `updateNumber` を置き換える。その行は策定中のまま | 画面の処理 4 |
 | 38 | SCR-002: 保存の応答が 400(金額の拒否) | いまのとおりトーストに文言を出す。予算の読み込み直しは送らない | 画面の処理 5(衝突だけを見分ける) |
+| 39 | クエリ `updateNumber=abc`(整数として読めない)の明細の保存 | 400。予算は変わらない | 整数でない入力 |
 
 ## テストの観点
 
 | 観点 | テストレベル | 置き場所 |
 |---|---|---|
-| 行 1〜7・21〜25・27(更新番号の初期値と増え方、状態の拒否、判定の順の順 1 → 2 → 3)。拒否したときに状態・明細・更新番号が変わらないこと | 単体(Domain) | `tests/unit/backend/Domain`(`DepartmentBudget`) |
-| 行 8〜20(衝突の拒否と、ほかの拒否との重なり)。409 に変える例外の型と文言 | 単体(Domain) | 同上 |
+| 行 1〜7・21〜24・27(更新番号の初期値と増え方、状態の拒否、判定の順の順 1 → 2 → 3)。拒否したときに状態・明細・更新番号が変わらないこと | 単体(Domain) | `tests/unit/backend/Domain`(`DepartmentBudget`) |
+| 行 8〜19(衝突の拒否と、ドメイン層で判定するほかの拒否との重なり)。409 に変える例外の型と文言 | 単体(Domain) | 同上 |
+| 行 20・25(Application 層の判定(案件の存在の確かめ・区分の読み取り)より先に、順 1・2 の拒否を返すこと)。拒否したときに明細・更新番号が変わらないこと | 結合(Application) | `tests/integration/backend/Application`(xUnit の例示テスト) |
 | 受け付けた保存だけが更新番号を 1 増やし、拒否した保存は更新番号を変えない(不変条件) | 単体(Domain・プロパティ) | `tests/unit/backend/Domain/PropertyBased/DepartmentBudgetPropertyTests.cs`(モデルベースの操作の列に、送る番号を持たせる) |
 | FR-4.15・FR-4.16・FR-4.17・FR-5.7・FR-5.8 のシナリオ(行 3〜9・12〜18・22〜24・26・28 を業務の流れで) | 結合(Gherkin) | `tests/integration/backend/Application/Features/課予算の策定と改定.feature` の `@FR-4.15` `@FR-4.16` `@FR-4.17` `@FR-5.7` `@FR-5.8`(`@未実装` を外す) |
 | 行 2・27・28(改定版の起票と承認で、引き継ぎ元・旧承認版の更新番号と状態が変わらないこと) | 結合(Application) | `tests/integration/backend/Application`(xUnit の例示テスト) |
 | 行 29・30(条件つきの更新が 0 件のとき 409 にし、どの書き込みもしないこと。承認では旧承認版も失効しないこと)。更新番号の列の往復。列を足すスキーマの作り直しの冪等性 | 結合(Infrastructure) | `tests/integration/backend/Infrastructure`(`RepositoryFixture`・`SchemaResetTests`) |
-| 409 と `ErrorResponse.error` の文言(4 つの操作のそれぞれ)。行 3 の 200 の `updateNumber`。行 31 の 400。行 32 の 404 | API E2E | `tests/e2e/api`(xUnit の例示テスト `*Tests.cs`。`.feature` は要件の成果物なので足さない) |
+| 409 と `ErrorResponse.error` の文言(4 つの操作のそれぞれ)。行 3 の 200 の `updateNumber`。行 31・39 の 400。行 32 の 404 | API E2E | `tests/e2e/api`(xUnit の例示テスト `*Tests.cs`。`.feature` は要件の成果物なので足さない) |
 | OpenAPI 定義が実装と一致すること(この仕様の差分を含む) | API E2E | `tests/e2e/api/OpenApiDocumentTests.cs` |
 | 行 33〜38(送るクエリ `updateNumber` の値・送る順・409 のときのトーストと読み込み直し・400 のときに読み込み直さないこと) | 単体(フロントエンド) | `tests/unit/frontend/pages/`(SCR-002 は `support/fakeBudgetApi.ts` の `偽の予算API` に更新番号と 409 を足す。SCR-003 は MSW) |
 | FR-4.18・FR-4.19・FR-4.20 のシナリオ(画面 → API → DB のつながり) | ブラウザ E2E | `tests/e2e/browser/features/予算明細の入力.feature` の `@FR-4.18` `@FR-4.19` `@FR-4.20`(`@未実装` を外す) |
