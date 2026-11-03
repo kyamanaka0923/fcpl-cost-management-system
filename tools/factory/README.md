@@ -14,6 +14,7 @@
 | `premises.sh` | 前提の記録を作る(`.factory/premises/README.md`) |
 | `metrics-cli.mjs`、`lib/metrics.mjs` | 工場の週報(WIP・流れの時間・介入)を作る。`--post` で「工場の週報」Issue に足す |
 | `intervention-cli.mjs`、`lib/intervention.mjs` | 介入の記録(`/intervention <種類> <原因>`)を確かめて `intervention` ラベルを付ける |
+| `save-draft.sh`、`draft-cli.mjs`、`lib/draft.mjs` | takt が異常終了したとき、持ち場の中の書きかけをコミットしてブランチを push する。`takt.sh` が呼ぶ(#101) |
 | `screens-docker.sh` | 画面の差分の検査を、CI と同じ Playwright のコンテナで動かす |
 | `update-approved-screens.sh` | 承認する画面の画像を撮り直す(人が実行する。エージェントはフックで止まる) |
 | `setup-github.sh` | ラベルとルールセットを作る(人が実行する。エージェントはフックで止まる) |

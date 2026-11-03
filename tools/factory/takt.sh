@@ -9,6 +9,7 @@
 # ここでするのは、決まった手順だけ(AI に判断させない):
 #   1. ラベルから工程を選ぶ・確かめる   2. ブランチを用意する(<種類>/<番号>-takt。続きは既存の <種類>/<番号>-* に origin/main を取り込む)
 #   3. [D] の着手なら列を stage:仕様確定 → stage:実装中 にする   4. ガードを PATH の先頭に置いて takt を動かす
+#   5. takt が異常終了したら(利用上限・エラー・Ctrl+C)、持ち場の中の書きかけをコミットしてブランチを push する(#101)
 set -euo pipefail
 
 usage() {
@@ -98,4 +99,25 @@ task="#$issue
 - 前の実行のコミット: ${drafts} 件
 - エージェント: $agent"
 # --skip-git: ブランチ・コミット・PR は workflow が自分で扱う。takt の worktree は origin を外すので使わない
-exec takt --pipeline --skip-git -w "$WORKFLOW" --runtime-assignment "$agent" -t "$task" "$@"
+# exec にしない: takt の終わり方を見て、異常終了なら書きかけを残す(5.)
+started="$(node -e 'console.log(Date.now())')"
+interrupted=""
+# Ctrl+C は takt にも届く。ここでは無視せず印だけ付け(無視にすると takt にも引き継がれる)、takt が終わるのを待つ
+trap 'interrupted="Ctrl+C で中断"' INT
+trap 'interrupted="SIGTERM で中断"' TERM
+set +e
+takt --pipeline --skip-git -w "$WORKFLOW" --runtime-assignment "$agent" -t "$task" "$@"
+rc=$?
+set -e
+trap - INT TERM
+
+# 5. 異常終了なら、書きかけを残す。AI は動けないことがある(利用上限)ので、スクリプトの決まった手順でする
+IFS=$'\t' read -r run_status run_reason < <(FACTORY_TASK="$task" node tools/factory/draft-cli.mjs run "$started")
+if [ "$rc" -eq 0 ] && [ "$run_status" = completed ] && [ -z "$interrupted" ]; then
+  exit 0
+fi
+reason="${interrupted:-${run_reason:-takt の終了コード $rc、run の状態 $run_status}}"
+echo "✖ takt が異常終了した: $reason" >&2
+bash tools/factory/save-draft.sh "$issue" "$branch" "$STAGE_NAME" "$reason"
+[ "$rc" -ne 0 ] && exit "$rc"
+exit 1
