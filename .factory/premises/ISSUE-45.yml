@@ -1,7 +1,7 @@
 issue: 45
 stage: spec
 factory_version: factory-v1
-recorded_at: 2026-11-03T10:36:24+09:00
+recorded_at: 2026-11-03T11:23:19+09:00
 premises:
   - path: requirements/budget/FR-4.15.md
     blob: 755f01cd3694b81ee092aa942f2462326b35f348
@@ -51,3 +51,5 @@ premises:
     blob: 5a44d7907d028bdbd416b4eba6fbca12f3b5ac0b
   - path: specs/rules/SPEC-003.md
     blob: 8735923528cf6ab4cde1b7c59761fee51cc9180c
+  - path: specs/README.md
+    blob: 8867889c0de75d3f0433b6bf4cca96113af727f6

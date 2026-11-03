@@ -954,15 +954,6 @@
               "type": "string",
               "format": "uuid"
             }
-          },
-          {
-            "name": "updateNumber",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
           }
         ],
         "requestBody": {
@@ -1002,16 +993,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BudgetDetailDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1061,15 +1042,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "updateNumber",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
           }
         ],
         "responses": {
@@ -1102,16 +1074,6 @@
                 }
               }
             }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         }
       }
@@ -1129,15 +1091,6 @@
             "schema": {
               "type": "string",
               "format": "uuid"
-            }
-          },
-          {
-            "name": "updateNumber",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
             }
           }
         ],
@@ -1181,16 +1134,6 @@
                 }
               }
             }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         }
       }
@@ -1208,15 +1151,6 @@
             "schema": {
               "type": "string",
               "format": "uuid"
-            }
-          },
-          {
-            "name": "updateNumber",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
             }
           }
         ],
@@ -1247,16 +1181,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BudgetDetailDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1818,8 +1742,7 @@
           "outsourcingTotal",
           "periodCostTotal",
           "plannedProfit",
-          "lines",
-          "updateNumber"
+          "lines"
         ],
         "type": "object",
         "properties": {
@@ -1880,10 +1803,6 @@
             "items": {
               "$ref": "#/components/schemas/BudgetLineDto"
             }
-          },
-          "updateNumber": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },
@@ -1956,8 +1875,7 @@
           "processingTotal",
           "outsourcingTotal",
           "periodCostTotal",
-          "plannedProfit",
-          "updateNumber"
+          "plannedProfit"
         ],
         "type": "object",
         "properties": {
@@ -2012,10 +1930,6 @@
           "plannedProfit": {
             "type": "number",
             "format": "double"
-          },
-          "updateNumber": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },

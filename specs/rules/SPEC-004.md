@@ -175,7 +175,7 @@ P の更新番号を n とする(n は起票と明細の登録で決まる値。
 | 行 2・27・28(改定版の起票と承認で、引き継ぎ元・旧承認版の更新番号と状態が変わらないこと) | 結合(Application) | `tests/integration/backend/Application`(xUnit の例示テスト) |
 | 行 29・30(条件つきの更新が 0 件のとき 409 にし、どの書き込みもしないこと。承認では旧承認版も失効しないこと)。更新番号の列の往復。列を足すスキーマの作り直しの冪等性 | 結合(Infrastructure) | `tests/integration/backend/Infrastructure`(`RepositoryFixture`・`SchemaResetTests`) |
 | 409 と `ErrorResponse.error` の文言(4 つの操作のそれぞれ)。行 3 の 200 の `updateNumber`。行 31・39 の 400。行 32 の 404 | API E2E | `tests/e2e/api`(xUnit の例示テスト `*Tests.cs`。`.feature` は要件の成果物なので足さない) |
-| OpenAPI 定義が実装と一致すること(この仕様の差分を含む) | API E2E | `tests/e2e/api/OpenApiDocumentTests.cs` |
+| OpenAPI 定義が実装と一致すること。実装から作り直した `docs/api/openapi.json` に `specs/api/ISSUE-45.openapi.json` の差分がすべて入っていること | API E2E・工場の検査 | `tests/e2e/api/OpenApiDocumentTests.cs`、CI「仕様の API と OpenAPI(api-spec)」 |
 | 行 33〜38(送るクエリ `updateNumber` の値・送る順・409 のときのトーストと読み込み直し・400 のときに読み込み直さないこと) | 単体(フロントエンド) | `tests/unit/frontend/pages/`(SCR-002 は `support/fakeBudgetApi.ts` の `偽の予算API` に更新番号と 409 を足す。SCR-003 は MSW) |
 | FR-4.18・FR-4.19・FR-4.20 のシナリオ(画面 → API → DB のつながり) | ブラウザ E2E | `tests/e2e/browser/features/予算明細の入力.feature` の `@FR-4.18` `@FR-4.19` `@FR-4.20`(`@未実装` を外す) |
 
@@ -185,9 +185,12 @@ P の更新番号を n とする(n は起票と明細の登録で決まる値。
 - 行 29・30 は、読んでから書くまでの間の保存を起こすため、同じ予算を 2 回読み込んだ 2 つの集約を、リポジトリで続けて書き込んで確かめる(並列の実行に頼らない)
 - 行 34・35 の送る順は、`偽の予算API` の `fake.writes` の順と各要求の `updateNumber` で確かめる
 
-## WebAPI 仕様(`docs/api/openapi.json`)
+## WebAPI 仕様(`specs/api/ISSUE-45.openapi.json`)
 
-変える。[D] で実装から再生成したもの(`UPDATE_OPENAPI=1 dotnet test --filter OpenApi`)と一致させる。
+変える。変える 4 つの操作と 2 つのスキーマの全体を `specs/api/ISSUE-45.openapi.json` に書いた(`specs/README.md`「API の変更の書き方」)。
+`docs/api/openapi.json` はこの仕様では変えない。[D] が実装から作り直し(`UPDATE_OPENAPI=1 dotnet test --filter OpenApi`)、
+作り直したものに `specs/api/ISSUE-45.openapi.json` に書いたことがすべて入っていることを、検査「仕様の API と OpenAPI(api-spec)」が確かめる。
+いまの `docs/api/openapi.json` との違いは次のとおり。
 
 | 場所 | 変更 |
 |---|---|
@@ -199,5 +202,5 @@ P の更新番号を n とする(n は起票と明細の登録で決まる値。
 | `components.schemas.BudgetSummaryDto` | `properties` の最後(`plannedProfit` のあと)に `updateNumber`(`integer`・`int32`)。`required` の最後に `updateNumber` |
 
 - 操作の数は 28 のまま(`OpenAPI定義は全エンドポイントと応答の型を含む` の固定値は変わらない)
-- `responses` の並び(`400`・`404`・`200`・`409`)は、`/api` のグループの宣言(400・404)→ 戻り値の型から推論される 200 → エンドポイントごとの宣言(409)の順になる、という見込みで書いた。
-  この環境に .NET の SDK がなく、生成して確かめていない。[D] で再生成したものと並びが違えば、この仕様の差分の並びが誤り(中身は同じ)
+- `parameters`・`responses`・`required` の並びは、検査「api-spec」の比較では問わない(配列は要素が含まれていればよく、オブジェクトはキーで比べる)。
+  この環境に .NET の SDK がなく、実装から生成して確かめていない
