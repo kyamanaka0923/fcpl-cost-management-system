@@ -86,12 +86,14 @@ public sealed class DepartmentBudgetService
 
     /// <summary>
     /// 明細を追加または更新する(区分に応じて案件別 or 費目別)。
-    /// 承認済み予算は編集不可(ドメイン側で拒否)。
+    /// updateNumber は画面が読んだ時点の更新番号。承認済み予算の編集と衝突は、区分・案件・費目の確かめより先に拒否する
+    /// (BR-BUD-008 の判定の順)。
     /// </summary>
     public async Task<BudgetDetailDto> UpsertLineAsync(Guid budgetId,
-        UpsertBudgetLineRequest request, CancellationToken ct = default)
+        UpsertBudgetLineRequest request, int updateNumber, CancellationToken ct = default)
     {
         var budget = await RequireAsync(budgetId, ct);
+        budget.EnsureSavable(updateNumber);
         var category = ParseCategory(request.Category);
         // MonthlyAmounts が来たら月次モード、無ければ半期一括モード。
         var monthly = request.MonthlyAmounts is { } ma
@@ -103,83 +105,92 @@ public sealed class DepartmentBudgetService
             var projectId = await RequireProjectInDepartmentAsync(request.ProjectId,
                 budget.DepartmentId, ct);
             if (monthly is not null)
-                budget.UpsertProjectLineMonthly(category, projectId, monthly);
+                budget.UpsertProjectLineMonthly(updateNumber, category, projectId, monthly);
             else
-                budget.UpsertProjectLine(category, projectId, new Money(request.Amount));
+                budget.UpsertProjectLine(updateNumber, category, projectId, new Money(request.Amount));
         }
         else
         {
             var elementCode = await RequireElementAsync(request.ElementCode, ct);
             if (monthly is not null)
-                budget.UpsertPeriodCostLineMonthly(elementCode, monthly, request.PeriodDetail);
+                budget.UpsertPeriodCostLineMonthly(updateNumber, elementCode, monthly, request.PeriodDetail);
             else
-                budget.UpsertPeriodCostLine(elementCode, new Money(request.Amount), request.PeriodDetail);
+                budget.UpsertPeriodCostLine(updateNumber, elementCode, new Money(request.Amount),
+                    request.PeriodDetail);
         }
 
-        await _budgets.UpdateAsync(budget, ct);
+        await _budgets.UpdateAsync(budget, updateNumber, ct);
         return ToDetailDto(budget);
     }
 
-    /// <summary>明細を削除する(区分に応じて案件別 or 費目別)。承認済み予算は編集不可。</summary>
+    /// <summary>
+    /// 明細を削除する(区分に応じて案件別 or 費目別)。updateNumber は画面が読んだ時点の更新番号。
+    /// 承認済み予算の編集と衝突は、区分の読み取りより先に拒否する(BR-BUD-008 の判定の順)。
+    /// </summary>
     public async Task<BudgetDetailDto> RemoveLineAsync(Guid budgetId, string category,
-        Guid? projectId, string? elementCode, string? periodDetail = null,
+        Guid? projectId, string? elementCode, string? periodDetail, int updateNumber,
         CancellationToken ct = default)
     {
         var budget = await RequireAsync(budgetId, ct);
+        budget.EnsureSavable(updateNumber);
         var parsed = ParseCategory(category);
 
         if (parsed.IsProjectBased())
         {
             if (projectId is not { } pid)
                 throw new DomainException("売上高・加工費・外注費の明細には案件を指定してください。");
-            budget.RemoveProjectLine(parsed, new ProjectId(pid));
+            budget.RemoveProjectLine(updateNumber, parsed, new ProjectId(pid));
         }
         else
         {
             if (string.IsNullOrWhiteSpace(elementCode))
                 throw new DomainException("期間費用の明細には費目を指定してください。");
-            budget.RemovePeriodCostLine(new CostElementCode(elementCode), periodDetail);
+            budget.RemovePeriodCostLine(updateNumber, new CostElementCode(elementCode), periodDetail);
         }
 
-        await _budgets.UpdateAsync(budget, ct);
+        await _budgets.UpdateAsync(budget, updateNumber, ct);
         return ToDetailDto(budget);
     }
 
     /// <summary>
     /// 期間費用の明細名を変更する(金額・月次モードは保持)。承認済み予算は編集不可。
     /// 実績は明細名で疎結合のため改名の対象外(旧名の実績は分析で「予定外」になる)。
+    /// updateNumber は画面が読んだ時点の更新番号。
     /// </summary>
     public async Task<BudgetDetailDto> RenamePeriodDetailAsync(Guid budgetId,
-        RenamePeriodDetailRequest request, CancellationToken ct = default)
+        RenamePeriodDetailRequest request, int updateNumber, CancellationToken ct = default)
     {
         var budget = await RequireAsync(budgetId, ct);
+        budget.EnsureSavable(updateNumber);
         if (string.IsNullOrWhiteSpace(request.ElementCode))
             throw new DomainException("期間費用の明細には費目を指定してください。");
-        budget.RenamePeriodCostDetail(new CostElementCode(request.ElementCode),
+        budget.RenamePeriodCostDetail(updateNumber, new CostElementCode(request.ElementCode),
             request.OldDetail, request.NewDetail);
-        await _budgets.UpdateAsync(budget, ct);
+        await _budgets.UpdateAsync(budget, updateNumber, ct);
         return ToDetailDto(budget);
     }
 
-    /// <summary>予算を承認する。同一 (課, 半期) の承認済みバージョンは失効(Superseded)となる。</summary>
-    public async Task<BudgetDetailDto> ApproveAsync(Guid budgetId, CancellationToken ct = default)
+    /// <summary>
+    /// 予算を承認する。同一 (課, 半期) の承認済みバージョンは失効(Superseded)となる。
+    /// updateNumber は画面が読んだ時点の更新番号。承認と旧承認版の失効は 1 つのトランザクションで書き、
+    /// 衝突で拒否したときは旧承認版も失効させない。
+    /// </summary>
+    public async Task<BudgetDetailDto> ApproveAsync(Guid budgetId, int updateNumber,
+        CancellationToken ct = default)
     {
         var budget = await RequireAsync(budgetId, ct);
-        budget.Approve(_clock.UtcNow);
+        budget.Approve(updateNumber, _clock.UtcNow);
 
         var siblings = await _budgets.ListAsync(budget.DepartmentId, budget.FiscalHalf, ct);
-        var superseded = new List<int>();
-        foreach (var sibling in siblings.Where(b =>
-                     b.Id != budget.Id && b.Status == BudgetStatus.Approved))
-        {
+        var superseded = siblings
+            .Where(b => b.Id != budget.Id && b.Status == BudgetStatus.Approved)
+            .ToList();
+        foreach (var sibling in superseded)
             sibling.Supersede();
-            await _budgets.UpdateAsync(sibling, ct);
-            superseded.Add(sibling.Version);
-        }
 
-        await _budgets.UpdateAsync(budget, ct);
+        await _budgets.ApproveAsync(budget, updateNumber, superseded, ct);
         _logger.BudgetApproved(budget.Id.Value, budget.DepartmentId.Value, budget.FiscalHalf,
-            budget.Version, superseded);
+            budget.Version, superseded.Select(b => b.Version).ToList());
         return ToDetailDto(budget);
     }
 
@@ -228,7 +239,8 @@ public sealed class DepartmentBudgetService
             b.CategoryTotal(BudgetCategory.Processing).Value,
             b.CategoryTotal(BudgetCategory.Outsourcing).Value,
             b.CategoryTotal(BudgetCategory.PeriodCost).Value,
-            b.PlannedProfit.Value);
+            b.PlannedProfit.Value,
+            b.UpdateNumber);
 
     /// <summary>予算を明細つき詳細 DTO(区分順→費目→案件で整列)へ変換する。</summary>
     internal static BudgetDetailDto ToDetailDto(DepartmentBudget b) =>
@@ -247,5 +259,6 @@ public sealed class DepartmentBudgetService
                 .Select(l => new BudgetLineDto(l.Id, l.Category.ToString(),
                     l.ProjectId?.Value, l.ElementCode?.Value, l.PeriodDetail, l.Amount.Value,
                     l.IsMonthly, l.MonthlyAmounts.ToDictionary(m => m.Key, m => m.Value.Value)))
-                .ToList());
+                .ToList(),
+            b.UpdateNumber);
 }

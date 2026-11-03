@@ -243,6 +243,12 @@ public sealed class DepartmentBudget
     /// <summary>承認日時(UTC)。未承認は null。</summary>
     public DateTime? ApprovedAt { get; private set; }
 
+    /// <summary>
+    /// 更新番号(BR-BUD-008)。起票時は 1 で、予算への保存(明細の保存・明細の削除・明細名の変更・承認)を
+    /// 受け付けるたびに 1 増える。拒否した保存では変わらない。バージョン(予算の版)とは別の番号。
+    /// </summary>
+    public int UpdateNumber { get; private set; }
+
     /// <summary>明細の読み取り専用ビュー。</summary>
     public IReadOnlyList<BudgetLine> Lines => _lines.AsReadOnly();
 
@@ -262,7 +268,7 @@ public sealed class DepartmentBudget
 
     private DepartmentBudget(DepartmentBudgetId id, DepartmentId departmentId, FiscalHalf fiscalHalf,
         int version, string label, BudgetStatus status, DateTime createdAt, DateTime? approvedAt,
-        List<BudgetLine> lines)
+        int updateNumber, List<BudgetLine> lines)
     {
         Id = id;
         DepartmentId = departmentId;
@@ -272,19 +278,26 @@ public sealed class DepartmentBudget
         Status = status;
         CreatedAt = createdAt;
         ApprovedAt = approvedAt;
+        UpdateNumber = updateNumber;
         _lines = lines;
     }
 
-    /// <summary>当初予算(バージョン1)をドラフトとして起票する。</summary>
+    /// <summary>起票したときの更新番号(当初予算・改定版とも)。</summary>
+    private const int InitialUpdateNumber = 1;
+
+    /// <summary>当初予算(バージョン1)をドラフトとして起票する。更新番号は 1 で始まる。</summary>
     public static DepartmentBudget CreateInitial(DepartmentId departmentId, FiscalHalf fiscalHalf,
         string label, DateTime now)
     {
         ValidateLabel(label);
         return new DepartmentBudget(DepartmentBudgetId.New(), departmentId, fiscalHalf, 1,
-            label.Trim(), BudgetStatus.Draft, now, null, []);
+            label.Trim(), BudgetStatus.Draft, now, null, InitialUpdateNumber, []);
     }
 
-    /// <summary>既存バージョンを基に改定版ドラフトを起票する(明細を引き継ぐ)。</summary>
+    /// <summary>
+    /// 既存バージョンを基に改定版ドラフトを起票する(明細を引き継ぐ)。
+    /// 改定版の更新番号は 1 で始まり、引き継ぎ元の更新番号は変わらない(起票は保存ではない)。
+    /// </summary>
     public static DepartmentBudget ReviseFrom(DepartmentBudget baseBudget, int nextVersion,
         string label, DateTime now)
     {
@@ -293,16 +306,19 @@ public sealed class DepartmentBudget
             throw new DomainException("改定版のバージョンは基となる予算より大きい必要があります。");
         var copiedLines = baseBudget._lines.Select(l => l.Copy()).ToList();
         return new DepartmentBudget(DepartmentBudgetId.New(), baseBudget.DepartmentId,
-            baseBudget.FiscalHalf, nextVersion, label.Trim(), BudgetStatus.Draft, now, null, copiedLines);
+            baseBudget.FiscalHalf, nextVersion, label.Trim(), BudgetStatus.Draft, now, null,
+            InitialUpdateNumber, copiedLines);
     }
 
     /// <summary>
     /// 案件別明細(売上高・加工費・外注費)を半期一括金額で追加または更新する。
     /// (区分, 案件) が同じ明細は1件に統合され、月次モードだった場合は半期一括に切り替わる。
+    /// expectedUpdateNumber は画面が読んだ時点の更新番号(<see cref="EnsureSavable"/>)。
     /// </summary>
-    public void UpsertProjectLine(BudgetCategory category, ProjectId projectId, Money amount)
+    public void UpsertProjectLine(int expectedUpdateNumber, BudgetCategory category, ProjectId projectId,
+        Money amount)
     {
-        EnsureDraft();
+        EnsureSavable(expectedUpdateNumber);
         ValidateAmount(amount);
         RequireProjectCategory(category);
 
@@ -311,16 +327,18 @@ public sealed class DepartmentBudget
             _lines.Add(new BudgetLine(Guid.NewGuid(), category, projectId, null, amount));
         else
             existing.UpdateHalf(amount);
+        AcceptSave();
     }
 
     /// <summary>
     /// 案件別明細を月別金額(1..6 → 金額)で追加または更新する(月次モード)。
     /// 半期合計は月次の合計になる。(区分, 案件) が同じ明細は1件に統合される。
+    /// expectedUpdateNumber は画面が読んだ時点の更新番号(<see cref="EnsureSavable"/>)。
     /// </summary>
-    public void UpsertProjectLineMonthly(BudgetCategory category, ProjectId projectId,
-        IReadOnlyDictionary<int, Money> monthly)
+    public void UpsertProjectLineMonthly(int expectedUpdateNumber, BudgetCategory category,
+        ProjectId projectId, IReadOnlyDictionary<int, Money> monthly)
     {
-        EnsureDraft();
+        EnsureSavable(expectedUpdateNumber);
         RequireProjectCategory(category);
 
         var existing = _lines.FirstOrDefault(l => l.Category == category && l.ProjectId == projectId);
@@ -328,16 +346,19 @@ public sealed class DepartmentBudget
             _lines.Add(new BudgetLine(Guid.NewGuid(), category, projectId, null, Money.Zero, monthly));
         else
             existing.UpdateMonthly(monthly);
+        AcceptSave();
     }
 
     /// <summary>
     /// 期間費用の明細を半期一括金額で追加または更新する。
     /// detailName を指定すると費目内の明細(例: ライセンス費 → "AWS")、null なら費目一括。
     /// 同一 (費目, 明細名) の明細は1件に統合される。費目一括と明細は同一費目内で併用できない。
+    /// expectedUpdateNumber は画面が読んだ時点の更新番号(<see cref="EnsureSavable"/>)。
     /// </summary>
-    public void UpsertPeriodCostLine(CostElementCode elementCode, Money amount, string? detailName = null)
+    public void UpsertPeriodCostLine(int expectedUpdateNumber, CostElementCode elementCode, Money amount,
+        string? detailName = null)
     {
-        EnsureDraft();
+        EnsureSavable(expectedUpdateNumber);
         ValidateAmount(amount);
         var detail = BudgetLine.NormalizeDetail(detailName);
         EnsurePeriodModeConsistent(elementCode, detail);
@@ -348,17 +369,19 @@ public sealed class DepartmentBudget
                 amount, null, detail));
         else
             existing.UpdateHalf(amount);
+        AcceptSave();
     }
 
     /// <summary>
     /// 期間費用の明細を月別金額で追加または更新する(月次モード)。
     /// detailName を指定すると費目内の明細、null なら費目一括。
     /// 同一 (費目, 明細名) の明細は1件に統合される。費目一括と明細は同一費目内で併用できない。
+    /// expectedUpdateNumber は画面が読んだ時点の更新番号(<see cref="EnsureSavable"/>)。
     /// </summary>
-    public void UpsertPeriodCostLineMonthly(CostElementCode elementCode,
+    public void UpsertPeriodCostLineMonthly(int expectedUpdateNumber, CostElementCode elementCode,
         IReadOnlyDictionary<int, Money> monthly, string? detailName = null)
     {
-        EnsureDraft();
+        EnsureSavable(expectedUpdateNumber);
         var detail = BudgetLine.NormalizeDetail(detailName);
         EnsurePeriodModeConsistent(elementCode, detail);
 
@@ -368,6 +391,7 @@ public sealed class DepartmentBudget
                 Money.Zero, monthly, detail));
         else
             existing.UpdateMonthly(monthly);
+        AcceptSave();
     }
 
     /// <summary>(費目, 明細名) が一致する期間費用の明細を探す。</summary>
@@ -395,70 +419,110 @@ public sealed class DepartmentBudget
             throw new DomainException("期間費用の明細は費目で指定してください。");
     }
 
-    /// <summary>案件別明細(売上高・加工費・外注費)を削除する。存在しなければ例外。</summary>
-    public void RemoveProjectLine(BudgetCategory category, ProjectId projectId)
+    /// <summary>
+    /// 案件別明細(売上高・加工費・外注費)を削除する。存在しなければ例外。
+    /// expectedUpdateNumber は画面が読んだ時点の更新番号(<see cref="EnsureSavable"/>)。
+    /// </summary>
+    public void RemoveProjectLine(int expectedUpdateNumber, BudgetCategory category, ProjectId projectId)
     {
-        EnsureDraft();
+        EnsureSavable(expectedUpdateNumber);
         if (!category.IsProjectBased())
             throw new DomainException("期間費用の明細は費目で指定してください。");
         var removed = _lines.RemoveAll(l => l.Category == category && l.ProjectId == projectId);
         if (removed == 0)
             throw new DomainException("指定された明細が存在しません。");
+        AcceptSave();
     }
 
     /// <summary>
     /// 期間費用の明細を削除する。detailName を指定すると費目内の明細、null なら費目一括の明細。
-    /// 存在しなければ例外。
+    /// 存在しなければ例外。expectedUpdateNumber は画面が読んだ時点の更新番号(<see cref="EnsureSavable"/>)。
     /// </summary>
-    public void RemovePeriodCostLine(CostElementCode elementCode, string? detailName = null)
+    public void RemovePeriodCostLine(int expectedUpdateNumber, CostElementCode elementCode,
+        string? detailName = null)
     {
-        EnsureDraft();
+        EnsureSavable(expectedUpdateNumber);
         var detail = BudgetLine.NormalizeDetail(detailName);
         var removed = _lines.RemoveAll(l => l.Category == BudgetCategory.PeriodCost
             && l.ElementCode == elementCode && l.PeriodDetail == detail);
         if (removed == 0)
             throw new DomainException("指定された明細が存在しません。");
+        AcceptSave();
     }
 
     /// <summary>
     /// 期間費用の明細名を変更する(金額・月次モードは保持)。
     /// 対象の明細が無い、または同一費目内で新しい明細名が既に使われている場合は例外。
+    /// 新しい明細名が今と同じでも、保存として受け付ける(更新番号は増える)。
+    /// expectedUpdateNumber は画面が読んだ時点の更新番号(<see cref="EnsureSavable"/>)。
     /// </summary>
-    public void RenamePeriodCostDetail(CostElementCode elementCode, string oldDetail, string newDetail)
+    public void RenamePeriodCostDetail(int expectedUpdateNumber, CostElementCode elementCode,
+        string oldDetail, string newDetail)
     {
-        EnsureDraft();
+        EnsureSavable(expectedUpdateNumber);
         var from = BudgetLine.NormalizeDetail(oldDetail);
         var to = BudgetLine.NormalizeDetail(newDetail)
             ?? throw new DomainException("新しい明細名は必須です。");
 
         var target = FindPeriodLine(elementCode, from)
             ?? throw new DomainException("指定された明細が存在しません。");
-        if (to == from)
-            return; // 変更なし
-        if (FindPeriodLine(elementCode, to) is not null)
-            throw new DomainException("同じ費目に同じ明細名が既に存在します。");
-
-        target.RenameDetail(to);
+        if (to != from)
+        {
+            if (FindPeriodLine(elementCode, to) is not null)
+                throw new DomainException("同じ費目に同じ明細名が既に存在します。");
+            target.RenameDetail(to);
+        }
+        AcceptSave();
     }
 
-    /// <summary>予算を承認する。承認後は編集不可となる。</summary>
-    public void Approve(DateTime now)
+    /// <summary>
+    /// 予算を承認する。承認後は編集不可となる。
+    /// 判定の順(BR-BUD-008): ドラフトでない → 衝突(expectedUpdateNumber ≠ 更新番号) → 明細がない。
+    /// </summary>
+    public void Approve(int expectedUpdateNumber, DateTime now)
     {
         if (Status != BudgetStatus.Draft)
             throw new DomainException("ドラフト状態の予算のみ承認できます。");
+        EnsureNoConflict(expectedUpdateNumber);
         if (_lines.Count == 0)
             throw new DomainException("明細のない予算は承認できません。");
         Status = BudgetStatus.Approved;
         ApprovedAt = now;
+        AcceptSave();
     }
 
-    /// <summary>後続バージョンの承認に伴い、この予算を失効させる。</summary>
+    /// <summary>
+    /// 後続バージョンの承認に伴い、この予算を失効させる。
+    /// 失効は予算への保存ではないため、更新番号は変えない(SPEC-004)。
+    /// </summary>
     public void Supersede()
     {
         if (Status != BudgetStatus.Approved)
             throw new DomainException("承認済みの予算のみ失効にできます。");
         Status = BudgetStatus.Superseded;
     }
+
+    /// <summary>
+    /// 明細の保存・明細の削除・明細名の変更を受け付けられる状態かを、BR-BUD-008 の判定の順で確かめる。
+    /// 1. 承認済み・失効済みなら状態の拒否(<see cref="DomainException"/>)。衝突にも当たっていても、こちらを返す
+    /// 2. expectedUpdateNumber(画面が読んだ時点の更新番号)が今の更新番号と違えば衝突の拒否(<see cref="BudgetConflictException"/>)
+    /// 明細の各操作はこれを最初に呼ぶ。アプリケーション層は、区分・案件・費目の確かめの前にこれを呼んで順を守る。
+    /// </summary>
+    public void EnsureSavable(int expectedUpdateNumber)
+    {
+        EnsureDraft();
+        EnsureNoConflict(expectedUpdateNumber);
+    }
+
+    /// <summary>画面が読んだ時点の更新番号が今の更新番号と違えば、衝突として拒否する(大小は問わない)。</summary>
+    private void EnsureNoConflict(int expectedUpdateNumber)
+    {
+        if (expectedUpdateNumber != UpdateNumber)
+            throw new BudgetConflictException();
+    }
+
+    /// <summary>保存を受け付けたので更新番号を 1 増やす(1 回の保存で 1 だけ)。</summary>
+    private void AcceptSave() => UpdateNumber++;
 
     /// <summary>ドラフト状態でなければ編集を拒否する(承認済み予算の不変条件)。</summary>
     private void EnsureDraft()
@@ -479,10 +543,11 @@ public sealed class DepartmentBudget
 
     /// <summary>
     /// 永続化層からの復元用ファクトリ。各明細の <c>Monthly</c> は月別金額(1..6 → 金額)で、
-    /// 空なら半期一括モード、非空なら月次モードとして復元する。
+    /// 空なら半期一括モード、非空なら月次モードとして復元する。updateNumber は保存されている更新番号。
     /// </summary>
     public static DepartmentBudget Restore(Guid id, Guid departmentId, string fiscalHalf,
         int version, string label, BudgetStatus status, DateTime createdAt, DateTime? approvedAt,
+        int updateNumber,
         IEnumerable<(Guid Id, string Category, Guid? ProjectId, string? ElementCode,
             string? PeriodDetail, decimal Amount,
             IReadOnlyDictionary<int, decimal> Monthly)> lines)
@@ -498,7 +563,8 @@ public sealed class DepartmentBudget
                 l.PeriodDetail))
             .ToList();
         return new DepartmentBudget(new DepartmentBudgetId(id), new DepartmentId(departmentId),
-            FiscalHalf.Parse(fiscalHalf), version, label, status, createdAt, approvedAt, restored);
+            FiscalHalf.Parse(fiscalHalf), version, label, status, createdAt, approvedAt, updateNumber,
+            restored);
     }
 }
 
@@ -541,6 +607,19 @@ public interface IDepartmentBudgetRepository
     /// <summary>予算を新規追加する(ヘッダ + 明細)。</summary>
     Task AddAsync(DepartmentBudget budget, CancellationToken ct = default);
 
-    /// <summary>予算を更新する(ヘッダ更新 + 明細の洗い替え)。</summary>
-    Task UpdateAsync(DepartmentBudget budget, CancellationToken ct = default);
+    /// <summary>
+    /// 予算への保存(明細の保存・明細の削除・明細名の変更)を書き込む(ヘッダ更新 + 明細の洗い替え)。
+    /// 書き込むのは、保存されている更新番号が expectedUpdateNumber(読んだときの更新番号)と一致するときだけ。
+    /// 一致しなければ(読んでから書くまでの間にほかの保存が受け付けられた)何も書かずに
+    /// <see cref="BudgetConflictException"/> を投げる。
+    /// </summary>
+    Task UpdateAsync(DepartmentBudget budget, int expectedUpdateNumber, CancellationToken ct = default);
+
+    /// <summary>
+    /// 承認を書き込む。承認した予算の書き込み(<see cref="UpdateAsync"/> と同じ条件つき)と、
+    /// 同じ (課, 半期) の旧承認版の失効を 1 つのトランザクションで書く。
+    /// 承認した予算の条件が合わなければ、旧承認版の失効も書かずに <see cref="BudgetConflictException"/> を投げる。
+    /// </summary>
+    Task ApproveAsync(DepartmentBudget approved, int expectedUpdateNumber,
+        IReadOnlyCollection<DepartmentBudget> superseded, CancellationToken ct = default);
 }

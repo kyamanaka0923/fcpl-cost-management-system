@@ -44,7 +44,10 @@ public sealed record BudgetLineDto(
     bool IsMonthly,
     IReadOnlyDictionary<int, decimal> MonthlyAmounts);
 
-/// <summary>予算バージョンの一覧用サマリ DTO(区分合計・計画損益つき)。</summary>
+/// <summary>
+/// 予算バージョンの一覧用サマリ DTO(区分合計・計画損益つき)。
+/// UpdateNumber は更新番号(BR-BUD-008)。承認するときにクエリ updateNumber として送り返す。
+/// </summary>
 public sealed record BudgetSummaryDto(
     Guid Id,
     Guid DepartmentId,
@@ -58,9 +61,13 @@ public sealed record BudgetSummaryDto(
     decimal ProcessingTotal,
     decimal OutsourcingTotal,
     decimal PeriodCostTotal,
-    decimal PlannedProfit);
+    decimal PlannedProfit,
+    int UpdateNumber);
 
-/// <summary>予算バージョンの詳細 DTO(サマリ + 明細一覧)。</summary>
+/// <summary>
+/// 予算バージョンの詳細 DTO(サマリ + 明細一覧)。
+/// UpdateNumber は更新番号(BR-BUD-008)。次の保存でクエリ updateNumber として送り返す。
+/// </summary>
 public sealed record BudgetDetailDto(
     Guid Id,
     Guid DepartmentId,
@@ -75,7 +82,8 @@ public sealed record BudgetDetailDto(
     decimal OutsourcingTotal,
     decimal PeriodCostTotal,
     decimal PlannedProfit,
-    IReadOnlyList<BudgetLineDto> Lines);
+    IReadOnlyList<BudgetLineDto> Lines,
+    int UpdateNumber);
 
 /// <summary>実績の応答 DTO。Month は計上対象の月(1..6)。半期一括の計上は null。</summary>
 public sealed record ActualEntryDto(
