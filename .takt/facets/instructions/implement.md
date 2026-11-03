@@ -9,7 +9,7 @@
 **どの回かで作業を分ける:**
 - 着手の初回: 処理ルール(`specs/rules/`)、API の変更(`specs/api/ISSUE-<n>.openapi.json`。あれば)といまの `docs/api/openapi.json`、要件と `.feature`、業務ルールを読み、具体例の各行とシナリオを先にテストにしてから、層の順に実装する
 - 続き(タスクの「既存の PR」が番号)の初回: `gh pr view <番号> --comments` と `gh pr checks <番号>` で、PR のレビューの指摘と CI の失敗を読み、指摘と失敗を1件ずつ直す。CI の失敗は `gh run view <run-id> --log-failed` で原因を見る。この工程の変更と関係のない失敗・対応しない指摘は、変えずにその判断と根拠をレポートに書く
-- 続き(タスクの「既存の PR」が「なし」で、「前の実行のコミット」が 1 件以上)の初回: 人の回答待ちで止めたときの書きかけから再開する。Issue の問いと、そのあとの人の回答(`gh issue view <n> --comments`)を読み、書きかけ(`git log --no-merges origin/main..HEAD` と `git diff "$(git merge-base origin/main HEAD)"`)を回答に合わせて直してから、残りを書き上げる。起動スクリプトが取り込んだ origin/main の変更(回答を受けて直した上流など)も読む。回答で決まらないことが残れば、もう一度要件の穴として止める
+- 続き(タスクの「既存の PR」が「なし」で、「前の実行のコミット」が 1 件以上)の初回: 人の回答待ちで止めたときの書きかけから再開する。Issue の問いと、そのあとの人の回答(`gh issue view <n> --comments` の「## 回答」)を読み、書きかけ(`git log --no-merges origin/main..HEAD` と `git diff "$(git merge-base origin/main HEAD)"`)を回答に合わせて直してから、残りを書き上げる。起動スクリプトが取り込んだ origin/main の変更(回答を受けて直した上流など)も読む。回答で決まらないことが残れば、もう一度要件の穴として止める
 - 検証の差し戻しのあと(直前の step が code-review): Report Directory の `code-review.md` の「直す」の指摘を1件ずつ直す。直さない指摘は理由をレポートに書く
 
 **書くとき:**

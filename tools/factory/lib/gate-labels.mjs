@@ -66,6 +66,12 @@ export function checkIssueLabels(n, labels, mergedBranches) {
       out.push(`${stages[0]} のときのゲートラベルは ${want}。いまは ${gates.length ? gates.join('・') : 'なし'}`);
     }
   }
+  const redos = labels.filter((l) => l.startsWith('redo:'));
+  if (redos.length > 1) out.push(`やり直しのラベル(redo:…)が ${redos.length} つ付いている(${redos.join('、')})。1 つにする`);
+  for (const r of redos) {
+    const role = r.slice('redo:'.length);
+    if (!REDO_ROLES.includes(role)) out.push(`${r} はやり直せる工程ではない(${REDO_ROLES.map((x) => `redo:${x}`).join('・')})`);
+  }
   out.push(...checkGateEvidence(n, labels, mergedBranches));
   return out;
 }
@@ -79,6 +85,30 @@ export const STAGES = {
   spec: { workflow: 'Spec', name: '[C] 仕様' },
   impl: { workflow: 'Implement', name: '[D] 実装' },
 };
+
+/** 上流のやり直し(redo:<工程>)ができる工程。[D] は本ラインの最後なので、やり直しではなく続きで直す。 */
+export const REDO_ROLES = ['knowledge', 'req', 'spec'];
+
+/** 判断待ちにしたときに外した列を、escalate が問いのコメントに埋める印(#102)。 */
+const RETURN_STAGE = /<!-- factory:return-stage=(stage:[^\s>]+) -->/;
+
+/**
+ * 回答のあとの列。人が needs-answer を外したら、stage:判断待ち を、escalate が問いのコメントに書いた列に戻す(#102)。
+ * 人は列を付け替えなくてよい。ラベルは変えず、変えたあとのラベルと戻す列を返す(付け替えは起動スクリプトがする)。
+ * @param {string[]} labels Issue のラベル
+ * @param {string[]} comments Issue のコメントの本文(古い順)
+ * @returns {{ labels: string[], restore: string | null } | { error: string }}
+ */
+export function labelsAfterAnswer(labels, comments) {
+  if (!labels.includes('stage:判断待ち') || labels.includes('needs-answer')) return { labels, restore: null };
+  const stage = comments
+    .map((c) => RETURN_STAGE.exec(c)?.[1])
+    .filter(Boolean)
+    .at(-1);
+  if (!stage) return { error: 'stage:判断待ち を戻す列が分からない(問いのコメントに factory:return-stage の印がない)。人が列を付け替えてから実行する' };
+  if (!(stage in STAGE_GATES) || stage === 'stage:判断待ち') return { error: `問いのコメントの印の列「${stage}」は戻せる列ではない` };
+  return { labels: [...labels.filter((l) => l !== 'stage:判断待ち'), stage], restore: stage };
+}
 
 /** 列のラベルとゲートラベルの組み合わせ → 進めてよい工程。ここにない組み合わせは進めない。 */
 const STAGE_TABLE = [
@@ -101,6 +131,16 @@ export function selectStage(labels) {
   const stages = labels.filter((l) => l.startsWith('stage:'));
   if (stages.length !== 1) return { role: null, reason: `列のラベル(stage:…)がちょうど1つでない(${stages.join('、') || 'なし'})` };
   const gates = gatesOf(labels);
+  // 上流のやり直し(#102)。人が redo:<工程> を付けたら、ゲートラベルを外さずにその工程を選ぶ
+  const redos = labels.filter((l) => l.startsWith('redo:'));
+  if (redos.length > 1) return { role: null, reason: `やり直しのラベル(redo:…)が ${redos.length} つある(${redos.join('、')})。1 つにする` };
+  if (redos.length === 1) {
+    const role = redos[0].slice('redo:'.length);
+    if (!REDO_ROLES.includes(role)) return { role: null, reason: `${redos[0]} はやり直せる工程ではない(${REDO_ROLES.map((r) => `redo:${r}`).join('・')})` };
+    const missing = (REQUIRED_GATES[role] ?? []).filter((g) => !gates.includes(g));
+    if (missing.length > 0) return { role: null, reason: `${redos[0]} には ${missing.join('・')} が要る` };
+    return { role, redo: true };
+  }
   const row = STAGE_TABLE.find((r) => r.stage === stages[0] && r.gates.length === gates.length && r.gates.every((g) => gates.includes(g)));
   if (!row) return { role: null, reason: `${stages[0]} とゲートラベル(${gates.join('・') || 'なし'})の組み合わせが表にない` };
   return { role: row.role };

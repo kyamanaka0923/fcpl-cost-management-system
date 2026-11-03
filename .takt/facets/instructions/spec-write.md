@@ -2,15 +2,16 @@
 
 **最初に:**
 - タスクの本文(起動スクリプトが書いた Issue 番号・工程・ブランチ・既存の PR)と、Issue の本文・コメント(`gh issue view <n> --comments`)を読む。`git branch --show-current` が `spec/<n>-…` であることを確かめる。違えば作業せずに止める
-- `gh issue view <n> --json labels` で `stage:着手待ち` と `gate1-approved` があることを確かめる。なければ作業せずに止める
+- `gh issue view <n> --json labels` で `gate1-approved` と、`stage:着手待ち` か `redo:spec`(上流のやり直し)があることを確かめる。なければ作業せずに止める
 - 前提ファイル `.factory/premises/ISSUE-<n>.yml` がなければ作る。Issue が指す要件(`requirements/` の FR・`.feature` のシナリオ)と、その要件が参照する業務ルールを origin/main の中から特定し、`bash tools/factory/premises.sh <n> spec <ファイル>…`。直前の [B] の PR(マージ済み。`gh pr list --state merged --search "<n> in:body"`)の変更ファイルを手がかりにしてよい。スクリプトが「main にないファイル」で失敗したら、そのファイルを外さずに要件の穴として止める。前提にできるファイルが1つも特定できないときも止める
 - 前提のファイルを開く
 
 **どの回かで作業を分ける:**
 - 初回: 承認済みの要件(`requirements/`)と `.feature` のシナリオ、要件が参照する業務ルール、いまの `docs/api/openapi.json` を読み、`specs/rules/SPEC-xxx.md` と、API を変えるなら `specs/api/ISSUE-<n>.openapi.json` を書く
 - 検証の差し戻しのあと(直前の step が spec-review): Report Directory の `spec-review.md` の指摘を1件ずつ直す。直さない指摘は理由をレポートに書く
+- 上流のやり直し(タスクの「上流のやり直し」が「あり」。人が Issue に `redo:spec` を付けた): 下流の工程が止めて出した問いと、人の回答(`gh issue view <n> --comments` の最後の問いと、そのあとの「## 回答」)を読み、回答で決まったことだけを、この工程の成果物に反映する。それ以外は変えない。いまの列のラベルは下流の工程のもの(`stage:実装中` など)のままでよい
 - 続き(タスクの「既存の PR」が番号)の初回: `gh pr view <番号> --comments` と `gh pr checks <番号>` で、PR のレビューの指摘と CI の失敗を読み、この工程の変更が原因のものを1件ずつ直す。CI の失敗は `gh run view <run-id> --log-failed` で原因を見る。この工程の変更と関係のない失敗・対応しない指摘は、変えずにその判断と根拠をレポートに書く
-- 続き(タスクの「既存の PR」が「なし」で、「前の実行のコミット」が 1 件以上)の初回: 人の回答待ちで止めたときの書きかけから再開する。Issue の問いと、そのあとの人の回答(`gh issue view <n> --comments`)を読み、書きかけ(`git log --no-merges origin/main..HEAD` と `git diff "$(git merge-base origin/main HEAD)"`)を回答に合わせて直してから、残りを書き上げる。起動スクリプトが取り込んだ origin/main の変更(回答を受けて直した上流など)も読む。回答で決まらないことが残れば、もう一度要件の穴として止める
+- 続き(タスクの「既存の PR」が「なし」で、「前の実行のコミット」が 1 件以上)の初回: 人の回答待ちで止めたときの書きかけから再開する。Issue の問いと、そのあとの人の回答(`gh issue view <n> --comments` の「## 回答」)を読み、書きかけ(`git log --no-merges origin/main..HEAD` と `git diff "$(git merge-base origin/main HEAD)"`)を回答に合わせて直してから、残りを書き上げる。起動スクリプトが取り込んだ origin/main の変更(回答を受けて直した上流など)も読む。回答で決まらないことが残れば、もう一度要件の穴として止める
 
 **書くとき:**
 - 仕様の形式と置き場は `specs/README.md`・`specs/rules/README.md`・`specs/test-plan.md` に従う(書く前に読む)

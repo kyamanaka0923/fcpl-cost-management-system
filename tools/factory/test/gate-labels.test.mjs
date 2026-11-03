@@ -63,3 +63,45 @@ test('進めてよい工程がないときは理由を返す', async () => {
   assert.match(selectStage(['stage:着手待ち', 'gate0-approved']).reason, /表にない/);
   assert.match(selectStage(['stage:仕様確定', 'gate0-approved', 'gate2-approved']).reason, /表にない/);
 });
+
+const all3 = ['gate0-approved', 'gate1-approved', 'gate2-approved'];
+
+test('redo:<工程> があれば、ゲートラベルを外さずにその工程を選ぶ(上流のやり直し。#102)', async () => {
+  const { selectStage } = await import('../lib/gate-labels.mjs');
+  assert.deepEqual(selectStage(['stage:実装中', ...all3, 'redo:req']), { role: 'req', redo: true });
+  assert.deepEqual(selectStage(['stage:実装中', ...all3, 'redo:spec']), { role: 'spec', redo: true });
+  assert.deepEqual(selectStage(['stage:準備中', 'gate0-approved', 'redo:knowledge']), { role: 'knowledge', redo: true });
+});
+
+test('redo:<工程> が使えないときは理由を返す', async () => {
+  const { selectStage } = await import('../lib/gate-labels.mjs');
+  assert.match(selectStage(['stage:実装中', ...all3, 'redo:req', 'redo:spec']).reason, /2 つある/);
+  assert.match(selectStage(['stage:実装中', ...all3, 'redo:impl']).reason, /やり直せる工程ではない/);
+  assert.match(selectStage(['stage:準備中', 'redo:req']).reason, /gate0-approved が要る/);
+  assert.match(selectStage(['stage:判断待ち', ...all3, 'needs-answer', 'redo:req']).reason, /回答待ち/, '回答待ちの間は redo でも進めない');
+});
+
+test('ラベルの検査: redo:<工程> は 1 つだけ、やり直せる工程だけ', () => {
+  assert.deepEqual(checkIssueLabels(46, ['stage:実装中', ...all3, 'redo:req'], merged), []);
+  assert.match(checkIssueLabels(46, ['stage:実装中', ...all3, 'redo:req', 'redo:spec'], merged)[0], /redo:…\)が 2 つ付いている/);
+  assert.match(checkIssueLabels(46, ['stage:実装中', ...all3, 'redo:impl'], merged)[0], /redo:impl はやり直せる工程ではない/);
+});
+
+test('回答のあと(needs-answer を外した)は、問いのコメントの印の列に戻す(#102)', async () => {
+  const { labelsAfterAnswer } = await import('../lib/gate-labels.mjs');
+  const q = (stage) => `## [D] 実装を止めました\n<!-- factory:return-stage=${stage} -->\n問い…`;
+  const labels = ['enhancement', 'stage:判断待ち', ...all3];
+  assert.deepEqual(labelsAfterAnswer(labels, [q('stage:着手待ち'), '回答', q('stage:実装中'), '## 回答\n1. C']), {
+    labels: ['enhancement', ...all3, 'stage:実装中'],
+    restore: 'stage:実装中',
+  });
+});
+
+test('回答のあとの戻し: 回答待ち・判断待ちでないときは変えず、印がない・戻せない列なら止める', async () => {
+  const { labelsAfterAnswer } = await import('../lib/gate-labels.mjs');
+  const waiting = ['stage:判断待ち', 'needs-answer', ...all3];
+  assert.deepEqual(labelsAfterAnswer(waiting, []), { labels: waiting, restore: null });
+  assert.deepEqual(labelsAfterAnswer(['stage:実装中', ...all3], []), { labels: ['stage:実装中', ...all3], restore: null });
+  assert.match(labelsAfterAnswer(['stage:判断待ち', ...all3], ['回答']).error, /印がない/);
+  assert.match(labelsAfterAnswer(['stage:判断待ち', ...all3], ['<!-- factory:return-stage=stage:完了 -->']).error, /戻せる列ではない/);
+});
