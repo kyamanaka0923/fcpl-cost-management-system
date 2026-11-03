@@ -20,7 +20,8 @@
         { "id": "77777777-7777-4777-8777-000000000002", "category": "Revenue", "projectId": "66666666-6666-4666-8666-666666666666", "elementCode": null, "periodDetail": null, "amount": 500000, "isMonthly": false, "monthlyAmounts": {} },
         { "id": "77777777-7777-4777-8777-000000000003", "category": "Processing", "projectId": "55555555-5555-4555-8555-555555555555", "elementCode": null, "periodDetail": null, "amount": 300000, "isMonthly": false, "monthlyAmounts": {} },
         { "id": "77777777-7777-4777-8777-000000000004", "category": "PeriodCost", "projectId": null, "elementCode": "PERSONNEL", "periodDetail": null, "amount": 200000, "isMonthly": false, "monthlyAmounts": {} }
-      ]
+      ],
+      "updateNumber": 5
     }
   },
   "GET /api/departments/{id}/projects": {
