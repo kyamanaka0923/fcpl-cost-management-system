@@ -52,6 +52,7 @@ wanted=(
   "要件とシナリオの網羅"
   "ナレッジの出どころと確定"
   "画面要件と fixtures"
+  "仕様の API と OpenAPI(api-spec)"
   "画面の差分(承認した画面との比較)"
   "工程の持ち場(role-guard)"
   "ゲートラベルの確認(gate-check)"
