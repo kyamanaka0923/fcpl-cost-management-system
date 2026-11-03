@@ -19,7 +19,7 @@
 
 - API の型は OpenAPI から生成する。DTO・エンドポイントを変えたら `cd backend && UPDATE_OPENAPI=1 dotnet test --filter OpenApi`(`docs/api/openapi.json` を更新)→ `cd frontend && npm run gen:api`(`src/api-schema.d.ts` を再生成)
 - 作成系(201)・204 のエンドポイントは `.Produces<T>()` で応答型を明示する
-- [C] の仕様で手で書いた `docs/api/openapi.json` の差分は、[D] で実装から再生成したものと一致させる
+- [C] は `docs/api/openapi.json` を変えず、API の変更を `specs/api/ISSUE-<n>.openapi.json` に書く。[D] は実装から作り直した `docs/api/openapi.json` を、`node tools/factory/cli.mjs api-spec` で仕様と突き合わせる(CI「仕様の API と OpenAPI(api-spec)」も同じ。#98)
 - DTO は camelCase JSON(ASP.NET Core の既定)。数値は JSON の数値のみ受け付ける(`NumberHandling.Strict`)
 - Dapper: decimal・Guid・DateTime は `SqliteConnectionFactory` の型ハンドラで TEXT 往復。金額カラムは TEXT
 - 明細の `project_id` / `element_code` は区分により排他。未使用側は DB では `''` として保存し、読み出しで null に読み替える(SQLite の UNIQUE 制約で NULL が重複できてしまう問題の回避を兼ねる)

@@ -1,7 +1,9 @@
 # 人に渡して止める(どの工程でも共通): ナレッジが未確定・要件の穴を、stage:判断待ち + needs-answer と問いのコメントで知らせる。
+# 書きかけはコミットしてブランチをプッシュする(PR は作らない)。次の実行が続きから再開できるように(#98)。
 name: escalate
-capabilities: readonly
+capabilities: edit
 edit: true
+allow_git_commit: true
 persona: factory-operator
 session: refresh
 policy: factory-rules

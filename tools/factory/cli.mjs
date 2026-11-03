@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // 工場のゲートの検査(ADR-0015 フェーズ4)。リポジトリ直下で実行する。
 //   node tools/factory/cli.mjs <検査名>
-// 検査名: ears | ambiguity | coverage | knowledge | screens | role | gate | premises | factory-version | closing | changes
+// 検査名: ears | ambiguity | coverage | knowledge | screens | api-spec | role | gate | premises | factory-version | closing | changes
+// screens と api-spec は、FACTORY_BRANCH(なければいまのブランチ)が spec/<n>-… か impl/<n>-… なら、仕様の API(specs/api/ISSUE-<n>.openapi.json)も使う(#98)。
 // changes は、工場の変更の記録(.factory/changes/)を確かめて、一覧の表を出す(#66)。
 // PR の検査(role・gate・premises・factory-version)は、次の環境変数を使う(.github/workflows/factory.yml が渡す)。
 //   FACTORY_BRANCH  PR のブランチ名。空なら PR ではない(main への push)ので何もしない
@@ -14,9 +15,11 @@ import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   isRequirementFile,
+  issue,
   loadAmbiguityWords,
   loadBusinessRules,
   loadRequirements,
+  parseBranch,
   parseSourceIds,
   read,
   walk,
@@ -31,6 +34,7 @@ import { changesMarkdown } from './lib/changes.mjs';
 import { checkPremises } from './checks/premises.mjs';
 import { checkScreens } from './checks/screens.mjs';
 import { checkClosingKeywords } from './checks/closing.mjs';
+import { apiSpecFile, applyApiSpec, checkApiSpecImplemented, checkApiSpecShape } from './checks/api-spec.mjs';
 
 const root = process.cwd();
 const env = process.env;
@@ -82,6 +86,29 @@ function issueLabels(n) {
   }
 }
 
+/** 検査するブランチ。CI は FACTORY_BRANCH、手元ではいまのブランチ。 */
+function branchName() {
+  if (env.FACTORY_BRANCH) return env.FACTORY_BRANCH;
+  try {
+    return git('branch', '--show-current');
+  } catch {
+    return '';
+  }
+}
+
+/** このブランチの Issue の仕様の API。{ role, file, spec }。ファイルがなければ spec は null、読めなければ error。 */
+function loadApiSpec() {
+  const b = parseBranch(branchName());
+  if (!b || !['spec', 'impl'].includes(b.role)) return null;
+  const file = apiSpecFile(b.issue);
+  if (!existsSync(join(root, file))) return { role: b.role, file, spec: null };
+  try {
+    return { role: b.role, file, spec: JSON.parse(read(root, file)) };
+  } catch (e) {
+    return { role: b.role, file, spec: null, error: issue(file, 0, `JSON として読めない: ${e.message}`) };
+  }
+}
+
 const featureFiles = () => walk(root, 'tests', (f) => f.endsWith('.feature')).map((file) => ({ file, parsed: parseFeature(read(root, file)) }));
 
 /** 検査ごとの中身。指摘の配列と、実行サマリに足す Markdown を返す。 */
@@ -120,9 +147,26 @@ const CHECKS = {
     const migrated = loadRequirements(root);
     const legacy = read(root, 'docs/REQUIREMENTS.md');
     const exists = (id) => migrated.has(id) || legacy.includes(`| ${id} |`);
-    const openapi = JSON.parse(read(root, 'docs/api/openapi.json'));
+    let openapi = JSON.parse(read(root, 'docs/api/openapi.json'));
+    // [C] は docs/api/openapi.json を変えないので、仕様の API を当てたもので fixtures を確かめる(#98)
+    const api = loadApiSpec();
+    if (api?.error) return { errors: [api.error] };
+    if (api?.role === 'spec' && api.spec) {
+      const shape = checkApiSpecShape(api.file, api.spec, openapi);
+      if (shape.length > 0) return { errors: shape };
+      openapi = applyApiSpec(openapi, api.spec);
+    }
     const fixtures = walk(root, 'requirements/screens/fixtures', (f) => f.endsWith('.json'));
     return { errors: checkScreens(readOrNull('requirements/screens/screens.yaml'), readOrNull, fixtures, openapi, exists) };
+  },
+
+  'api-spec': () => {
+    const api = loadApiSpec();
+    if (!api?.spec) return { errors: api?.error ? [api.error] : [], summary: api ? `仕様の API ${api.file} はない` : '' };
+    const openapi = JSON.parse(read(root, 'docs/api/openapi.json'));
+    return {
+      errors: api.role === 'spec' ? checkApiSpecShape(api.file, api.spec, openapi) : checkApiSpecImplemented(api.file, api.spec, openapi),
+    };
   },
 
   role: () => ({ errors: checkRole(env.FACTORY_BRANCH, changedFiles()), pr: true }),

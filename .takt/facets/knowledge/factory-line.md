@@ -23,15 +23,15 @@ tools/factory/takt.sh <Issue番号> [knowledge|req|spec|impl] [claude|codex|copi
 起動スクリプトが決まった手順(AI に判断させない)を済ませてから、工程の workflow を呼ぶ。
 
 1. ラベルから工程を選ぶ(工程を渡したときは、選んだ工程と同じかを確かめる)。下の判定表に当たらなければ何もしない
-2. ブランチを用意する。リモートに `<種類>/<n>-*` があれば、それに切り替えて「続き」にする。なければ `<種類>/<n>-takt` を origin/main から切る
+2. ブランチを用意する。リモートに `<種類>/<n>-*` があれば、それに切り替えて「続き」にし、origin/main が進んでいれば取り込む(衝突したら止める)。なければ `<種類>/<n>-takt` を origin/main から切る
 3. [D] の着手(`stage:仕様確定`)なら、列を `stage:実装中` にする
-4. `tools/factory/guard/bin`(ゲートを破る操作を止める `gh`・`git` の包み)を PATH の先頭に置き、workflow を呼ぶ。タスクの本文に Issue 番号・工程・ブランチ・既存の PR を書く
+4. `tools/factory/guard/bin`(ゲートを破る操作を止める `gh`・`git` の包み)を PATH の先頭に置き、workflow を呼ぶ。タスクの本文に Issue 番号・工程・ブランチ・既存の PR・前の実行のコミットの件数を書く
 
 各工程の workflow は一本道: 書く ⇄ 検証(差し戻しは3回まで)→ publish(Draft PR)→ 終わり。CI は待たない。
 
 - CI が落ちた、PR に指摘が付いた → 人が同じコマンドをもう一度実行する。書く step が「続き」として PR の指摘と CI の失敗を直し、publish が push する
 - 検証の差し戻しが上限に達した → 止めずに、残った指摘を添えて Draft PR を出す(タイトルに「⚠️ 未解決の指摘あり」)。扱いは人のゲートが決める
-- 人の回答が要る(ナレッジが未確定・要件の穴)→ escalate が `stage:判断待ち` + `needs-answer` を付けて問いをコメントし、終わる
+- 人の回答が要る(ナレッジが未確定・要件の穴)→ escalate が書きかけを「[書きかけ]」としてコミットしてブランチをプッシュし(PR は作らない)、`stage:判断待ち` + `needs-answer` を付けて問いをコメントし、終わる。回答のあとに同じコマンドを実行すると、書く step がその書きかけと回答から続ける
 
 ## 進めてよい工程の判定表
 
@@ -78,7 +78,7 @@ gh issue edit <n> --remove-label stage:着手待ち --add-label stage:判断待�
 |---|---|---|
 | [A] ナレッジ | `knowledge/`(用語・業務ルール・未確定事項・出どころ) | `knowledge/<Issue番号>-<名前>`(takt は `<名前>` を `takt` にする) |
 | [B] 要件・画面 | `requirements/`(EARS)、`.feature` の `ルール:` と `@FR-x.y`、`requirements/screens/` | `req/<n>-<名前>` |
-| [C] 仕様 | `specs/`、`docs/api/openapi.json`、テスト計画 | `spec/<n>-<名前>` |
+| [C] 仕様 | `specs/`(API の変更は `specs/api/ISSUE-<n>.openapi.json`)、テスト計画 | `spec/<n>-<名前>` |
 | [D] 実装 | `backend/`、`frontend/`、`tests/` | `impl/<n>-<名前>` |
 
 - `<名前>` は英小文字・数字・ハイフンの短い語(takt の起動スクリプトは `takt`)。ブランチは `origin/main` から切る
@@ -89,7 +89,7 @@ gh issue edit <n> --remove-label stage:着手待ち --add-label stage:判断待�
 |---|---|---|
 | `knowledge/` | `knowledge/` | なし |
 | `req/` | `requirements/`、`docs/REQUIREMENTS.md`、`knowledge/open-questions.md`、`tests/**/*.feature` | なし |
-| `spec/` | `specs/`、`docs/api/openapi.json`、`.factory/premises/` | なし |
+| `spec/` | `specs/`、`.factory/premises/` | なし |
 | `impl/` | `backend/`、`frontend/`、`tests/`、`docs/`、`infra/`、`docker/`、`docker-compose.yml`、`README.md`、`.factory/premises/` | `docs/REQUIREMENTS.md`、`docs/adr/` |
 
 - 着手に要るゲートラベル(CI の gate-check が検査する): `req/` は `gate0-approved`、`spec/` は `gate1-approved`、`impl/` は `gate2-approved`

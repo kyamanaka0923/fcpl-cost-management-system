@@ -4,10 +4,10 @@
 #   工程を省くと、Issue のラベルから選ぶ(tools/factory/lib/gate-labels.mjs の selectStage)。
 #   エージェントを省くと、環境変数 FACTORY_AGENT、それもなければ claude。
 #   例: tools/factory/takt.sh 45          tools/factory/takt.sh 45 spec codex
-# 同じコマンドをもう一度実行すると、既存のブランチ・PR の「続き」になる(CI の失敗・PR の指摘を直す)。
+# 同じコマンドをもう一度実行すると、既存のブランチ・PR の「続き」になる(CI の失敗・PR の指摘を直す。判断待ちで止めた書きかけから再開する)。
 #
 # ここでするのは、決まった手順だけ(AI に判断させない):
-#   1. ラベルから工程を選ぶ・確かめる   2. ブランチを用意する(<種類>/<番号>-takt。続きは既存の <種類>/<番号>-*)
+#   1. ラベルから工程を選ぶ・確かめる   2. ブランチを用意する(<種類>/<番号>-takt。続きは既存の <種類>/<番号>-* に origin/main を取り込む)
 #   3. [D] の着手なら列を stage:仕様確定 → stage:実装中 にする   4. ガードを PATH の先頭に置いて takt を動かす
 set -euo pipefail
 
@@ -64,6 +64,12 @@ if [ ${#remote[@]} -eq 1 ]; then
     git switch -q -c "$branch" --track "origin/$branch"
   fi
   say "続き: 既存のブランチ $branch"
+  # 判断待ちの回答で上流(要件・仕様)が変わっていることがあるので、main の最新を取り込む(#98)
+  if ! git merge-base --is-ancestor origin/main HEAD; then
+    git merge -q --no-edit -m "origin/main を取り込む(工場の続きの起点をそろえる)" origin/main \
+      || { git merge --abort; fail "$branch に origin/main を取り込むと衝突する。人が解いてから実行する"; }
+    say "続き: origin/main を取り込んだ"
+  fi
 else
   branch="$ROLE/$issue-takt"
   if git show-ref -q --verify "refs/heads/$branch"; then
@@ -76,6 +82,7 @@ else
   say "着手: $branch を origin/main から作った"
 fi
 pr="$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')"
+drafts="$(git rev-list --count --no-merges origin/main..HEAD)"
 
 # 3. [D] の着手なら列を付け替える(外すものと付けるものを1つのコマンドで)
 if [ "$ROLE" = impl ] && [ "$STAGE_LABEL" = "stage:仕様確定" ]; then
@@ -88,6 +95,7 @@ task="#$issue
 - 工程: $STAGE_NAME($ROLE)
 - ブランチ: $branch
 - 既存の PR: ${pr:+#$pr}${pr:-なし}
+- 前の実行のコミット: ${drafts} 件
 - エージェント: $agent"
 # --skip-git: ブランチ・コミット・PR は workflow が自分で扱う。takt の worktree は origin を外すので使わない
 exec takt --pipeline --skip-git -w "$WORKFLOW" --runtime-assignment "$agent" -t "$task" "$@"
