@@ -6,6 +6,7 @@
 **どの回かで作業を分ける:**
 - 初回: Issue の本文とコメント、`docs/REQUIREMENTS.md`、`docs/requests/`、`docs/adr/`、既存の `knowledge/` を読み、用語・業務ルール・未確定事項・出どころを書く
 - 検証の差し戻しのあと(直前の step が knowledge-review): Report Directory の `knowledge-review.md` の指摘を1件ずつ直す。直さない指摘は理由をレポートに書く
+- 上流のやり直し(タスクの「上流のやり直し」が「あり」。人が Issue に `redo:knowledge` を付けた): 下流の工程が止めて出した問いと、人の回答(`gh issue view <n> --comments` の最後の問いと、そのあとの「## 回答」)を読み、回答で決まったことだけを、この工程の成果物に反映する。それ以外は変えない。いまの列のラベルは下流の工程のもの(`stage:実装中` など)のままでよい
 - 続き(タスクの「既存の PR」が番号)の初回: `gh pr view <番号> --comments` と `gh pr checks <番号>` で、PR のレビューの指摘と CI の失敗を読み、この工程の変更が原因のものを1件ずつ直す。CI の失敗は `gh run view <run-id> --log-failed` で原因を見る。この工程の変更と関係のない失敗・対応しない指摘は、変えずにその判断と根拠をレポートに書く
 
 **書くとき:**

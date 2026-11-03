@@ -8,7 +8,7 @@
 #
 # ここでするのは、決まった手順だけ(AI に判断させない):
 #   1. ラベルから工程を選ぶ・確かめる   2. ブランチを用意する(<種類>/<番号>-takt。続きは既存の <種類>/<番号>-* に origin/main を取り込む)
-#   3. [D] の着手なら列を stage:仕様確定 → stage:実装中 にする   4. ガードを PATH の先頭に置いて takt を動かす
+#   3. 回答のあとなら列を stage:判断待ち から戻す。[D] の着手なら列を stage:仕様確定 → stage:実装中 にする   4. ガードを PATH の先頭に置いて takt を動かす
 #   5. takt が異常終了したら(利用上限・エラー・Ctrl+C)、持ち場の中の書きかけをコミットしてブランチを push する(#101)
 set -euo pipefail
 
@@ -50,7 +50,7 @@ git remote get-url origin >/dev/null 2>&1 || fail "origin がない。リポジ�
 # 1. 工程を選ぶ・確かめる
 picked="$(node tools/factory/line-cli.mjs "$issue" ${role:+"$role"})" || exit 1
 eval "$picked"
-say "Issue #$issue: $STAGE_NAME を進める(workflow $WORKFLOW、エージェント $agent)"
+say "Issue #$issue: $STAGE_NAME を進める(workflow $WORKFLOW、エージェント $agent)${REDO:+。redo:$ROLE による上流のやり直し}"
 
 # 2. ブランチを用意する
 git fetch -q origin
@@ -85,7 +85,13 @@ fi
 pr="$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')"
 drafts="$(git rev-list --count --no-merges origin/main..HEAD)"
 
-# 3. [D] の着手なら列を付け替える(外すものと付けるものを1つのコマンドで)
+# 3. 列を付け替える(外すものと付けるものを1つのコマンドで)
+# 人が回答して needs-answer を外したら、stage:判断待ち を escalate が記録した列に戻す(#102)
+if [ -n "$RESTORE_STAGE" ]; then
+  gh issue edit "$issue" --remove-label "stage:判断待ち" --add-label "$RESTORE_STAGE" >/dev/null
+  say "列: stage:判断待ち → $RESTORE_STAGE(回答のあとの戻し)"
+fi
+# [D] の着手なら stage:仕様確定 → stage:実装中
 if [ "$ROLE" = impl ] && [ "$STAGE_LABEL" = "stage:仕様確定" ]; then
   gh issue edit "$issue" --remove-label "stage:仕様確定" --add-label "stage:実装中" >/dev/null
   say "列: stage:仕様確定 → stage:実装中"
@@ -97,6 +103,7 @@ task="#$issue
 - ブランチ: $branch
 - 既存の PR: ${pr:+#$pr}${pr:-なし}
 - 前の実行のコミット: ${drafts} 件
+- 上流のやり直し: ${REDO:+あり(Issue の redo:$ROLE。回答で決まったことを直す)}${REDO:-なし}
 - エージェント: $agent"
 # --skip-git: ブランチ・コミット・PR は workflow が自分で扱う。takt の worktree は origin を外すので使わない
 # exec にしない: takt の終わり方を見て、異常終了なら書きかけを残す(5.)
