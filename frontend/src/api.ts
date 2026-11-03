@@ -105,6 +105,30 @@ type RecordActualBody = Override<
   { category: BudgetCategory }
 >
 
+/** API のエラー応答(本文の `error` をメッセージに、HTTP ステータスを `status` に持つ)。 */
+export class ApiError extends Error {
+  /** HTTP ステータス(400・404・409 など)。 */
+  readonly status: number
+
+  /** メッセージと HTTP ステータスで作る。 */
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+/**
+ * 予算への保存が衝突として拒否されたか(409。BR-BUD-008)。
+ * 画面が読んだあとに、その予算へほかの保存が受け付けられていた。画面は予算を読み込み直す。
+ */
+export const isConflict = (err: unknown): boolean => err instanceof ApiError && err.status === 409
+
+/** 予算への保存に付けるクエリ `updateNumber`(画面が読んだ時点の更新番号)。 */
+const withUpdateNumber = (path: string, updateNumber: number): string =>
+  `${path}${path.includes('?') ? '&' : '?'}updateNumber=${updateNumber}`
+
+/** API を呼ぶ。エラー応答は {@link ApiError} として投げる。 */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (authEnabled) {
@@ -125,7 +149,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       // JSON でないエラー応答はステータス行をそのまま使う
     }
-    throw new Error(message)
+    throw new ApiError(message, res.status)
   }
   if (res.status === 204) return undefined as T
   return (await res.json()) as T
@@ -192,13 +216,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  upsertBudgetLine: (budgetId: string, body: UpsertBudgetLineBody) =>
-    request<BudgetDetail>(`/budgets/${budgetId}/lines`, {
+  // 予算への保存(明細の保存・削除・明細名の変更・承認)は、画面が読んだ時点の更新番号 updateNumber を送る。
+  // ほかの保存が先に受け付けられていたら 409(isConflict)。
+  /** 明細を保存する。 */
+  upsertBudgetLine: (budgetId: string, updateNumber: number, body: UpsertBudgetLineBody) =>
+    request<BudgetDetail>(withUpdateNumber(`/budgets/${budgetId}/lines`, updateNumber), {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+  /** 明細を削除する。 */
   removeBudgetLine: (
     budgetId: string,
+    updateNumber: number,
     category: BudgetCategory,
     projectId: string | null,
     elementCode: string | null,
@@ -208,16 +237,24 @@ export const api = {
     if (projectId) params.set('projectId', projectId)
     if (elementCode) params.set('elementCode', elementCode)
     if (periodDetail) params.set('periodDetail', periodDetail)
+    params.set('updateNumber', String(updateNumber))
     return request<BudgetDetail>(`/budgets/${budgetId}/lines?${params}`, { method: 'DELETE' })
   },
   /** 期間費用の明細名を変更する(金額・月次は保持)。 */
-  renamePeriodDetail: (budgetId: string, body: Schemas['RenamePeriodDetailRequest']) =>
-    request<BudgetDetail>(`/budgets/${budgetId}/rename-period-detail`, {
+  renamePeriodDetail: (
+    budgetId: string,
+    updateNumber: number,
+    body: Schemas['RenamePeriodDetailRequest'],
+  ) =>
+    request<BudgetDetail>(
+      withUpdateNumber(`/budgets/${budgetId}/rename-period-detail`, updateNumber),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** 予算を承認する。 */
+  approveBudget: (budgetId: string, updateNumber: number) =>
+    request<BudgetDetail>(withUpdateNumber(`/budgets/${budgetId}/approve`, updateNumber), {
       method: 'POST',
-      body: JSON.stringify(body),
     }),
-  approveBudget: (budgetId: string) =>
-    request<BudgetDetail>(`/budgets/${budgetId}/approve`, { method: 'POST' }),
 
   // ---- 実績 ----
   listActuals: (departmentId: string, fiscalHalf: string) =>

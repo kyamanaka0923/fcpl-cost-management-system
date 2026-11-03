@@ -95,9 +95,9 @@ internal static class ドメイン生成器
                 foreach (var (category, project, amount, monthly, months) in projectLines)
                 {
                     if (monthly)
-                        budget.UpsertProjectLineMonthly(category, project, ToMoney(months));
+                        budget.UpsertProjectLineMonthly(budget.UpdateNumber, category, project, ToMoney(months));
                     else
-                        budget.UpsertProjectLine(category, project, new Money(amount));
+                        budget.UpsertProjectLine(budget.UpdateNumber, category, project, new Money(amount));
                 }
                 // 費目ごとに最初に現れた明細名の有無でモードを固定し、混在を避ける。
                 var modeByElement = new Dictionary<CostElementCode, bool>();
@@ -108,9 +108,9 @@ internal static class ドメイン生成器
                         continue;
                     modeByElement[element] = hasDetail;
                     if (monthly)
-                        budget.UpsertPeriodCostLineMonthly(element, ToMoney(months), detail);
+                        budget.UpsertPeriodCostLineMonthly(budget.UpdateNumber, element, ToMoney(months), detail);
                     else
-                        budget.UpsertPeriodCostLine(element, new Money(amount), detail);
+                        budget.UpsertPeriodCostLine(budget.UpdateNumber, element, new Money(amount), detail);
                 }
                 return budget;
             });
@@ -119,7 +119,7 @@ internal static class ドメイン生成器
     public static readonly Gen<DepartmentBudget> 承認済み課予算 =
         課予算.Where(b => b.Lines.Count > 0).Select(b =>
         {
-            b.Approve(現在時刻);
+            b.Approve(b.UpdateNumber, 現在時刻);
             return b;
         });
 

@@ -8,6 +8,7 @@ import {
   formatPercent,
   formatYen,
   halfLabel,
+  isConflict,
   marginRate,
   type BudgetStatus,
   type BudgetSummary,
@@ -76,13 +77,16 @@ function BudgetVersionsCard({
     }
   }
 
-  const approve = async (budgetId: string) => {
+  // 承認には、一覧で読んだその行の更新番号を送る(BR-BUD-008)。
+  // 衝突(409)なら、メッセージを出して一覧(と各行の更新番号)を読み込み直す(FR-4.18・FR-4.19)。
+  const approve = async (budget: BudgetSummary) => {
     onError(null)
     try {
-      await api.approveBudget(budgetId)
+      await api.approveBudget(budget.id, budget.updateNumber)
       onChanged()
     } catch (err) {
       onError((err as Error).message)
+      if (isConflict(err)) onChanged()
     }
   }
 
@@ -134,7 +138,7 @@ function BudgetVersionsCard({
                 </td>
                 <td>
                   {b.status === 'Draft' && (
-                    <button onClick={() => approve(b.id)} className="primary">
+                    <button onClick={() => approve(b)} className="primary">
                       承認
                     </button>
                   )}

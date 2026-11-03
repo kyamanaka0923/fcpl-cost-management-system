@@ -25,7 +25,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
 
     /// <summary>department_budgets(ヘッダ)テーブルの1行に対応する DTO。</summary>
     private sealed record BudgetRow(Guid Id, Guid DepartmentId, string FiscalHalf, long Version,
-        string Label, string Status, DateTime CreatedAt, DateTime? ApprovedAt);
+        string Label, string Status, DateTime CreatedAt, DateTime? ApprovedAt, long UpdateNumber);
 
     /// <summary>department_budget_lines(明細)テーブルの1行に対応する DTO。</summary>
     private sealed record LineRow(Guid Id, Guid BudgetId, string Category, string ProjectId,
@@ -38,7 +38,8 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
     private const string SelectBudgetSql = """
         SELECT id AS Id, department_id AS DepartmentId, fiscal_half AS FiscalHalf,
                version AS Version, label AS Label, status AS Status,
-               created_at AS CreatedAt, approved_at AS ApprovedAt
+               created_at AS CreatedAt, approved_at AS ApprovedAt,
+               update_number AS UpdateNumber
         FROM department_budgets
         """;
 
@@ -177,8 +178,10 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
         using var tx = conn.BeginTransaction();
         await conn.ExecuteAsync("""
             INSERT INTO department_budgets
-                (id, department_id, fiscal_half, version, label, status, created_at, approved_at)
-            VALUES (@Id, @DepartmentId, @FiscalHalf, @Version, @Label, @Status, @CreatedAt, @ApprovedAt)
+                (id, department_id, fiscal_half, version, label, status, created_at, approved_at,
+                 update_number)
+            VALUES (@Id, @DepartmentId, @FiscalHalf, @Version, @Label, @Status, @CreatedAt, @ApprovedAt,
+                    @UpdateNumber)
             """, new
         {
             Id = budget.Id.Value,
@@ -189,32 +192,70 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
             Status = budget.Status.ToString(),
             budget.CreatedAt,
             budget.ApprovedAt,
+            budget.UpdateNumber,
         }, tx);
         await InsertLinesAsync(conn, tx, budget);
         tx.Commit();
     }
 
     /// <inheritdoc />
-    public async Task UpdateAsync(DepartmentBudget budget, CancellationToken ct = default)
+    public async Task UpdateAsync(DepartmentBudget budget, int expectedUpdateNumber,
+        CancellationToken ct = default)
     {
         using var conn = _factory.Create();
         using var tx = conn.BeginTransaction();
-        await conn.ExecuteAsync("""
+        await SaveAsync(conn, tx, budget, expectedUpdateNumber);
+        tx.Commit();
+    }
+
+    /// <inheritdoc />
+    public async Task ApproveAsync(DepartmentBudget approved, int expectedUpdateNumber,
+        IReadOnlyCollection<DepartmentBudget> superseded, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        using var tx = conn.BeginTransaction();
+        // The conditional write of the approved budget comes first: on conflict it throws and the
+        // transaction is rolled back (disposed without commit), so no older version is superseded.
+        await SaveAsync(conn, tx, approved, expectedUpdateNumber);
+        foreach (var old in superseded)
+        {
+            // Superseding is not a save (SPEC-004), so update_number of the older version is kept.
+            await conn.ExecuteAsync(
+                "UPDATE department_budgets SET status = @Status WHERE id = @Id",
+                new { Id = old.Id.Value, Status = old.Status.ToString() }, tx);
+        }
+        tx.Commit();
+    }
+
+    /// <summary>
+    /// Writes the header (only when the stored update_number equals expectedUpdateNumber) and
+    /// replaces all lines. Throws <see cref="BudgetConflictException"/> when no header row matched,
+    /// i.e. another save was accepted between the read and this write (SPEC-004).
+    /// </summary>
+    private static async Task SaveAsync(SqliteConnection conn, SqliteTransaction tx,
+        DepartmentBudget budget, int expectedUpdateNumber)
+    {
+        var updated = await conn.ExecuteAsync("""
             UPDATE department_budgets
-            SET label = @Label, status = @Status, approved_at = @ApprovedAt
-            WHERE id = @Id
+            SET label = @Label, status = @Status, approved_at = @ApprovedAt,
+                update_number = @UpdateNumber
+            WHERE id = @Id AND update_number = @Expected
             """, new
         {
             Id = budget.Id.Value,
             budget.Label,
             Status = budget.Status.ToString(),
             budget.ApprovedAt,
+            budget.UpdateNumber,
+            Expected = expectedUpdateNumber,
         }, tx);
-        // 明細は洗い替え(集約単位での置き換え)。月別金額は FK の ON DELETE CASCADE で一緒に消える。
+        if (updated == 0)
+            throw new BudgetConflictException();
+        // Lines are replaced as a whole (aggregate-level write). Monthly amounts go with them via
+        // ON DELETE CASCADE.
         await conn.ExecuteAsync("DELETE FROM department_budget_lines WHERE budget_id = @Id",
             new { Id = budget.Id.Value }, tx);
         await InsertLinesAsync(conn, tx, budget);
-        tx.Commit();
     }
 
     /// <summary>予算IDに紐づく明細の月別金額を、明細IDでルックアップできる形で取得する。</summary>
@@ -269,7 +310,7 @@ public sealed class DepartmentBudgetRepository : IDepartmentBudgetRepository
         ILookup<Guid, MonthRow> monthsByLine) =>
         DepartmentBudget.Restore(budget.Id, budget.DepartmentId, budget.FiscalHalf,
             (int)budget.Version, budget.Label, Enum.Parse<BudgetStatus>(budget.Status),
-            budget.CreatedAt, budget.ApprovedAt,
+            budget.CreatedAt, budget.ApprovedAt, (int)budget.UpdateNumber,
             lines.Select(l => (l.Id, l.Category,
                 l.ProjectId == "" ? (Guid?)null : Guid.Parse(l.ProjectId),
                 l.ElementCode == "" ? null : l.ElementCode,

@@ -45,7 +45,10 @@ describe('予算編集画面: 案件別の金額セル', () => {
 
     await waitFor(() => expect(タイル('売上高')).toHaveTextContent('¥0'))
     expect(fake.writes).toEqual([
-      expect.objectContaining({ method: 'DELETE', query: '?category=Revenue&projectId=pa' }),
+      expect.objectContaining({
+        method: 'DELETE',
+        query: '?category=Revenue&projectId=pa&updateNumber=1',
+      }),
     ])
   })
 })

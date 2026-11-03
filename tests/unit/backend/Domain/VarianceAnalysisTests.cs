@@ -24,11 +24,11 @@ public class VarianceAnalysisTests
         foreach (var (category, project, element, amount) in lines)
         {
             if (project is { } pid)
-                budget.UpsertProjectLine(category, pid, new Money(amount));
+                budget.UpsertProjectLine(budget.UpdateNumber, category, pid, new Money(amount));
             else
-                budget.UpsertPeriodCostLine(element!.Value, new Money(amount));
+                budget.UpsertPeriodCostLine(budget.UpdateNumber, element!.Value, new Money(amount));
         }
-        budget.Approve(Now);
+        budget.Approve(budget.UpdateNumber, Now);
         return budget;
     }
 
@@ -143,12 +143,12 @@ public class BudgetComparisonTests
     public void バージョン間の増減を区分ごとに算出できる()
     {
         var v1 = DepartmentBudget.CreateInitial(Dept, Half, "当初予算", Now);
-        v1.UpsertProjectLine(BudgetCategory.Revenue, ProjectA, new Money(3_000_000m));
-        v1.UpsertPeriodCostLine(Personnel, new Money(1_000_000m));
-        v1.Approve(Now);
+        v1.UpsertProjectLine(v1.UpdateNumber, BudgetCategory.Revenue, ProjectA, new Money(3_000_000m));
+        v1.UpsertPeriodCostLine(v1.UpdateNumber, Personnel, new Money(1_000_000m));
+        v1.Approve(v1.UpdateNumber, Now);
 
         var v2 = DepartmentBudget.ReviseFrom(v1, 2, "見直し", Now);
-        v2.UpsertProjectLine(BudgetCategory.Revenue, ProjectA, new Money(3_500_000m));
+        v2.UpsertProjectLine(v2.UpdateNumber, BudgetCategory.Revenue, ProjectA, new Money(3_500_000m));
 
         var report = Service.Compare(v1, v2);
 

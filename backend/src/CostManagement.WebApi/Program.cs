@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Amazon.Lambda.AspNetCoreServer.Hosting;
 using CostManagement.Application;
 using CostManagement.Application.Common;
+using CostManagement.Domain.Budgeting;
 using CostManagement.Domain.Shared;
 using CostManagement.Infrastructure;
 using CostManagement.Infrastructure.Persistence;
@@ -58,7 +59,7 @@ if (auth.Enabled)
 
 var errorLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(RequestLogging.Category);
 
-// ドメイン例外 → 400, 未検出 → 404 に変換する。
+// ドメイン例外 → 400, 未検出 → 404, 保存の衝突(楽観ロック) → 409 に変換する。
 app.Use(async (context, next) =>
 {
     try
@@ -75,6 +76,12 @@ app.Use(async (context, next) =>
     {
         RequestLogging.ResourceNotFound(errorLogger, ex.Message);
         context.Response.StatusCode = StatusCodes.Status404NotFound;
+        await context.Response.WriteAsJsonAsync(new ErrorResponse(ex.Message));
+    }
+    catch (BudgetConflictException ex)
+    {
+        RequestLogging.SaveConflicted(errorLogger, ex.Message);
+        context.Response.StatusCode = StatusCodes.Status409Conflict;
         await context.Response.WriteAsJsonAsync(new ErrorResponse(ex.Message));
     }
 });
@@ -158,19 +165,27 @@ api.MapPost("/departments/{id:guid}/budgets",
     .Produces<BudgetDetailDto>(StatusCodes.Status201Created);
 api.MapGet("/budgets/{budgetId:guid}",
     (Guid budgetId, DepartmentBudgetService svc, CancellationToken ct) => svc.GetAsync(budgetId, ct));
+// Saves to a budget carry the update number the screen read (query updateNumber, SPEC-004).
+// A mismatch is rejected as a conflict (409), declared only on these four operations.
 api.MapPut("/budgets/{budgetId:guid}/lines",
-    (Guid budgetId, UpsertBudgetLineRequest req, DepartmentBudgetService svc, CancellationToken ct) =>
-        svc.UpsertLineAsync(budgetId, req, ct));
+    (Guid budgetId, int updateNumber, UpsertBudgetLineRequest req, DepartmentBudgetService svc,
+        CancellationToken ct) =>
+        svc.UpsertLineAsync(budgetId, req, updateNumber, ct))
+    .ProducesConflict();
 api.MapDelete("/budgets/{budgetId:guid}/lines",
     (Guid budgetId, string category, Guid? projectId, string? elementCode, string? periodDetail,
-        DepartmentBudgetService svc, CancellationToken ct) =>
-        svc.RemoveLineAsync(budgetId, category, projectId, elementCode, periodDetail, ct));
+        int updateNumber, DepartmentBudgetService svc, CancellationToken ct) =>
+        svc.RemoveLineAsync(budgetId, category, projectId, elementCode, periodDetail, updateNumber, ct))
+    .ProducesConflict();
 api.MapPost("/budgets/{budgetId:guid}/rename-period-detail",
-    (Guid budgetId, RenamePeriodDetailRequest req, DepartmentBudgetService svc, CancellationToken ct) =>
-        svc.RenamePeriodDetailAsync(budgetId, req, ct));
+    (Guid budgetId, int updateNumber, RenamePeriodDetailRequest req, DepartmentBudgetService svc,
+        CancellationToken ct) =>
+        svc.RenamePeriodDetailAsync(budgetId, req, updateNumber, ct))
+    .ProducesConflict();
 api.MapPost("/budgets/{budgetId:guid}/approve",
-    (Guid budgetId, DepartmentBudgetService svc, CancellationToken ct) =>
-        svc.ApproveAsync(budgetId, ct));
+    (Guid budgetId, int updateNumber, DepartmentBudgetService svc, CancellationToken ct) =>
+        svc.ApproveAsync(budgetId, updateNumber, ct))
+    .ProducesConflict();
 
 // ---- 実績 ----
 api.MapGet("/departments/{id:guid}/actuals",

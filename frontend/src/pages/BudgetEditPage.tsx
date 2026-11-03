@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useState, type FormEvent } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   api,
@@ -8,6 +8,7 @@ import {
   formatYen,
   halfLabel,
   halfMonths,
+  isConflict,
   marginRate,
   projectCategories,
   type BudgetCategory,
@@ -80,13 +81,29 @@ export default function BudgetEditPage() {
   const [renameValue, setRenameValue] = useState('')
   const [savingRename, setSavingRename] = useState(false)
 
-  const loadBudget = useCallback(() => {
+  // 画面が持つ更新番号(BR-BUD-008)。予算を読んだ応答か、自分の保存を受け付けた応答の値に置き換える。
+  const updateNumber = useRef(0)
+  // 予算への保存を 1 つずつ送るための待ち行列(前の保存の応答を受け取ってから次を送る。FR-4.20)。
+  const saveQueue = useRef<Promise<unknown>>(Promise.resolve())
+
+  /** 予算の表示と、画面が持つ更新番号を応答の値に置き換える。 */
+  const applyBudget = useCallback((b: BudgetDetail) => {
+    updateNumber.current = b.updateNumber
+    setBudget(b)
+  }, [])
+
+  /** 予算を読み込む(表示と持つ更新番号を置き換える)。 */
+  const reloadBudget = useCallback(async () => {
     if (!budgetId) return
-    api
-      .getBudget(budgetId)
-      .then(setBudget)
-      .catch((e: Error) => setError(e.message))
-  }, [budgetId])
+    try {
+      applyBudget(await api.getBudget(budgetId))
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }, [budgetId, applyBudget])
+  const loadBudget = useCallback(() => {
+    void reloadBudget()
+  }, [reloadBudget])
   const loadProjects = useCallback(() => {
     if (!departmentId) return
     api
@@ -106,6 +123,35 @@ export default function BudgetEditPage() {
   useEffect(loadElements, [loadElements])
 
   if (!departmentId || !budgetId) return null
+
+  /**
+   * 予算への保存(明細の保存・削除・明細名の変更・承認)を待ち行列に入れて 1 つずつ送る。
+   * send には、送る時点で画面が持つ更新番号を渡す。受け付けたら表示と持つ更新番号を応答で置き換える。
+   * 衝突(409)なら予算を読み込み直し、拒否された入力を入力欄から消してから、エラーを呼び出し元へ投げる
+   * (呼び出し元が応答のメッセージをトーストに出す。FR-4.18・FR-4.19)。
+   */
+  const save = (send: (updateNumber: number) => Promise<BudgetDetail>): Promise<BudgetDetail> => {
+    const run = saveQueue.current.then(async () => {
+      try {
+        const updated = await send(updateNumber.current)
+        applyBudget(updated)
+        return updated
+      } catch (err) {
+        if (isConflict(err)) {
+          setEdits({})
+          setMonthlyTarget(null)
+          setRenamingDetail(null)
+          setDetailName({})
+          setDetailAmount({})
+          await reloadBudget()
+        }
+        throw err
+      }
+    })
+    saveQueue.current = run.catch(() => undefined)
+    return run
+  }
+
   const editable = budget?.status === 'Draft'
   const lines = budget?.lines ?? []
   const elementName = (code: string | null) =>
@@ -118,23 +164,34 @@ export default function BudgetEditPage() {
       return next
     })
 
+  // 編集中のセルの値が、保存に送った値のままなら編集中の値を消す(保存の応答を待つ間に打ち直した値は残す)。
+  const clearEditIfUnchanged = (key: string, sent: string) =>
+    setEdits((prev) => {
+      if (prev[key] !== sent) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+
   // 編集中セルの値を、変更があったときだけ upsert / 削除する共通処理。
+  // 送る更新番号は、待ち行列の順番が来た時点で画面が持つ値(updateNumber)。
   const saveCell = async (
     key: string,
     current: number,
-    upsert: (amount: number) => Promise<BudgetDetail>,
-    remove: () => Promise<BudgetDetail>,
+    upsert: (amount: number, updateNumber: number) => Promise<BudgetDetail>,
+    remove: (updateNumber: number) => Promise<BudgetDetail>,
   ) => {
     if (!(key in edits)) return
-    const action = cellAction(edits[key], current)
+    const sent = edits[key]
+    const action = cellAction(sent, current)
     if (action.kind === 'none') {
       clearEdit(key)
       return
     }
     setError(null)
     try {
-      setBudget(await (action.kind === 'upsert' ? upsert(action.amount) : remove()))
-      clearEdit(key)
+      await save((n) => (action.kind === 'upsert' ? upsert(action.amount, n) : remove(n)))
+      clearEditIfUnchanged(key, sent)
     } catch (err) {
       setError((err as Error).message)
     }
@@ -155,8 +212,8 @@ export default function BudgetEditPage() {
     saveCell(
       projectKey(projectId, category),
       projectAmount(projectId, category),
-      (amount) => api.upsertBudgetLine(budgetId, { category, projectId, amount }),
-      () => api.removeBudgetLine(budgetId, category, projectId, null),
+      (amount, n) => api.upsertBudgetLine(budgetId, n, { category, projectId, amount }),
+      (n) => api.removeBudgetLine(budgetId, n, category, projectId, null),
     )
   const projectProfit = (projectId: string): number => projectProfitOf(lines, projectId)
   // 案件粗利率 = 損益 ÷ 売上高。売上高が0なら「—」。
@@ -172,9 +229,9 @@ export default function BudgetEditPage() {
     saveCell(
       periodKey(code),
       periodAmount(code),
-      (amount) =>
-        api.upsertBudgetLine(budgetId, { category: 'PeriodCost', elementCode: code, amount }),
-      () => api.removeBudgetLine(budgetId, 'PeriodCost', null, code),
+      (amount, n) =>
+        api.upsertBudgetLine(budgetId, n, { category: 'PeriodCost', elementCode: code, amount }),
+      (n) => api.removeBudgetLine(budgetId, n, 'PeriodCost', null, code),
     )
 
   // 費目内の明細名つきの明細(名前順)と、費目の小計(費目一括 + 明細)。
@@ -187,14 +244,14 @@ export default function BudgetEditPage() {
     saveCell(
       periodDetailKey(code, detail),
       findLine('PeriodCost', null, code, detail)?.amount ?? 0,
-      (amount) =>
-        api.upsertBudgetLine(budgetId, {
+      (amount, n) =>
+        api.upsertBudgetLine(budgetId, n, {
           category: 'PeriodCost',
           elementCode: code,
           amount,
           periodDetail: detail,
         }),
-      () => api.removeBudgetLine(budgetId, 'PeriodCost', null, code, detail),
+      (n) => api.removeBudgetLine(budgetId, n, 'PeriodCost', null, code, detail),
     )
 
   // 費目の明細の折りたたみを切り替える。
@@ -232,10 +289,11 @@ export default function BudgetEditPage() {
     setSavingRename(true)
     setError(null)
     try {
-      setBudget(
-        await api.renamePeriodDetail(budgetId, {
-          elementCode: renamingDetail.code,
-          oldDetail: renamingDetail.oldName,
+      const { code, oldName } = renamingDetail
+      await save((n) =>
+        api.renamePeriodDetail(budgetId, n, {
+          elementCode: code,
+          oldDetail: oldName,
           newDetail: newName,
         }),
       )
@@ -250,7 +308,7 @@ export default function BudgetEditPage() {
   const removePeriodDetail = async (code: string, detail: string) => {
     setError(null)
     try {
-      setBudget(await api.removeBudgetLine(budgetId, 'PeriodCost', null, code, detail))
+      await save((n) => api.removeBudgetLine(budgetId, n, 'PeriodCost', null, code, detail))
     } catch (err) {
       setError((err as Error).message)
     }
@@ -269,15 +327,16 @@ export default function BudgetEditPage() {
       // 費目一括の金額が入っている費目に明細を足す場合は、明細モードへ切り替えるため
       // 先に費目一括の明細を削除する(費目一括と明細は同一費目内で併用できないため)。
       if (findLine('PeriodCost', null, code, null)) {
-        await api.removeBudgetLine(budgetId, 'PeriodCost', null, code)
+        await save((n) => api.removeBudgetLine(budgetId, n, 'PeriodCost', null, code))
       }
-      const updated = await api.upsertBudgetLine(budgetId, {
-        category: 'PeriodCost',
-        elementCode: code,
-        amount,
-        periodDetail: name,
-      })
-      setBudget(updated)
+      await save((n) =>
+        api.upsertBudgetLine(budgetId, n, {
+          category: 'PeriodCost',
+          elementCode: code,
+          amount,
+          periodDetail: name,
+        }),
+      )
       setDetailName((prev) => ({ ...prev, [code]: '' }))
       setDetailAmount((prev) => ({ ...prev, [code]: '' }))
     } catch (err) {
@@ -321,18 +380,18 @@ export default function BudgetEditPage() {
     try {
       const monthlyAmounts = toMonthlyAmounts(half, monthlyEdits)
       const { category, projectId, elementCode, periodDetail } = monthlyTarget
-      const updated =
+      await save((n) =>
         Object.keys(monthlyAmounts).length === 0
-          ? await api.removeBudgetLine(budgetId, category, projectId, elementCode, periodDetail)
-          : await api.upsertBudgetLine(budgetId, {
+          ? api.removeBudgetLine(budgetId, n, category, projectId, elementCode, periodDetail)
+          : api.upsertBudgetLine(budgetId, n, {
               category,
               projectId,
               elementCode,
               amount: 0,
               monthlyAmounts,
               periodDetail,
-            })
-      setBudget(updated)
+            }),
+      )
       setMonthlyTarget(null)
     } catch (err) {
       setError((err as Error).message)
@@ -348,17 +407,17 @@ export default function BudgetEditPage() {
     try {
       const { category, projectId, elementCode, periodDetail } = monthlyTarget
       const total = findLine(category, projectId, elementCode, periodDetail)?.amount ?? 0
-      const updated =
+      await save((n) =>
         total > 0
-          ? await api.upsertBudgetLine(budgetId, {
+          ? api.upsertBudgetLine(budgetId, n, {
               category,
               projectId,
               elementCode,
               amount: total,
               periodDetail,
             })
-          : await api.removeBudgetLine(budgetId, category, projectId, elementCode, periodDetail)
-      setBudget(updated)
+          : api.removeBudgetLine(budgetId, n, category, projectId, elementCode, periodDetail),
+      )
       setMonthlyTarget(null)
     } catch (err) {
       setError((err as Error).message)
@@ -409,7 +468,7 @@ export default function BudgetEditPage() {
   const approve = async () => {
     setError(null)
     try {
-      setBudget(await api.approveBudget(budgetId))
+      await save((n) => api.approveBudget(budgetId, n))
     } catch (err) {
       setError((err as Error).message)
     }

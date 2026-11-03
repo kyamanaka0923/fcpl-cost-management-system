@@ -50,10 +50,19 @@ export const 明細 = (
 
 const error = (message: string, status = 400) => HttpResponse.json({ error: message }, { status })
 
+/** 承認済み・失効済みの予算への明細の保存・削除・明細名の変更の拒否の文言(BR-BUD-002)。 */
+const 編集の状態の文言 = '承認済み・失効済みの予算は編集できません。改定版を作成してください。'
+
+/** 保存の衝突(409)の文言(BR-BUD-008)。 */
+export const 衝突の文言 =
+  'ほかの画面でこの予算が更新されました。最新の内容を読み込み直しました。もう一度入力してください。'
+
 /**
  * 予算編集画面のための、メモリ上の偽バックエンド。
  * 明細の登録・削除・明細名の変更・承認・案件の追加と編集を受け付け、区分合計と計画損益を計算し直して返す。
  * 「1費目は費目一括か明細のどちらか」「承認済みは編集不可」「案件コードは課の中で一意」もサーバと同じく拒否する。
+ * 予算への保存(明細の登録・削除・明細名の変更・承認)は、サーバと同じ順(状態の拒否 → クエリ updateNumber が
+ * 予算の更新番号と違えば衝突の 409)で判定し、受け付けたら更新番号を 1 増やす(BR-BUD-008・SPEC-004)。
  */
 export class 偽の予算API {
   readonly requests: RecordedRequest[] = []
@@ -68,6 +77,7 @@ export class 偽の予算API {
       elements?: CostElement[]
       status?: BudgetDetail['status']
       fiscalHalf?: string
+      updateNumber?: number
     } = {},
   ) {
     this.projects = opts.projects ?? []
@@ -87,7 +97,53 @@ export class 偽の予算API {
       periodCostTotal: 0,
       plannedProfit: 0,
       lines: opts.lines ?? [],
+      updateNumber: opts.updateNumber ?? 1,
     })
+  }
+
+  /** 止めている保存の応答(応答を止める で止め、戻り値の関数で流す)。 */
+  private gate: Promise<void> | null = null
+
+  /**
+   * これから届く予算への保存の応答を止める(リクエストは記録してから待たせる)。
+   * 戻り値の関数を呼ぶと、止めていた応答を流し、以降は止めない。
+   */
+  応答を止める(): () => void {
+    let release!: () => void
+    this.gate = new Promise<void>((r) => (release = r))
+    return () => {
+      this.gate = null
+      release()
+    }
+  }
+
+  /** ほかの画面の保存が受け付けられたことにする(明細を書き換え、更新番号を 1 増やす)。 */
+  ほかの画面で保存する(change: (b: BudgetDetail) => BudgetDetail = (b) => b) {
+    this.budget = this.recalc({
+      ...change(this.budget),
+      updateNumber: this.budget.updateNumber + 1,
+    })
+  }
+
+  /**
+   * 予算への保存を判定する。状態の拒否・衝突ならエラー応答を、受け付けるなら null を返す。
+   * 応答を止めているときは、判定の前に流されるのを待つ(届いた順に、前の応答が返るまで書き込まない)。
+   */
+  private async 保存を判定する(
+    req: RecordedRequest,
+    stateMessage: string,
+  ): Promise<Response | null> {
+    if (this.gate) await this.gate
+    if (this.budget.status !== 'Draft') return error(stateMessage)
+    const sent = new URLSearchParams(req.query).get('updateNumber')
+    if (sent !== String(this.budget.updateNumber)) return error(衝突の文言, 409)
+    return null
+  }
+
+  /** 保存を受け付けて、更新番号を 1 増やした予算を返す。 */
+  private 受け付ける(next: BudgetDetail) {
+    this.budget = this.recalc({ ...next, updateNumber: this.budget.updateNumber + 1 })
+    return HttpResponse.json(this.budget)
   }
 
   /** 書き込み系のリクエストだけ(GET を除く)。 */
@@ -150,9 +206,10 @@ export class 偽の予算API {
       }),
 
       http.put('/api/budgets/:id/lines', async ({ request }) => {
-        const body = (await this.record(request)).body as LineBody
-        if (this.budget.status !== 'Draft')
-          return error('承認済みの予算は編集できません。改定版を作成してください。')
+        const req = await this.record(request)
+        const body = req.body as LineBody
+        const rejected = await this.保存を判定する(req, 編集の状態の文言)
+        if (rejected) return rejected
         if (body.category === 'PeriodCost') {
           const sameElement = this.budget.lines.filter(
             (l) => l.category === 'PeriodCost' && l.elementCode === body.elementCode,
@@ -174,15 +231,16 @@ export class 偽の予算API {
           periodDetail: body.periodDetail ?? null,
           monthlyAmounts: monthly,
         })
-        this.budget = this.recalc({
+        if (body.amount < 0) return error('金額は0以上で入力してください。')
+        return this.受け付ける({
           ...this.budget,
           lines: [...this.budget.lines.filter((l) => !this.same(l, body)), next],
         })
-        return HttpResponse.json(this.budget)
       }),
 
       http.delete('/api/budgets/:id/lines', async ({ request }) => {
-        await this.record(request)
+        const rejected = await this.保存を判定する(await this.record(request), 編集の状態の文言)
+        if (rejected) return rejected
         const q = new URL(request.url).searchParams
         const key: LineBody = {
           category: q.get('category') as BudgetCategory,
@@ -191,20 +249,22 @@ export class 偽の予算API {
           periodDetail: q.get('periodDetail'),
           amount: 0,
         }
-        this.budget = this.recalc({
+        return this.受け付ける({
           ...this.budget,
           lines: this.budget.lines.filter((l) => !this.same(l, key)),
         })
-        return HttpResponse.json(this.budget)
       }),
 
       http.post('/api/budgets/:id/rename-period-detail', async ({ request }) => {
-        const body = (await this.record(request)).body as {
+        const req = await this.record(request)
+        const body = req.body as {
           elementCode: string
           oldDetail: string
           newDetail: string
         }
-        this.budget = {
+        const rejected = await this.保存を判定する(req, 編集の状態の文言)
+        if (rejected) return rejected
+        return this.受け付ける({
           ...this.budget,
           lines: this.budget.lines.map((l) =>
             l.category === 'PeriodCost' &&
@@ -213,14 +273,20 @@ export class 偽の予算API {
               ? { ...l, periodDetail: body.newDetail }
               : l,
           ),
-        }
-        return HttpResponse.json(this.budget)
+        })
       }),
 
       http.post('/api/budgets/:id/approve', async ({ request }) => {
-        await this.record(request)
-        this.budget = { ...this.budget, status: 'Approved', approvedAt: '2026-04-02T00:00:00Z' }
-        return HttpResponse.json(this.budget)
+        const rejected = await this.保存を判定する(
+          await this.record(request),
+          'ドラフト状態の予算のみ承認できます。',
+        )
+        if (rejected) return rejected
+        return this.受け付ける({
+          ...this.budget,
+          status: 'Approved',
+          approvedAt: '2026-04-02T00:00:00Z',
+        })
       }),
 
       http.post('/api/departments/:id/projects', async ({ request }) => {

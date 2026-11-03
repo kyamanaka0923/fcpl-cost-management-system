@@ -912,7 +912,9 @@ export interface paths {
     get?: never
     put: {
       parameters: {
-        query?: never
+        query: {
+          updateNumber: number
+        }
         header?: never
         path: {
           budgetId: string
@@ -952,6 +954,15 @@ export interface paths {
             'application/json': components['schemas']['ErrorResponse']
           }
         }
+        /** @description Conflict */
+        409: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            'application/json': components['schemas']['ErrorResponse']
+          }
+        }
       }
     }
     post?: never
@@ -962,6 +973,7 @@ export interface paths {
           projectId?: string
           elementCode?: string
           periodDetail?: string
+          updateNumber: number
         }
         header?: never
         path: {
@@ -998,6 +1010,15 @@ export interface paths {
             'application/json': components['schemas']['ErrorResponse']
           }
         }
+        /** @description Conflict */
+        409: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            'application/json': components['schemas']['ErrorResponse']
+          }
+        }
       }
     }
     options?: never
@@ -1016,7 +1037,9 @@ export interface paths {
     put?: never
     post: {
       parameters: {
-        query?: never
+        query: {
+          updateNumber: number
+        }
         header?: never
         path: {
           budgetId: string
@@ -1056,6 +1079,15 @@ export interface paths {
             'application/json': components['schemas']['ErrorResponse']
           }
         }
+        /** @description Conflict */
+        409: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            'application/json': components['schemas']['ErrorResponse']
+          }
+        }
       }
     }
     delete?: never
@@ -1075,7 +1107,9 @@ export interface paths {
     put?: never
     post: {
       parameters: {
-        query?: never
+        query: {
+          updateNumber: number
+        }
         header?: never
         path: {
           budgetId: string
@@ -1104,6 +1138,15 @@ export interface paths {
         }
         /** @description Not Found */
         404: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            'application/json': components['schemas']['ErrorResponse']
+          }
+        }
+        /** @description Conflict */
+        409: {
           headers: {
             [name: string]: unknown
           }
@@ -1519,6 +1562,8 @@ export interface components {
       /** Format: double */
       plannedProfit: number
       lines: components['schemas']['BudgetLineDto'][]
+      /** Format: int32 */
+      updateNumber: number
     }
     BudgetLineDto: {
       /** Format: uuid */
@@ -1559,6 +1604,8 @@ export interface components {
       periodCostTotal: number
       /** Format: double */
       plannedProfit: number
+      /** Format: int32 */
+      updateNumber: number
     }
     CategoryComparisonDto: {
       category: string

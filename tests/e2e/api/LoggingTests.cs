@@ -68,10 +68,11 @@ public class ログ出力のE2E
         var deptId = dept.GetProperty("id").GetString();
         var budget = await Post($"/api/departments/{deptId}/budgets", new { fiscalHalf = "2026-H1", label = "当初予算" });
         var budgetId = budget.GetProperty("id").GetString();
-        var line = await client.PutAsJsonAsync($"/api/budgets/{budgetId}/lines",
+        var line = await client.PutAsJsonAsync(
+            await 更新番号.読んで付ける(client, budgetId!, $"/api/budgets/{budgetId}/lines"),
             new { category = "PeriodCost", elementCode = "PERSONNEL", amount = 100 }, Json);
         Assert.Equal(HttpStatusCode.OK, line.StatusCode);
-        await Post($"/api/budgets/{budgetId}/approve", new { });
+        await Post(await 更新番号.読んで付ける(client, budgetId!, $"/api/budgets/{budgetId}/approve"), new { });
         return budgetId!;
     }
 
@@ -103,6 +104,24 @@ public class ログ出力のE2E
         Assert.Contains("responded 404", request.Message);
         Assert.Equal("anonymous", request.Scope["User"]);
         Assert.False(string.IsNullOrEmpty(request.Scope["RequestId"]?.ToString()));
+    }
+
+    [Fact]
+    public async Task 保存の衝突は409として理由つきで記録される()
+    {
+        var (api, logs) = 起動(new ApiFixture());
+        using var _ = api;
+        var client = api.CreateClient();
+        var budgetId = await 承認済み予算を作る(client);
+        var draft = await client.PostAsJsonAsync(
+            $"/api/departments/{(await (await client.GetAsync($"/api/budgets/{budgetId}")).Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("departmentId")}/budgets",
+            new { fiscalHalf = "2026-H1", label = "見直し" }, Json);
+        var draftId = (await draft.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("id").GetString();
+
+        var res = await client.PostAsJsonAsync($"/api/budgets/{draftId}/approve?updateNumber=99", new { }, Json);
+
+        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+        Assert.Contains(logs.ログ, l => l.EventId == 2004 && l.Message.Contains("ほかの画面でこの予算が更新されました"));
     }
 
     [Fact]

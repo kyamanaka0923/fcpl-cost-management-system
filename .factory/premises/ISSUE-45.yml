@@ -1,7 +1,7 @@
 issue: 45
-stage: spec
+stage: impl
 factory_version: factory-v1
-recorded_at: 2026-11-03T11:23:19+09:00
+recorded_at: 2026-11-03T15:21:58+09:00
 premises:
   - path: requirements/budget/FR-4.15.md
     blob: 755f01cd3694b81ee092aa942f2462326b35f348
@@ -53,3 +53,7 @@ premises:
     blob: 8735923528cf6ab4cde1b7c59761fee51cc9180c
   - path: specs/README.md
     blob: 8867889c0de75d3f0433b6bf4cca96113af727f6
+  - path: specs/rules/SPEC-004.md
+    blob: c2cd2879cce9ee4d435f922d8604779e02351d9e
+  - path: specs/api/ISSUE-45.openapi.json
+    blob: 482cc6f480f9c491ca4fab3b55d7111d0790973d

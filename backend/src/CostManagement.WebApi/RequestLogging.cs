@@ -24,6 +24,10 @@ public static partial class RequestLogging
         Message = "Requested resource was not found (404): {Reason}")]
     public static partial void ResourceNotFound(ILogger logger, string reason);
 
+    [LoggerMessage(EventId = 2004, EventName = "SaveConflicted", Level = LogLevel.Information,
+        Message = "Save rejected as a conflict with another accepted save (409): {Reason}")]
+    public static partial void SaveConflicted(ILogger logger, string reason);
+
     /// <summary>
     /// Adds the request logging middleware. Must run after authentication so the user is known.
     /// The user is the token's "username" claim, or "anonymous" when not authenticated.

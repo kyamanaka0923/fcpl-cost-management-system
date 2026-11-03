@@ -189,8 +189,9 @@ public sealed class DepartmentBudgetService
             sibling.Supersede();
 
         await _budgets.ApproveAsync(budget, updateNumber, superseded, ct);
+        var supersededVersions = superseded.Select(b => b.Version).ToList();
         _logger.BudgetApproved(budget.Id.Value, budget.DepartmentId.Value, budget.FiscalHalf,
-            budget.Version, superseded.Select(b => b.Version).ToList());
+            budget.Version, supersededVersions);
         return ToDetailDto(budget);
     }
 

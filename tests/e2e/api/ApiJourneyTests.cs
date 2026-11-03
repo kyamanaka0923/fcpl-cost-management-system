@@ -26,16 +26,29 @@ public class 業務フロー全体のE2E : IDisposable
     private async Task<JsonElement> PostAsync(string path, object body,
         HttpStatusCode expected = HttpStatusCode.Created)
     {
-        var res = await _client.PostAsJsonAsync(path, body, Json);
+        var res = await _client.PostAsJsonAsync(await 読んだ更新番号を付ける(path), body, Json);
         Assert.Equal(expected, res.StatusCode);
         return await res.Content.ReadFromJsonAsync<JsonElement>(Json);
     }
 
     private async Task<JsonElement> PutAsync(string path, object body)
     {
-        var res = await _client.PutAsJsonAsync(path, body, Json);
+        var res = await _client.PutAsJsonAsync(await 読んだ更新番号を付ける(path), body, Json);
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         return await res.Content.ReadFromJsonAsync<JsonElement>(Json);
+    }
+
+    /// <summary>
+    /// 予算への保存(/api/budgets/{id}/…)なら、直前に予算を読んだ更新番号をクエリ updateNumber に付ける。
+    /// それ以外のパスはそのまま返す。
+    /// </summary>
+    private async Task<string> 読んだ更新番号を付ける(string path)
+    {
+        const string prefix = "/api/budgets/";
+        if (!path.StartsWith(prefix, StringComparison.Ordinal))
+            return path;
+        var budgetId = path[prefix.Length..].Split('/')[0];
+        return await 更新番号.読んで付ける(_client, budgetId, path);
     }
 
     private async Task<JsonElement> GetAsync(string path)
@@ -267,7 +280,8 @@ public class エラー応答のE2E : IDisposable
             new { fiscalHalf = "2026-H1", label = "空の予算" });
         var budgetId = (await budget.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("id").GetString();
-        var res = await _client.PostAsJsonAsync($"/api/budgets/{budgetId}/approve", new { });
+        var res = await _client.PostAsJsonAsync(
+            await 更新番号.読んで付ける(_client, budgetId!, $"/api/budgets/{budgetId}/approve"), new { });
 
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
         var body = await res.Content.ReadFromJsonAsync<JsonElement>();

@@ -60,7 +60,7 @@ describe('予算編集画面: 期間費用の明細', () => {
 
     await screen.findByText('└ AWS')
     expect(fake.writes.map((r) => r.method)).toEqual(['DELETE', 'PUT']) // 混在はサーバが拒否するため順序が大事
-    expect(fake.writes[0].query).toBe('?category=PeriodCost&elementCode=LICENSE')
+    expect(fake.writes[0].query).toBe('?category=PeriodCost&elementCode=LICENSE&updateNumber=1')
     expect(タイル('期間費用')).toHaveTextContent('¥250,000')
   })
 
@@ -139,7 +139,7 @@ describe('予算編集画面: 期間費用の明細', () => {
 
     await waitFor(() => expect(明細行('GitHub')).not.toBeInTheDocument())
     expect(fake.writes[0].query).toBe(
-      '?category=PeriodCost&elementCode=LICENSE&periodDetail=GitHub',
+      '?category=PeriodCost&elementCode=LICENSE&periodDetail=GitHub&updateNumber=1',
     )
     expect(タイル('期間費用')).toHaveTextContent('¥300,000')
   })

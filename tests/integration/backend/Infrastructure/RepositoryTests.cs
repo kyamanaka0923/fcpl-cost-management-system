@@ -155,9 +155,9 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         var repo = new DepartmentBudgetRepository(_fx.Factory);
 
         var budget = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
-        budget.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(1_234_567m));
-        budget.UpsertPeriodCostLine(new CostElementCode("PERSONNEL"), new Money(300_000m));
-        budget.Approve(_fx.Now);
+        budget.UpsertProjectLine(budget.UpdateNumber, BudgetCategory.Revenue, project.Id, new Money(1_234_567m));
+        budget.UpsertPeriodCostLine(budget.UpdateNumber, new CostElementCode("PERSONNEL"), new Money(300_000m));
+        budget.Approve(budget.UpdateNumber, _fx.Now);
         await repo.AddAsync(budget);
 
         var restored = await repo.FindByIdAsync(budget.Id);
@@ -187,7 +187,7 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         var repo = new DepartmentBudgetRepository(_fx.Factory);
 
         var budget = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
-        budget.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(100.0m));
+        budget.UpsertProjectLine(budget.UpdateNumber, BudgetCategory.Revenue, project.Id, new Money(100.0m));
         await repo.AddAsync(budget);
 
         var restored = await repo.FindByIdAsync(budget.Id);
@@ -203,7 +203,7 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         var repo = new DepartmentBudgetRepository(_fx.Factory);
 
         var budget = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
-        budget.UpsertProjectLineMonthly(BudgetCategory.Revenue, project.Id,
+        budget.UpsertProjectLineMonthly(budget.UpdateNumber, BudgetCategory.Revenue, project.Id,
             new Dictionary<int, Money> { [1] = new(1_000_000m), [3] = new(500_000m) });
         await repo.AddAsync(budget);
 
@@ -238,8 +238,8 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         var repo = new DepartmentBudgetRepository(_fx.Factory);
 
         var budget = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
-        budget.UpsertPeriodCostLine(new CostElementCode("LICENSE"), new Money(300_000m), "AWS");
-        budget.UpsertPeriodCostLine(new CostElementCode("LICENSE"), new Money(200_000m), "GitHub");
+        budget.UpsertPeriodCostLine(budget.UpdateNumber, new CostElementCode("LICENSE"), new Money(300_000m), "AWS");
+        budget.UpsertPeriodCostLine(budget.UpdateNumber, new CostElementCode("LICENSE"), new Money(200_000m), "GitHub");
         await repo.AddAsync(budget);
 
         var restored = await repo.FindByIdAsync(budget.Id);
@@ -273,12 +273,13 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         var repo = new DepartmentBudgetRepository(_fx.Factory);
 
         var budget = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
-        budget.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(1_000_000m));
+        budget.UpsertProjectLine(budget.UpdateNumber, BudgetCategory.Revenue, project.Id, new Money(1_000_000m));
         await repo.AddAsync(budget);
+        var 読んだ更新番号 = budget.UpdateNumber;
 
-        budget.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(1_500_000m));
-        budget.UpsertProjectLine(BudgetCategory.Processing, project.Id, new Money(600_000m));
-        await repo.UpdateAsync(budget);
+        budget.UpsertProjectLine(budget.UpdateNumber, BudgetCategory.Revenue, project.Id, new Money(1_500_000m));
+        budget.UpsertProjectLine(budget.UpdateNumber, BudgetCategory.Processing, project.Id, new Money(600_000m));
+        await repo.UpdateAsync(budget, 読んだ更新番号);
 
         var restored = await repo.FindByIdAsync(budget.Id);
         Assert.Equal(2, restored!.Lines.Count);
@@ -293,15 +294,15 @@ public class リポジトリの永続化ラウンドトリップ : IDisposable
         var repo = new DepartmentBudgetRepository(_fx.Factory);
 
         var v1 = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
-        v1.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(1_000_000m));
-        v1.Approve(_fx.Now);
+        v1.UpsertProjectLine(v1.UpdateNumber, BudgetCategory.Revenue, project.Id, new Money(1_000_000m));
+        v1.Approve(v1.UpdateNumber, _fx.Now);
         await repo.AddAsync(v1);
 
         var v2 = DepartmentBudget.ReviseFrom(v1, 2, "見直し", _fx.Now);
-        v2.Approve(_fx.Now);
+        v2.Approve(v2.UpdateNumber, _fx.Now);
         await repo.AddAsync(v2);
         v1.Supersede();
-        await repo.UpdateAsync(v1);
+        await repo.UpdateAsync(v1, v1.UpdateNumber);
 
         var latest = await repo.FindLatestApprovedAsync(dept.Id, _fx.Half);
         Assert.Equal(2, latest!.Version);
@@ -400,8 +401,8 @@ public class 複数課の区分別合計の一括取得 : IDisposable
         var dept = await _fx.課を保存(code);
         var project = await _fx.案件を保存(dept.Id, $"PJ-{code}");
         var budget = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
-        budget.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(売上));
-        budget.Approve(_fx.Now);
+        budget.UpsertProjectLine(budget.UpdateNumber, BudgetCategory.Revenue, project.Id, new Money(売上));
+        budget.Approve(budget.UpdateNumber, _fx.Now);
         await new DepartmentBudgetRepository(_fx.Factory).AddAsync(budget);
         return dept;
     }
@@ -435,15 +436,15 @@ public class 複数課の区分別合計の一括取得 : IDisposable
         var repo = new DepartmentBudgetRepository(_fx.Factory);
 
         var budget = DepartmentBudget.CreateInitial(dept.Id, _fx.Half, "当初予算", _fx.Now);
-        budget.UpsertProjectLine(BudgetCategory.Revenue, pj1.Id, new Money(1_000_000m));
-        budget.UpsertProjectLine(BudgetCategory.Revenue, pj2.Id, new Money(1_500_000m));
+        budget.UpsertProjectLine(budget.UpdateNumber, BudgetCategory.Revenue, pj1.Id, new Money(1_000_000m));
+        budget.UpsertProjectLine(budget.UpdateNumber, BudgetCategory.Revenue, pj2.Id, new Money(1_500_000m));
         // 月次入力の明細は半期合計(月別の合計)で数える
-        budget.UpsertProjectLineMonthly(BudgetCategory.Processing, pj1.Id,
+        budget.UpsertProjectLineMonthly(budget.UpdateNumber, BudgetCategory.Processing, pj1.Id,
             new Dictionary<int, Money> { [1] = new(100_000m), [2] = new(200_000m) });
         // 期間費用は明細名で細分できる
-        budget.UpsertPeriodCostLine(new CostElementCode("PERSONNEL"), new Money(400_000m), "正社員");
-        budget.UpsertPeriodCostLine(new CostElementCode("PERSONNEL"), new Money(150_000m), "派遣");
-        budget.Approve(_fx.Now);
+        budget.UpsertPeriodCostLine(budget.UpdateNumber, new CostElementCode("PERSONNEL"), new Money(400_000m), "正社員");
+        budget.UpsertPeriodCostLine(budget.UpdateNumber, new CostElementCode("PERSONNEL"), new Money(150_000m), "派遣");
+        budget.Approve(budget.UpdateNumber, _fx.Now);
         await repo.AddAsync(budget);
 
         var totals = await repo.SumLatestApprovedByCategoryAsync([dept.Id], _fx.Half);
@@ -462,7 +463,7 @@ public class 複数課の区分別合計の一括取得 : IDisposable
         var repo = new DepartmentBudgetRepository(_fx.Factory);
 
         var draft = DepartmentBudget.CreateInitial(下書きのみ.Id, _fx.Half, "当初予算", _fx.Now);
-        draft.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(5_000_000m));
+        draft.UpsertProjectLine(draft.UpdateNumber, BudgetCategory.Revenue, project.Id, new Money(5_000_000m));
         await repo.AddAsync(draft);
         var 予算なし = await _fx.課を保存("DEV-3");
 
@@ -484,11 +485,11 @@ public class 複数課の区分別合計の一括取得 : IDisposable
 
         var v1 = (await repo.ListAsync(dept.Id, _fx.Half)).Single();
         var v2 = DepartmentBudget.ReviseFrom(v1, 2, "見直し", _fx.Now);
-        v2.UpsertProjectLine(BudgetCategory.Revenue, project.Id, new Money(4_000_000m));
-        v2.Approve(_fx.Now);
+        v2.UpsertProjectLine(v2.UpdateNumber, BudgetCategory.Revenue, project.Id, new Money(4_000_000m));
+        v2.Approve(v2.UpdateNumber, _fx.Now);
         await repo.AddAsync(v2);
         v1.Supersede();
-        await repo.UpdateAsync(v1);
+        await repo.UpdateAsync(v1, v1.UpdateNumber);
 
         var totals = await repo.SumLatestApprovedByCategoryAsync([dept.Id, other.Id], _fx.Half);
 

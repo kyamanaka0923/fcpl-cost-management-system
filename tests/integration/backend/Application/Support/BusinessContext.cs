@@ -1,5 +1,6 @@
 using System.Globalization;
 using CostManagement.Application.Common;
+using CostManagement.Domain.Budgeting;
 using CostManagement.Domain.Shared;
 using Reqnroll;
 
@@ -28,6 +29,12 @@ public sealed class 業務コンテキスト : IDisposable
     public DivisionBudgetSummaryDto? 部サマリ { get; set; }
     public string? 部サマリの半期 { get; set; }
 
+    /// <summary>
+    /// 予算を読み込んだ画面(BR-BUD-008)。画面名 → (読み込んだ予算の Id, 画面が持つ更新番号)。
+    /// 画面が持つ更新番号は、予算を読んだときか、その画面の保存の応答で受け取った値。
+    /// </summary>
+    public Dictionary<string, (Guid 予算Id, int 更新番号)> 画面 { get; } = new();
+
     /// <summary>「…しようとする」ステップで捕捉した業務エラー。「… を含むエラーになる」で検証する。</summary>
     public Exception? 直前のエラー { get; set; }
 
@@ -42,7 +49,7 @@ public sealed class 業務コンテキスト : IDisposable
     public BudgetDetailDto 予算() =>
         現在の予算 ?? throw new InvalidOperationException("対象の予算がありません。先に予算を起票してください。");
 
-    /// <summary>業務エラー(400/404 相当)になりうる操作を実行し、例外を記録する。</summary>
+    /// <summary>業務エラー(400/404/409 相当)になりうる操作を実行し、例外を記録する。</summary>
     public async Task 試行(Func<Task> action)
     {
         直前のエラー = null;
@@ -50,7 +57,7 @@ public sealed class 業務コンテキスト : IDisposable
         {
             await action();
         }
-        catch (Exception e) when (e is DomainException or NotFoundException)
+        catch (Exception e) when (e is DomainException or NotFoundException or BudgetConflictException)
         {
             直前のエラー = e;
         }

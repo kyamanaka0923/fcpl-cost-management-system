@@ -132,24 +132,28 @@ public class 課予算の性質
         }
     }
 
-    private static void 集約に適用(DepartmentBudget budget, 操作 op)
+    private static void 集約に適用(DepartmentBudget budget, 操作 op) =>
+        集約に適用(budget, op, budget.UpdateNumber);
+
+    /// <summary>操作を、画面が読んだ時点の更新番号として 送る番号 を付けて集約に適用する。</summary>
+    private static void 集約に適用(DepartmentBudget budget, 操作 op, int 送る番号)
     {
         switch (op)
         {
             case 案件明細を半期一括で登録(var c, var p, var a):
-                budget.UpsertProjectLine(c, p, new Money(a)); break;
+                budget.UpsertProjectLine(送る番号, c, p, new Money(a)); break;
             case 案件明細を月次で登録(var c, var p, var m):
-                budget.UpsertProjectLineMonthly(c, p, ToMoney(m)); break;
+                budget.UpsertProjectLineMonthly(送る番号, c, p, ToMoney(m)); break;
             case 期間費用を半期一括で登録(var e, var a, var d):
-                budget.UpsertPeriodCostLine(e, new Money(a), d); break;
+                budget.UpsertPeriodCostLine(送る番号, e, new Money(a), d); break;
             case 期間費用を月次で登録(var e, var m, var d):
-                budget.UpsertPeriodCostLineMonthly(e, ToMoney(m), d); break;
+                budget.UpsertPeriodCostLineMonthly(送る番号, e, ToMoney(m), d); break;
             case 案件明細を削除(var c, var p):
-                budget.RemoveProjectLine(c, p); break;
+                budget.RemoveProjectLine(送る番号, c, p); break;
             case 期間費用を削除(var e, var d):
-                budget.RemovePeriodCostLine(e, d); break;
+                budget.RemovePeriodCostLine(送る番号, e, d); break;
             case 明細名を変更(var e, var oldName, var newName):
-                budget.RenamePeriodCostDetail(e, oldName!, newName!); break;
+                budget.RenamePeriodCostDetail(送る番号, e, oldName!, newName!); break;
             default:
                 throw new InvalidOperationException($"未知の操作: {op}");
         }
@@ -248,6 +252,72 @@ public class 課予算の性質
         });
     }
 
+    /// <summary>
+    /// 送る番号のずれ。多くは 0(画面が読んだ番号のまま = 一致)、ときどき前後にずらして衝突を起こす。
+    /// </summary>
+    private static readonly Gen<int> 番号のずれ = Gen.Frequency(
+        (6, Gen.Const(0)), (1, Gen.Int[-3, -1]), (1, Gen.Int[1, 3]), (1, Gen.Const(int.MinValue / 2)));
+
+    /// <summary>編集操作のほかに、承認も混ぜる(承認のあとは状態の拒否が衝突より先に当たる)。</summary>
+    private sealed record 承認する : 操作;
+
+    private static readonly Gen<操作> 承認を含む任意の操作 =
+        Gen.Frequency((12, 任意の操作), (1, Gen.Const<操作>(new 承認する())));
+
+    [Fact]
+    public void 受け付けた保存だけが更新番号を1増やし拒否した保存は更新番号も状態も変えない()
+    {
+        Gen.Select(承認を含む任意の操作, 番号のずれ).List[1, 40].Sample(steps =>
+        {
+            var budget = DepartmentBudget.CreateInitial(対象課, 対象半期, "当初予算", 現在時刻);
+            var model = new Dictionary<明細キー, 明細モデル>();
+            var 承認済み = false;
+
+            foreach (var (op, ずれ) in steps)
+            {
+                var before = 状態(budget);
+                var 番号の前 = budget.UpdateNumber;
+                var 送る番号 = unchecked(番号の前 + ずれ);
+
+                // 期待する結果(BR-BUD-008 の判定の順): 状態の拒否 → 衝突の拒否 → ほかの拒否 → 受け付け
+                Type? 期待する拒否;
+                if (承認済み)
+                    期待する拒否 = typeof(DomainException);
+                else if (ずれ != 0)
+                    期待する拒否 = typeof(BudgetConflictException);
+                else if (op is 承認する)
+                    期待する拒否 = model.Count == 0 ? typeof(DomainException) : null;
+                else
+                    期待する拒否 = モデルに適用(model, op) ? null : typeof(DomainException);
+
+                var error = Record.Exception(() =>
+                {
+                    if (op is 承認する)
+                        budget.Approve(送る番号, 現在時刻);
+                    else
+                        集約に適用(budget, op, 送る番号);
+                });
+
+                if (期待する拒否 is null)
+                {
+                    Assert.Null(error);
+                    Assert.Equal(番号の前 + 1, budget.UpdateNumber);
+                    if (op is 承認する)
+                        承認済み = true;
+                }
+                else
+                {
+                    Assert.IsType(期待する拒否, error);
+                    Assert.Equal(番号の前, budget.UpdateNumber);
+                    Assert.Equal(before, 状態(budget));
+                }
+                Assert.Equal(承認済み ? BudgetStatus.Approved : BudgetStatus.Draft, budget.Status);
+                不変条件を確認(budget);
+                Assert.Equal(model.Keys.ToHashSet(), budget.Lines.Select(キー).ToHashSet());
+            }
+        });
+    }
+
     [Fact]
     public void 承認済みの予算はどの編集操作も拒否し状態を変えない()
     {
@@ -299,7 +369,7 @@ public class 課予算の性質
         {
             var restored = DepartmentBudget.Restore(budget.Id.Value, budget.DepartmentId.Value,
                 budget.FiscalHalf.ToString(), budget.Version, budget.Label, status,
-                budget.CreatedAt, budget.ApprovedAt,
+                budget.CreatedAt, budget.ApprovedAt, budget.UpdateNumber,
                 budget.Lines.Select(l => (l.Id, l.Category.ToString(), l.ProjectId?.Value,
                     l.ElementCode?.Value, l.PeriodDetail, l.Amount.Value,
                     (IReadOnlyDictionary<int, decimal>)l.MonthlyAmounts.ToDictionary(m => m.Key, m => m.Value.Value))));
@@ -307,6 +377,7 @@ public class 課予算の性質
             Assert.Equal(状態(budget), 状態(restored));
             Assert.Equal(status, restored.Status);
             Assert.Equal(budget.FiscalHalf, restored.FiscalHalf);
+            Assert.Equal(budget.UpdateNumber, restored.UpdateNumber);
         });
     }
 
@@ -317,18 +388,18 @@ public class 課予算の性質
         {
             if (budget.Lines.Count == 0)
             {
-                Assert.Throws<DomainException>(() => budget.Approve(現在時刻));
+                Assert.Throws<DomainException>(() => budget.Approve(budget.UpdateNumber, 現在時刻));
                 Assert.Equal(BudgetStatus.Draft, budget.Status);
                 return;
             }
             Assert.Throws<DomainException>(() => budget.Supersede()); // ドラフトは失効にできない
-            budget.Approve(現在時刻);
+            budget.Approve(budget.UpdateNumber, 現在時刻);
             Assert.Equal(現在時刻, budget.ApprovedAt);
-            Assert.Throws<DomainException>(() => budget.Approve(現在時刻)); // 二重承認不可
+            Assert.Throws<DomainException>(() => budget.Approve(budget.UpdateNumber, 現在時刻)); // 二重承認不可
             budget.Supersede();
             Assert.Equal(BudgetStatus.Superseded, budget.Status);
             Assert.Throws<DomainException>(() => budget.Supersede());
-            Assert.Throws<DomainException>(() => budget.Approve(現在時刻));
+            Assert.Throws<DomainException>(() => budget.Approve(budget.UpdateNumber, 現在時刻));
         });
     }
 }

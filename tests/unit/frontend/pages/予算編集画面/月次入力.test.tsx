@@ -63,7 +63,7 @@ describe('予算編集画面: 月次入力', () => {
     await waitFor(() => expect(fake.writes).toHaveLength(1))
     expect(fake.writes[0]).toMatchObject({
       method: 'DELETE',
-      query: '?category=Revenue&projectId=pa',
+      query: '?category=Revenue&projectId=pa&updateNumber=1',
     })
   })
 

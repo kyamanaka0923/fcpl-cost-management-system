@@ -81,7 +81,7 @@ public sealed class APIのステップ(APIコンテキスト ctx)
     {
         var row = table.Rows.Single();
         var project = 空ならnull(row["案件"]) is { } code ? ctx.案件Id(ctx.現在の課!, code) : null;
-        await ctx.送信(Put, $"/api/budgets/{予算Id()}/lines", new
+        await ctx.送信(Put, await 更新番号.読んで付ける(ctx.Client, 予算Id(), $"/api/budgets/{予算Id()}/lines"), new
         {
             category = 区分(row["区分"]),
             projectId = project,
@@ -94,7 +94,7 @@ public sealed class APIのステップ(APIコンテキスト ctx)
     [When("API で区分 {string} の案件 {string} を次の月別金額で登録しようとする:")]
     public async Task 月別金額で登録しようとする(string category, string project, DataTable table)
     {
-        await ctx.送信(Put, $"/api/budgets/{予算Id()}/lines", new
+        await ctx.送信(Put, await 更新番号.読んで付ける(ctx.Client, 予算Id(), $"/api/budgets/{予算Id()}/lines"), new
         {
             category = 区分(category),
             projectId = ctx.案件Id(ctx.現在の課!, project),
@@ -109,7 +109,7 @@ public sealed class APIのステップ(APIコンテキスト ctx)
         foreach (var row in table.Rows)
         {
             var project = 空ならnull(row["案件"]) is { } code ? ctx.案件Id(ctx.現在の課!, code) : null;
-            await ctx.成功する(Put, $"/api/budgets/{予算Id()}/lines", new
+            await ctx.成功する(Put, await 更新番号.読んで付ける(ctx.Client, 予算Id(), $"/api/budgets/{予算Id()}/lines"), new
             {
                 category = 区分(row["区分"]),
                 projectId = project,
@@ -121,7 +121,8 @@ public sealed class APIのステップ(APIコンテキスト ctx)
 
     /// <summary>承認は成否を問わず送る(明細のない予算のシナリオでも使う)。</summary>
     [StepDefinition("API で予算を承認する")]
-    public Task 予算を承認する() => ctx.送信(Post, $"/api/budgets/{予算Id()}/approve", new { });
+    public async Task 予算を承認する() => await ctx.送信(Post,
+        await 更新番号.読んで付ける(ctx.Client, 予算Id(), $"/api/budgets/{予算Id()}/approve"), new { });
 
     [Given("API で課 {string} の {string} に次の明細の承認済み予算がある:")]
     public async Task 承認済み予算がある(string department, string half, DataTable table)

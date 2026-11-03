@@ -31,6 +31,7 @@ public sealed class DatabaseInitializer
         MigrateDropProjectStatus(connection);
         MigrateAddActualMonth(connection);
         MigrateAddPeriodDetail(connection);
+        MigrateAddBudgetUpdateNumber(connection);
 
         connection.Execute("""
             CREATE TABLE IF NOT EXISTS divisions (
@@ -64,6 +65,7 @@ public sealed class DatabaseInitializer
             );
 
             -- fiscal_half は "2026-H1" 形式(FiscalHalf.ToString)。
+            -- update_number は楽観ロックの更新番号(BR-BUD-008)。保存を受け付けるたびに 1 増える。
             CREATE TABLE IF NOT EXISTS department_budgets (
                 id            TEXT PRIMARY KEY,
                 department_id TEXT NOT NULL REFERENCES departments(id),
@@ -73,6 +75,7 @@ public sealed class DatabaseInitializer
                 status        TEXT NOT NULL,
                 created_at    TEXT NOT NULL,
                 approved_at   TEXT NULL,
+                update_number INTEGER NOT NULL DEFAULT 1,
                 UNIQUE (department_id, fiscal_half, version)
             );
 
@@ -353,5 +356,24 @@ public sealed class DatabaseInitializer
             connection.Execute(
                 "ALTER TABLE actual_entries ADD COLUMN period_detail TEXT NOT NULL DEFAULT '';");
         }
+    }
+
+    /// <summary>
+    /// Adds the optimistic-lock column update_number to department_budgets (Issue #45, SPEC-004).
+    /// Existing rows start at 1. Idempotent: does nothing when the table is absent (a new DB gets the
+    /// column from CREATE TABLE) or the column already exists.
+    /// </summary>
+    private static void MigrateAddBudgetUpdateNumber(SqliteConnection connection)
+    {
+        var tableExists = connection.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'department_budgets'") > 0;
+        if (!tableExists)
+            return;
+        var hasColumn = connection.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM pragma_table_info('department_budgets') WHERE name = 'update_number'") > 0;
+        if (hasColumn)
+            return;
+        connection.Execute(
+            "ALTER TABLE department_budgets ADD COLUMN update_number INTEGER NOT NULL DEFAULT 1;");
     }
 }

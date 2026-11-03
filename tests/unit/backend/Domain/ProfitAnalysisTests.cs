@@ -29,13 +29,13 @@ public class ProfitAnalysisTests
         // 案件B: 売上200万 加工費80万 → 損益120万
         // 期間費用: 人件費70万
         var budget = DepartmentBudget.CreateInitial(Dept, Half, "当初予算", Now);
-        budget.UpsertProjectLine(BudgetCategory.Revenue, ProjectA, new Money(3_000_000m));
-        budget.UpsertProjectLine(BudgetCategory.Revenue, ProjectB, new Money(2_000_000m));
-        budget.UpsertProjectLine(BudgetCategory.Processing, ProjectA, new Money(1_000_000m));
-        budget.UpsertProjectLine(BudgetCategory.Processing, ProjectB, new Money(800_000m));
-        budget.UpsertProjectLine(BudgetCategory.Outsourcing, ProjectA, new Money(500_000m));
-        budget.UpsertPeriodCostLine(Personnel, new Money(700_000m));
-        budget.Approve(Now);
+        budget.UpsertProjectLine(budget.UpdateNumber, BudgetCategory.Revenue, ProjectA, new Money(3_000_000m));
+        budget.UpsertProjectLine(budget.UpdateNumber, BudgetCategory.Revenue, ProjectB, new Money(2_000_000m));
+        budget.UpsertProjectLine(budget.UpdateNumber, BudgetCategory.Processing, ProjectA, new Money(1_000_000m));
+        budget.UpsertProjectLine(budget.UpdateNumber, BudgetCategory.Processing, ProjectB, new Money(800_000m));
+        budget.UpsertProjectLine(budget.UpdateNumber, BudgetCategory.Outsourcing, ProjectA, new Money(500_000m));
+        budget.UpsertPeriodCostLine(budget.UpdateNumber, Personnel, new Money(700_000m));
+        budget.Approve(budget.UpdateNumber, Now);
         return budget;
     }
 
@@ -108,8 +108,8 @@ public class ProfitAnalysisTests
     public void 売上高が0のとき粗利率はnullになる()
     {
         var budget = DepartmentBudget.CreateInitial(Dept, Half, "当初予算", Now);
-        budget.UpsertPeriodCostLine(Personnel, new Money(700_000m));
-        budget.Approve(Now);
+        budget.UpsertPeriodCostLine(budget.UpdateNumber, Personnel, new Money(700_000m));
+        budget.Approve(budget.UpdateNumber, Now);
 
         var report = Analyze(budget);
 

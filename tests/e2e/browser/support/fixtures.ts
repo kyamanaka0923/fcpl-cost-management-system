@@ -37,6 +37,8 @@ export class 業務データ {
   private readonly 課 = new Map<string, 組織>()
   private readonly 案件 = new Map<string, string>() // `${課}/${案件名}` → 案件Id
   private 連番 = 0
+  /** 同じブラウザでもう 1 つ開いた画面(画面名 → ページ)。同じ予算への保存の衝突を確かめる(BR-BUD-008)。 */
+  readonly 画面 = new Map<string, Page>()
 
   constructor(private readonly request: APIRequestContext) {}
 
@@ -79,9 +81,10 @@ export class 業務データ {
     return res.json()
   }
 
-  private async put(path: string, data: unknown): Promise<void> {
+  private async put(path: string, data: unknown): Promise<{ updateNumber: number }> {
     const res = await this.request.put(path, { data })
     expect(res.ok(), `${path}: ${res.status()} ${await res.text()}`).toBeTruthy()
+    return res.json()
   }
 
   async 部と課を用意(division: string, department: string): Promise<void> {
@@ -114,19 +117,24 @@ export class 業務データ {
 
   async 承認済み予算を用意(department: string, lines: Record<string, string>[]): Promise<void> {
     const deptId = this.課を取得(department).id
-    const budget = await this.post(`/api/departments/${deptId}/budgets`, {
+    const budget = (await this.post(`/api/departments/${deptId}/budgets`, {
       fiscalHalf: 今期(),
       label: '当初予算',
-    })
+    })) as { id: string; updateNumber: number }
+    // 予算への保存には、直前の応答の更新番号を付ける(BR-BUD-008)
+    let updateNumber = budget.updateNumber
     for (const line of lines) {
-      await this.put(`/api/budgets/${budget.id}/lines`, {
-        category: 区分(line['区分']),
-        projectId: line['案件'] ? this.案件Id(department, line['案件']) : null,
-        elementCode: line['費目'] || null,
-        amount: Number(line['金額']),
-      })
+      ;({ updateNumber } = await this.put(
+        `/api/budgets/${budget.id}/lines?updateNumber=${updateNumber}`,
+        {
+          category: 区分(line['区分']),
+          projectId: line['案件'] ? this.案件Id(department, line['案件']) : null,
+          elementCode: line['費目'] || null,
+          amount: Number(line['金額']),
+        },
+      ))
     }
-    await this.post(`/api/budgets/${budget.id}/approve`, {})
+    await this.post(`/api/budgets/${budget.id}/approve?updateNumber=${updateNumber}`, {})
   }
 
   async 実績を用意(department: string, lines: Record<string, string>[]): Promise<void> {

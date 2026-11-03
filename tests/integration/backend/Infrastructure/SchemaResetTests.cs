@@ -632,3 +632,116 @@ public class 期間費用明細列追加マイグレーション : IDisposable
             "SELECT COUNT(*) FROM department_budget_line_months WHERE line_id = 'l1'"));
     }
 }
+
+/// <summary>
+/// 予算の更新番号の列(update_number)を足すマイグレーション(Issue #45・SPEC-004)。
+/// 現世代の予算の表に列を足し、すでにある行は 1 にする。データは消さない。
+/// </summary>
+public class 予算の更新番号列追加マイグレーション : IDisposable
+{
+    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _factory;
+
+    public 予算の更新番号列追加マイグレーション()
+    {
+        _dbPath = Path.Combine(Path.GetTempPath(), $"cm-updatenumber-{Guid.NewGuid():N}.db");
+        _factory = new SqliteConnectionFactory($"Data Source={_dbPath}");
+    }
+
+    public void Dispose()
+    {
+        if (File.Exists(_dbPath))
+            File.Delete(_dbPath);
+    }
+
+    /// <summary>update_number 列を持たない現世代の予算の表(明細・月別金額つき)の DB を作る。</summary>
+    private void 更新番号列なしのDBを作成()
+    {
+        using var conn = _factory.Create();
+        conn.Execute("""
+            CREATE TABLE divisions (
+                id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE TABLE departments (
+                id TEXT PRIMARY KEY, division_id TEXT NOT NULL, code TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE TABLE department_budgets (
+                id TEXT PRIMARY KEY, department_id TEXT NOT NULL, fiscal_half TEXT NOT NULL,
+                version INTEGER NOT NULL, label TEXT NOT NULL, status TEXT NOT NULL,
+                created_at TEXT NOT NULL, approved_at TEXT NULL,
+                UNIQUE (department_id, fiscal_half, version)
+            );
+            CREATE TABLE department_budget_lines (
+                id TEXT PRIMARY KEY,
+                budget_id TEXT NOT NULL REFERENCES department_budgets(id) ON DELETE CASCADE,
+                category TEXT NOT NULL, project_id TEXT NOT NULL DEFAULT '',
+                element_code TEXT NOT NULL DEFAULT '', period_detail TEXT NOT NULL DEFAULT '',
+                amount TEXT NOT NULL,
+                UNIQUE (budget_id, category, project_id, element_code, period_detail)
+            );
+            CREATE TABLE department_budget_line_months (
+                line_id TEXT NOT NULL REFERENCES department_budget_lines(id) ON DELETE CASCADE,
+                month INTEGER NOT NULL, amount TEXT NOT NULL, PRIMARY KEY (line_id, month)
+            );
+            INSERT INTO divisions VALUES ('v1', 'SALES', '営業本部', '2026-04-01');
+            INSERT INTO departments VALUES ('d1', 'v1', 'DEV-1', '開発1課', '2026-04-01');
+            INSERT INTO department_budgets VALUES ('b1', 'd1', '2026-H1', 1, '当初予算', 'Approved', '2026-04-01', '2026-04-02');
+            INSERT INTO department_budgets VALUES ('b2', 'd1', '2026-H1', 2, '見直し', 'Draft', '2026-05-01', NULL);
+            INSERT INTO department_budget_lines (id, budget_id, category, project_id, element_code, period_detail, amount)
+            VALUES ('l1', 'b2', 'PeriodCost', '', 'LICENSE', 'AWS', '250000');
+            INSERT INTO department_budget_line_months (line_id, month, amount) VALUES ('l1', 1, '250000');
+            """);
+    }
+
+    private bool 更新番号列がある()
+    {
+        using var conn = _factory.Create();
+        return conn.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM pragma_table_info('department_budgets') WHERE name = 'update_number'") > 0;
+    }
+
+    [Fact]
+    public void 更新番号列が無い予算の表は列が足されすでにある行は1になりデータは保持される()
+    {
+        更新番号列なしのDBを作成();
+        Assert.False(更新番号列がある());
+
+        new DatabaseInitializer(_factory).Initialize();
+
+        Assert.True(更新番号列がある());
+        using var conn = _factory.Create();
+        Assert.Equal([1L, 1L], conn.Query<long>(
+            "SELECT update_number FROM department_budgets ORDER BY version").ToList());
+        Assert.Equal("Approved", conn.ExecuteScalar<string>("SELECT status FROM department_budgets WHERE id = 'b1'"));
+        Assert.Equal("見直し", conn.ExecuteScalar<string>("SELECT label FROM department_budgets WHERE id = 'b2'"));
+        Assert.Equal("AWS", conn.ExecuteScalar<string>(
+            "SELECT period_detail FROM department_budget_lines WHERE id = 'l1'"));
+        Assert.Equal(1, conn.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM department_budget_line_months WHERE line_id = 'l1'"));
+    }
+
+    [Fact]
+    public void 移行は冪等で2回実行しても壊れず進んだ更新番号を戻さない()
+    {
+        更新番号列なしのDBを作成();
+        var initializer = new DatabaseInitializer(_factory);
+        initializer.Initialize();
+        using (var conn = _factory.Create())
+            conn.Execute("UPDATE department_budgets SET update_number = 5 WHERE id = 'b2'");
+
+        initializer.Initialize(); // 2回目は列があるため何もしない
+
+        using var check = _factory.Create();
+        Assert.Equal(5, check.ExecuteScalar<long>("SELECT update_number FROM department_budgets WHERE id = 'b2'"));
+        Assert.Equal(2, check.ExecuteScalar<long>("SELECT COUNT(*) FROM department_budgets"));
+    }
+
+    [Fact]
+    public void 新規DBの予算の表は最初から更新番号列を持つ()
+    {
+        new DatabaseInitializer(_factory).Initialize();
+
+        Assert.True(更新番号列がある());
+    }
+}
