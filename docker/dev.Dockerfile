@@ -1,6 +1,6 @@
 # 開発・ビルド・テスト共用イメージ(.NET 10 SDK + Node.js 22)
 # VS Code Dev Containers と docker-compose.yml の両方から利用する。
-FROM mcr.microsoft.com/dotnet/sdk:10.0
+FROM mcr.microsoft.com/dotnet/sdk:11.0
 
 # Node.js 22 と開発ツール
 RUN apt-get update \
